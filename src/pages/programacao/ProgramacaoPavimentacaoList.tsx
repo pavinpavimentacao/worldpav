@@ -73,7 +73,7 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
             </div>
             <div className="flex gap-3">
               <ExportProgramacaoPDF programacoes={programacoesFiltradas} />
-              <Button onClick={() => navigate('/programacao/nova')} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => navigate('/programacao-pavimentacao/nova')} className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Programação
               </Button>
@@ -181,7 +181,7 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
                 : 'Comece criando sua primeira programação'}
             </p>
             {!searchTerm && !selectedDate && (
-              <Button onClick={() => navigate('/programacao/nova')} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => navigate('/programacao-pavimentacao/nova')} className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Programação
               </Button>

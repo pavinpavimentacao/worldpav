@@ -307,7 +307,7 @@ export default function Dashboard() {
               <h3 className="text-lg leading-6 font-medium text-gray-900">
                 Programação de Hoje
               </h3>
-              <Link to="/programacao">
+              <Link to="/programacao-pavimentacao">
                 <span className="text-sm text-primary-600 hover:text-primary-800">
                   Ver programação completa →
                 </span>
@@ -346,7 +346,7 @@ export default function Dashboard() {
               <h3 className="text-lg leading-6 font-medium text-gray-900">
                 Programação de Amanhã
               </h3>
-              <Link to="/programacao">
+              <Link to="/programacao-pavimentacao">
                 <span className="text-sm text-primary-600 hover:text-primary-800">
                   Ver programação completa →
                 </span>

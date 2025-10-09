@@ -82,7 +82,7 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
 
       // Redirecionar após 2 segundos
       setTimeout(() => {
-        navigate('/programacao');
+        navigate('/programacao-pavimentacao');
       }, 2000);
     } catch (error: any) {
       console.error('Erro ao criar programação:', error);

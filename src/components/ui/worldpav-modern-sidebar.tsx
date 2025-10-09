@@ -36,7 +36,7 @@ const navigationItems: NavigationItem[] = [
   { id: "dashboard", name: "Dashboard", icon: LayoutDashboard, href: "/" },
   { id: "clientes", name: "Clientes", icon: Users, href: "/clients" },
   { id: "obras", name: "Obras", icon: Construction, href: "/obras" },
-  { id: "programacao", name: "Programação", icon: Calendar, href: "/programacao" },
+  { id: "programacao", name: "Programação", icon: Calendar, href: "/programacao-pavimentacao" },
   { id: "colaboradores", name: "Colaboradores", icon: UserCheck, href: "/colaboradores" },
   { id: "relatorios-diarios", name: "Relatórios Diários", icon: ClipboardList, href: "/relatorios-diarios" },
   { id: "financeiro", name: "Financeiro", icon: Calculator, href: "/financial" },
@@ -54,7 +54,7 @@ export function WorldPavModernSidebar({ className = "", onNavigate }: WorldPavMo
     if (path === '/') return 'dashboard';
     if (path.startsWith('/clients')) return 'clientes';
     if (path.startsWith('/obras')) return 'obras';
-    if (path.startsWith('/programacao')) return 'programacao';
+    if (path.startsWith('/programacao-pavimentacao')) return 'programacao';
     if (path.startsWith('/colaboradores')) return 'colaboradores';
     if (path.startsWith('/relatorios-diarios')) return 'relatorios-diarios';
     if (path.startsWith('/financial')) return 'financeiro';
