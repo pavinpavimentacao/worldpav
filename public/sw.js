@@ -45,8 +45,22 @@ self.addEventListener('activate', function(event) {
 
 // Interceptar requisições
 self.addEventListener('fetch', function(event) {
-  // Ignorar requisições que não são GET ou que são para APIs externas
-  if (event.request.method !== 'GET' || event.request.url.includes('supabase.co')) {
+  const url = event.request.url;
+  
+  // Ignorar requisições que não devem ser cacheadas:
+  // - Não são GET
+  // - APIs externas (Supabase)
+  // - Vite dev server (desenvolvimento)
+  // - Hot Module Replacement
+  if (
+    event.request.method !== 'GET' || 
+    url.includes('supabase.co') ||
+    url.includes('/@vite/') ||
+    url.includes('/@react-refresh') ||
+    url.includes('/@fs/') ||
+    url.includes('.hot-update.') ||
+    url.includes('localhost') && (url.includes('/@') || url.includes('/__'))
+  ) {
     return;
   }
 
@@ -54,9 +68,14 @@ self.addEventListener('fetch', function(event) {
     caches.match(event.request)
       .then(function(response) {
         // Retornar do cache ou buscar da rede
-        return response || fetch(event.request).catch(() => {
-          // Se falhar, não retornar nada (evita erros no console)
-          console.log('Falha ao buscar:', event.request.url);
+        if (response) {
+          return response;
+        }
+        
+        return fetch(event.request).catch((error) => {
+          console.log('Falha ao buscar:', event.request.url, error);
+          // Retornar resposta vazia em caso de erro
+          return new Response('', { status: 404, statusText: 'Not Found' });
         });
       })
   );

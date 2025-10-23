@@ -28,7 +28,8 @@
     
     <!-- Service Worker Registration -->
     <script>
-      if ('serviceWorker' in navigator) {
+      // Registrar Service Worker apenas em produção
+      if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
@@ -38,6 +39,16 @@
               console.log('Falha no registro do SW:', registrationError);
             });
         });
+      } else if (window.location.hostname === 'localhost') {
+        // Em desenvolvimento, desregistrar qualquer SW existente
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            registrations.forEach((registration) => {
+              registration.unregister();
+              console.log('SW desregistrado em desenvolvimento');
+            });
+          });
+        }
       }
     </script>
   </body>
