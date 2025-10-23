@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Select } from '../ui/Select';
+import { Select } from '../ui/select';
 import { supabase } from '../../lib/supabase';
 import { toast } from '../../lib/toast-hooks';
 import {

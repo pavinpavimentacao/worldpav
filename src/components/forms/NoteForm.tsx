@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
 import { DatePicker } from '../ui/date-picker';
 import { ApiService } from '../../lib/api';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 import { FormField } from '../shared/FormField';
 import { formatCurrency } from '../../utils/format';
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 import { formatCurrency } from '../../utils/format';
 import { formatDateSafe } from '../../utils/date-utils';
 import { NotaFiscalDetailsModal } from '../modals/NotaFiscalDetailsModal';

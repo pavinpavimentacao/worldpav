@@ -13,7 +13,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { CurrencyInput } from '../ui/CurrencyInput';
+import { CurrencyInput } from '../ui/currency-input';
 import { DatePicker } from '../ui/date-picker';
 import {
   Select,

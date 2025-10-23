@@ -1,7 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Button } from '../ui/Button'
-import { Badge } from '../ui/Badge'
+import { Button } from '../ui/button'
+import { Badge } from '../ui/badge'
 import { formatDateToBR } from '../../utils/date-utils'
 import { ObraWithProgress, formatVolume, formatValorPorUnidade, getUnidadeLabel } from '../../types/obras'
 import { 

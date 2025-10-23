@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Button } from '../ui/Button'
-import { Select } from '../ui/Select'
+import { Button } from '../ui/button'
+import { Select } from '../ui/select'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { CurrencyInput } from '../ui/currency-input'

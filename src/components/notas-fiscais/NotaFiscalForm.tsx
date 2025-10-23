@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 import { FormField } from '../shared/FormField';
 import { CurrencyInputWithValidation } from '../inputs/validation/CurrencyInputWithValidation';
 import { getCurrentDateString } from '../../utils/date-utils';

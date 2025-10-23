@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { formatDateSafe } from '../../utils/date-utils';
 import type { Database } from '../../lib/supabase';

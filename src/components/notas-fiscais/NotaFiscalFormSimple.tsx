@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Button } from '../ui/Button';
+import { Button } from '../ui/button';
 import { DatePicker } from '../ui/date-picker';
 import { getCurrentDateString } from '../../utils/date-utils';
 
