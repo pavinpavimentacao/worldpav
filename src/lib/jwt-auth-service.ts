@@ -60,7 +60,7 @@ export class JWTAuthService {
 
       // Busca dados do usuário na tabela users
       const { data: userData, error: userError } = await supabase
-        .from('users')
+        .from('profiles')
         .select('id, email, full_name, company_id')
         .eq('id', authData.user.id)
         .single()
@@ -164,7 +164,7 @@ export class JWTAuthService {
 
       // Cria entrada na tabela users
       const { error: userError } = await supabase
-        .from('users')
+        .from('profiles')
         .insert({
           id: authData.user.id,
           email: data.email,
@@ -213,7 +213,7 @@ export class JWTAuthService {
       
       // Busca dados atualizados do usuário
       const { data: userData, error: userError } = await supabase
-        .from('users')
+        .from('profiles')
         .select('id, email, full_name, company_id')
         .eq('id', decoded.userId)
         .single()

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { ObraCard } from '../../components/ObraCard'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { ObraCard } from "../../components/cards/ObraCard"
 import { formatDateToBR } from '../../utils/date-utils'
 import { getObrasByCliente, getAllObrasWithProgress } from '../../types/obras'
 import { 

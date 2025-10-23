@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { DatePicker } from '../../components/ui/date-picker';
-import { Select } from '../../components/Select'
+import { Select } from "../../components/shared/Select"
 import { usePagamentosReceber } from '../../lib/pagamentos-receber-api'
 import { PagamentoReceberCompleto, FormaPagamento, UpdatePagamentoReceberData } from '../../types/pagamentos-receber'
 import { toast } from '../../lib/toast-hooks'
-import { Loading } from '../../components/Loading'
+import { Loading } from "../../components/shared/Loading"
 import { GenericError } from '../errors/GenericError'
 import { formatDateToBR } from '../../utils/date-utils'
 

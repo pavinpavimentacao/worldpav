@@ -72,7 +72,7 @@ export function SidebarDemo() {
           <div>
             <SidebarLink
               link={{
-                label: "Félix Mix",
+                label: "WorldPav",
                 href: "/profile",
                 icon: (
                   <div className="h-7 w-7 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
@@ -101,7 +101,7 @@ export const Logo = () => {
         animate={{ opacity: 1 }}
         className="font-medium text-black dark:text-white whitespace-pre"
       >
-        Félix Mix
+        WorldPav
       </motion.span>
     </Link>
   );

@@ -1,6 +1,6 @@
 import { Calendar, DollarSign, TrendingDown, Ruler, Weight, ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { KpiCard } from '../KpiCard'
+import { KpiCard } from '../cards/KpiCard'
 import { ProximaProgramacaoCard } from './ProximaProgramacaoCard'
 import { ProgramacaoListItem } from './ProgramacaoListItem'
 import type { DashboardData } from '../../types/dashboard-pavimentacao'

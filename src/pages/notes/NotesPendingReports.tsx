@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
-import { Table } from '../../components/Table';
-import { NoteForm } from '../../components/NoteForm';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
+import { Table } from "../../components/shared/Table";
+import { NoteForm } from "../../components/forms/NoteForm";
 import { formatCurrency, formatDate } from '../../utils/format';
 
 // Tipo para relatórios pendentes (assumindo estrutura da view)
@@ -12,7 +12,7 @@ interface PendingReport {
   report_number: string;
   created_at: string;
   responsible_name: string;
-  pump_prefix: string;
+
   total_value: number;
   client_name: string;
   company_name: string;
@@ -145,11 +145,9 @@ export const NotesPendingReports: React.FC = () => {
       )
     },
     {
-      key: 'pump_prefix',
       label: 'Bomba',
       render: (report: PendingReport) => (
         <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
-          {report.pump_prefix}
         </span>
       )
     },
@@ -263,7 +261,6 @@ export const NotesPendingReports: React.FC = () => {
                 initialData={{
                   company_name: selectedReport.client_name,
                   nf_value: selectedReport.total_value,
-                  descricao: `Serviços de bomba ${selectedReport.pump_prefix} - ${selectedReport.total_hours}h`,
                   report_id: selectedReport.id
                 }}
                 onSuccess={handleFormSuccess}

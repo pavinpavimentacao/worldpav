@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Users, Building } from 'lucide-react'
-import { Select } from '../Select'
+import { Select } from "../shared/Select"
 import { EquipeSelecionavel } from '../../types/relatorios-diarios'
 import { getEquipesParceiros } from '../../lib/parceirosApi'
 

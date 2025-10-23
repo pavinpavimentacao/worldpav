@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
-import { FileDownloadButton } from '../../components/FileDownloadButton';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
+import { FileDownloadButton } from "../../components/exports/FileDownloadButton";
 import { formatCurrency, formatDate, formatPhone, formatDocument, formatCEP } from '../../utils/format';
 import type { Database } from '../../lib/supabase';
 

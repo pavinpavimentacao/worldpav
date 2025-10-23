@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Fuel, Edit, Trash2, TrendingDown } from 'lucide-react'
-import { Button } from '../Button'
+import { Button } from "../shared/Button"
 import { AdicionarDieselModal } from './AdicionarDieselModal'
 import { useToast } from '../../lib/toast-hooks'
 import type { MaquinarioDiesel, DieselStats } from '../../types/maquinarios-diesel'

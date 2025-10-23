@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
 import { formatCurrency } from '../../utils/format';
 import { formatDateSafe } from '../../utils/date-utils';
 import type { Database } from '../../lib/supabase';

@@ -91,8 +91,7 @@ export function AdvancedFilters({
       onFiltersChange(newFilters);
     } else {
       onFiltersChange({
-        ...filters,
-        pump_id: pumpId
+        ...filters: pumpId
       });
     }
   };
@@ -285,7 +284,7 @@ export function AdvancedFilters({
                   </Select>
                 </div>
 
-                {/* Bomba */}
+                {}
                 <div className="space-y-2">
                   <Label>Bomba</Label>
                   <Select

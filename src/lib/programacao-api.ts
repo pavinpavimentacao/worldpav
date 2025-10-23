@@ -65,11 +65,9 @@ export class ProgramacaoAPI {
         return null;
       }
 
-      // 2. Buscar dados da bomba (interna ou terceira)
-      let pumpData = null;
+            let pumpData = null;
       if (programacaoData.bomba_id) {
-        // Tentar buscar bomba interna primeiro
-        const { data: pumpsData } = await supabase
+                const { data: pumpsData } = await supabase
           .from('pumps')
           .select('id, prefix, model, brand')
           .eq('id', programacaoData.bomba_id)
@@ -78,8 +76,7 @@ export class ProgramacaoAPI {
         if (pumpsData) {
           pumpData = pumpsData;
         } else {
-          // Se não encontrou bomba interna, buscar bomba terceira
-          const { data: bombaTerceira } = await supabase
+                    const { data: bombaTerceira } = await supabase
             .from('view_bombas_terceiras_com_empresa')
             .select('id, prefixo, modelo, empresa_nome_fantasia, valor_diaria')
             .eq('id', programacaoData.bomba_id)
@@ -218,8 +215,6 @@ export class ProgramacaoAPI {
           slump,
           equipe,
           motorista_operador,
-          auxiliares_bomba,
-          bomba_id,
           status,
           company_id,
           created_at,
@@ -256,8 +251,7 @@ export class ProgramacaoAPI {
         slump: p.slump
       })));
 
-      // 2. Buscar bombas internas
-      const pumpIds = [...new Set(programacoesData.map(p => p.bomba_id).filter(Boolean))];
+            const pumpIds = [...new Set(programacoesData.map(p => p.bomba_id).filter(Boolean))];
       console.log('🔍 [ProgramacaoAPI] Pump IDs únicos:', pumpIds);
       
       const { data: pumpsData } = await supabase
@@ -267,8 +261,7 @@ export class ProgramacaoAPI {
       
       console.log('📊 [ProgramacaoAPI] Bombas internas carregadas:', pumpsData?.length || 0);
       
-      // 3. Buscar bombas terceiras para IDs que não foram encontrados nas bombas internas
-      const foundPumpIds = pumpsData?.map(p => p.id) || [];
+            const foundPumpIds = pumpsData?.map(p => p.id) || [];
       const missingPumpIds = pumpIds.filter(id => !foundPumpIds.includes(id));
       
       let bombasTerceirasData: Array<{
@@ -289,13 +282,10 @@ export class ProgramacaoAPI {
         console.log('📊 [ProgramacaoAPI] Bombas terceiras carregadas:', bombasTerceirasData.length);
       }
       
-      // 4. Enriquecer programações com dados das bombas
-      const enrichedProgramacoes = programacoesData.map(programacao => {
-        // Buscar bomba interna primeiro
-        let pumpData = pumpsData?.find(p => p.id === programacao.bomba_id);
+            const enrichedProgramacoes = programacoesData.map(programacao => {
+                let pumpData = pumpsData?.find(p => p.id === programacao.bomba_id);
         
-        // Se não encontrou bomba interna, buscar bomba terceira
-        if (!pumpData) {
+                if (!pumpData) {
           const bombaTerceira = bombasTerceirasData?.find(bt => bt.id === programacao.bomba_id);
           if (bombaTerceira) {
             pumpData = {
@@ -377,11 +367,9 @@ export class ProgramacaoAPI {
     }
   }
 
-  // Buscar bombas disponíveis (internas + terceiras) com priorização
-  static async getBombas(): Promise<Array<{ id: string; prefix: string; model: string; brand: string; is_terceira?: boolean; empresa_nome?: string; valor_diaria?: number; has_programacao?: boolean }>> {
+    static async getBombas(): Promise<Array<{ id: string; prefix: string; model: string; brand: string; is_terceira?: boolean; empresa_nome?: string; valor_diaria?: number; has_programacao?: boolean }>> {
     try {
-      // Buscar bombas internas
-      const { data: pumpsData, error: pumpsError } = await supabase
+            const { data: pumpsData, error: pumpsError } = await supabase
         .from('pumps')
         .select('id, prefix, model, brand')
         .order('prefix');
@@ -390,8 +378,7 @@ export class ProgramacaoAPI {
         throw new Error(`Erro ao buscar bombas internas: ${pumpsError.message}`);
       }
 
-      // Buscar bombas de terceiros
-      const { data: bombasTerceirasData, error: bombasTerceirasError } = await supabase
+            const { data: bombasTerceirasData, error: bombasTerceirasError } = await supabase
         .from('view_bombas_terceiras_com_empresa')
         .select('id, prefixo, modelo, empresa_nome_fantasia, valor_diaria')
         .order('empresa_nome_fantasia, prefixo');
@@ -400,26 +387,21 @@ export class ProgramacaoAPI {
         throw new Error(`Erro ao buscar bombas terceiras: ${bombasTerceirasError.message}`);
       }
 
-      // Buscar programações ativas para identificar bombas com programação
-      const today = new Date();
+            const today = new Date();
       const endDate = new Date(today);
       endDate.setDate(today.getDate() + 7); // Próximos 7 dias
       
       const { data: programacoesData } = await supabase
         .from('programacao')
-        .select('bomba_id, bomba_prefixo')
         .gte('data', today.toISOString().split('T')[0])
         .lte('data', endDate.toISOString().split('T')[0]);
 
-      // Criar conjunto de bombas com programação
-      const bombasComProgramacao = new Set<string>();
+            const bombasComProgramacao = new Set<string>();
       programacoesData?.forEach(p => {
         if (p.bomba_id) bombasComProgramacao.add(p.bomba_id);
-        if (p.bomba_prefixo) bombasComProgramacao.add(p.bomba_prefixo);
       });
 
-      // Combinar as bombas internas e terceiras
-      const bombasInternas = (pumpsData || []).map(pump => ({
+            const bombasInternas = (pumpsData || []).map(pump => ({
         id: pump.id,
         prefix: pump.prefix,
         model: pump.model,
@@ -441,13 +423,11 @@ export class ProgramacaoAPI {
 
       // Combinar e ordenar com priorização
       const todasBombas = [...bombasInternas, ...bombasTerceiras].sort((a, b) => {
-        // 1. PRIORIDADE: Bombas com programação primeiro
-        if (a.has_programacao !== b.has_programacao) {
+                if (a.has_programacao !== b.has_programacao) {
           return a.has_programacao ? -1 : 1;
         }
         
-        // 2. PRIORIDADE: Bombas internas antes das terceiras
-        if (a.is_terceira !== b.is_terceira) {
+                if (a.is_terceira !== b.is_terceira) {
           return a.is_terceira ? 1 : -1;
         }
         
@@ -490,8 +470,7 @@ export class ProgramacaoAPI {
     return data || [];
   }
 
-  // Validar se há conflito de horário para uma bomba
-  static async checkBombaConflict(
+    static async checkBombaConflict(
     bombaId: string, 
     data: string, 
     horario: string, 

@@ -3,14 +3,16 @@
  */
 
 export type RuaStatus = 'pendente' | 'em_andamento' | 'finalizada'
-export type FaturamentoStatus = 'pendente' | 'pago'
 export type DespesaCategoria = 'diesel' | 'materiais' | 'manutencao' | 'outros'
+export type NotaFiscalStatus = 'pendente' | 'pago' | 'vencido' | 'renegociado'
 
 export interface ObraRua {
   id: string
   obra_id: string
   nome: string
   metragem_planejada?: number
+  toneladas_previstas?: number
+  imagem_trecho?: string // URL da imagem
   status: RuaStatus
   ordem: number
   observacoes?: string
@@ -28,10 +30,8 @@ export interface ObraFaturamento {
   espessura_calculada: number
   preco_por_m2: number
   valor_total: number
-  status: FaturamentoStatus
   data_finalizacao: string
-  data_pagamento?: string
-  nota_fiscal?: string
+  nota_fiscal_id?: string
   observacoes?: string
   created_at: string
   updated_at: string
@@ -99,12 +99,6 @@ export interface CreateFaturamentoInput {
   observacoes?: string
 }
 
-export interface UpdateFaturamentoStatusInput {
-  status: FaturamentoStatus
-  data_pagamento?: string
-  nota_fiscal?: string
-}
-
 export interface CreateDespesaInput {
   obra_id: string
   categoria: DespesaCategoria
@@ -117,17 +111,81 @@ export interface CreateDespesaInput {
   sincronizado_financeiro_principal?: boolean
 }
 
-export interface FaturamentoFilters {
-  status?: FaturamentoStatus
-  data_inicio?: string
-  data_fim?: string
-}
-
 export interface DespesaFilters {
   categoria?: DespesaCategoria
   data_inicio?: string
   data_fim?: string
   maquinario_id?: string
+}
+
+// ============================================
+// Notas Fiscais e Medições
+// ============================================
+
+export interface ObraNotaFiscal {
+  id: string
+  obra_id: string
+  numero_nota: string
+  valor_nota: number
+  vencimento: string
+  desconto_inss: number
+  desconto_iss: number
+  outro_desconto: number
+  valor_liquido: number
+  status: NotaFiscalStatus
+  data_pagamento?: string
+  arquivo_nota_url?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ObraMedicao {
+  id: string
+  obra_id: string
+  nota_fiscal_id?: string
+  descricao: string
+  arquivo_medicao_url: string
+  data_medicao: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateNotaFiscalInput {
+  obra_id: string
+  numero_nota: string
+  valor_nota: number
+  vencimento: string
+  desconto_inss?: number
+  desconto_iss?: number
+  outro_desconto?: number
+  arquivo_nota_url?: string
+  observacoes?: string
+}
+
+export interface UpdateNotaFiscalInput {
+  numero_nota?: string
+  valor_nota?: number
+  vencimento?: string
+  desconto_inss?: number
+  desconto_iss?: number
+  outro_desconto?: number
+  arquivo_nota_url?: string
+  observacoes?: string
+}
+
+export interface CreateMedicaoInput {
+  obra_id: string
+  nota_fiscal_id?: string
+  descricao: string
+  arquivo_medicao_url: string
+  data_medicao: string
+}
+
+export interface NotaFiscalFilters {
+  status?: NotaFiscalStatus
+  data_inicio?: string
+  data_fim?: string
 }
 
 

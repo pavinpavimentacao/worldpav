@@ -1,4 +1,4 @@
-import { Layout } from '../../components/Layout'
+import { Layout } from "../../components/layout/Layout"
 import { formatDateToBR } from '../../utils/date-utils'
 
 export default function ClientNew() {

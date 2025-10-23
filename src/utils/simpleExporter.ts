@@ -17,7 +17,7 @@ export const exportToXLSXSimple = (data: ExportData, options: ExportOptions = { 
     
     // Dados simples sem formatação complexa
     const simpleData = [
-      ['RELATÓRIO DE BOMBEAMENTOS - FÉLIX MIX / WORLD RENTAL'],
+      ['RELATÓRIO DE BOMBEAMENTOS - WORLDPAV'],
       [''],
       ['Data de Exportação:', data.exportDate],
       ['Total de Registros:', data.totalRecords.toString()],
@@ -30,7 +30,6 @@ export const exportToXLSXSimple = (data: ExportData, options: ExportOptions = { 
         report.report_number || 'N/A',
         report.date ? formatDateBR(report.date) : 'N/A',
         report.clients?.name || report.client_rep_name || 'N/A',
-        report.pumps?.prefix || report.pump_prefix || 'N/A',
         report.realized_volume || 0,
         report.total_value || 0,
         report.status || 'N/A'

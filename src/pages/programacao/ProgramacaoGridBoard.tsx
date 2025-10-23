@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProgramacaoAPI } from '../../lib/programacao-api';
 import { Programacao, BombaOption } from '../../types/programacao';
-import { Layout } from '../../components/Layout';
-import { Loading } from '../../components/Loading';
-import { Button } from '../../components/Button';
+import { Layout } from "../../components/layout/Layout";
+import { Loading } from "../../components/shared/Loading";
+import { Button } from "../../components/shared/Button";
 import { toast } from '../../lib/toast-hooks';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { ExportButtons } from '../../components/ExportButtons';
+import { ConfirmDialog } from "../../components/modals/ConfirmDialog";
+import { ExportButtons } from "../../components/exports/ExportButtons";
 import { getWeekBoundsBrasilia, getDayOfWeekBR, formatDateToLocalString, formatDateToBR } from '../../utils/date-utils';
 import { DailyScheduleView } from '../../components/DailyScheduleView';
 
@@ -31,8 +31,7 @@ export function ProgramacaoGridBoard() {
     return getWeekBoundsBrasilia(date);
   };
 
-  // Carregar bombas disponíveis
-  const loadBombas = useCallback(async () => {
+    const loadBombas = useCallback(async () => {
     try {
       const bombasData = await ProgramacaoAPI.getBombas();
       setBombas(bombasData);
@@ -90,8 +89,7 @@ export function ProgramacaoGridBoard() {
     setCurrentWeek(new Date());
   };
 
-  // Obter programações para uma bomba e dia específicos
-  const getProgramacoesForBombaAndDay = (bombaId: string, dayOfWeek: number) => {
+    const getProgramacoesForBombaAndDay = (bombaId: string, dayOfWeek: number) => {
     return programacoes.filter(p => {
       const programacaoDate = new Date(p.data);
       const programacaoDayOfWeek = programacaoDate.getDay();
@@ -276,11 +274,11 @@ export function ProgramacaoGridBoard() {
                 </tr>
               </thead>
 
-              {/* Corpo da tabela com bombas */}
+              {}
               <tbody>
                 {bombas.map((bomba, bombaIndex) => (
                   <tr key={bomba.id} className={`${bombaIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} print-row`}>
-                    {/* Coluna da bomba */}
+                    {}
                     <td className="w-32 p-4 font-medium text-gray-900 border-r border-gray-200 sticky left-0 bg-inherit print-cell">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-semibold">{bomba.prefix}</div>

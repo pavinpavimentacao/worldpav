@@ -1,46 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-// import { supabase } from '../../lib/supabase'
-// import { GenericError } from '../errors/GenericError'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { format } from 'date-fns'
-import { Badge } from '../../components/Badge'
+import { Badge } from "../../components/shared/Badge"
 import { useAuth } from '../../lib/auth-hooks'
-import { WorkScheduling } from '../../components/WorkScheduling'
+import { WorkScheduling } from '../../components/shared/WorkScheduling'
 import { formatDateToBR } from '../../utils/date-utils'
-
-type Client = {
-  id: string
-  rep_name?: string | null
-  company_name?: string | null
-  legal_name?: string | null
-  document?: string | null
-  email?: string | null
-  phone?: string | null
-  address?: string | null
-  city?: string | null
-  state?: string | null
-  cep?: string | null
-  // Novos campos
-  client_type?: 'construtora' | 'prefeitura' | 'empresa_privada' | 'incorporadora' | null
-  work_area?: 'residencial' | 'comercial' | 'industrial' | 'publico' | null
-  work_type?: 'pavimentacao_nova' | 'recapeamento' | 'manutencao' | null
-  responsible_company?: 'WorldPav' | 'Pavin' | null
-  estimated_volume?: string | null
-  payment_terms?: '30' | '60' | '90' | null
-  technical_contact?: string | null
-  financial_contact?: string | null
-  equipment_preferences?: string[] | null
-  documentation_requirements?: string | null
-  notes?: string | null
-}
+import { useToast } from '../../lib/toast-hooks'
+import { getClienteById, type Cliente } from '../../lib/clientesApi'
 
 type Report = {
   id: string
   report_number: string
   date: string
-  pump_prefix: string | null
   realized_volume: number | null
   total_value: number | null
   status: 'PENDENTE' | 'CONFIRMADO' | 'PAGO' | 'NOTA_EMITIDA'
@@ -82,10 +55,11 @@ export default function ClientDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { addToast } = useToast()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [client, setClient] = useState<Client | null>(null)
+  const [client, setClient] = useState<Cliente | null>(null)
   const [reports, setReports] = useState<Report[]>([])
   const [works, setWorks] = useState<Work[]>([])
   const [contracts, setContracts] = useState<Contract[]>([])
@@ -96,75 +70,52 @@ export default function ClientDetails() {
     return role === 'admin' || role === 'financeiro'
   }, [user])
 
-  function fetchAll() {
+  async function fetchAll() {
     if (!id) return
     setLoading(true)
     setError(null)
     
     try {
-      // Simular delay de carregamento
-      setTimeout(() => {
-        // Mock data para cliente
-        const mockClient: Client = {
-          id: id,
-          rep_name: 'João Silva',
-          company_name: 'Construtora ABC Ltda',
-          legal_name: 'Construtora ABC Ltda',
-          document: '12345678000199',
-          email: 'joao@construtoraabc.com',
-          phone: '11999887766',
-          address: 'Rua das Flores, 123',
-          city: 'São Paulo',
-          state: 'SP',
-          cep: '01234567',
-          client_type: 'construtora',
-          work_area: 'residencial',
-          work_type: 'pavimentacao_nova',
-          responsible_company: 'WorldPav',
-          estimated_volume: '500m²',
-          payment_terms: '30',
-          technical_contact: 'Carlos Engenheiro',
-          financial_contact: 'Maria Financeiro',
-          equipment_preferences: ['Vibroacabadora CAT AP1055F', 'Rolo Compactador Chapa Dynapac CA2500'],
-          documentation_requirements: 'ART, NR-12, NR-18, Alvará de Construção',
-          notes: 'Cliente preferencial, sempre pontual nos pagamentos'
-        }
-        setClient(mockClient)
+      // Buscar dados reais do cliente
+      const clientData = await getClienteById(id)
+      
+      if (!clientData) {
+        throw new Error('Cliente não encontrado')
+      }
+      
+      setClient(clientData)
 
-        // Mock data para relatórios
-        const mockReports: Report[] = [
-          {
-            id: '1',
-            report_number: 'REL-001',
-            date: '2024-01-15',
-            pump_prefix: 'BM-001',
-            realized_volume: 150,
-            total_value: 15000,
-            status: 'PAGO',
-            work_id: 'work-1'
-          },
-          {
-            id: '2',
-            report_number: 'REL-002',
-            date: '2024-01-20',
-            pump_prefix: 'BM-002',
-            realized_volume: 200,
-            total_value: 20000,
-            status: 'CONFIRMADO',
-            work_id: 'work-1'
-          },
-          {
-            id: '3',
-            report_number: 'REL-003',
-            date: '2024-02-01',
-            pump_prefix: 'BM-001',
-            realized_volume: 100,
-            total_value: 10000,
-            status: 'PENDENTE',
-            work_id: 'work-2'
-          }
-        ]
-        setReports(mockReports)
+      // Mock data para relatórios (TODO: Implementar busca real de relatórios)
+      const mockReports: Report[] = [
+        {
+          id: '1',
+          report_number: 'REL-001',
+          date: '2024-01-15',
+          realized_volume: 150,
+          total_value: 15000,
+          status: 'PAGO',
+          work_id: 'work-1'
+        },
+        {
+          id: '2',
+          report_number: 'REL-002',
+          date: '2024-01-20',
+          realized_volume: 200,
+          total_value: 20000,
+          status: 'CONFIRMADO',
+          work_id: 'work-1'
+        },
+        {
+          id: '3',
+          report_number: 'REL-003',
+          date: '2024-02-01',
+          realized_volume: 100,
+          total_value: 10000,
+          status: 'PENDENTE',
+          work_id: 'work-2'
+        }
+      ]
+      setReports(mockReports)
 
       // Mock data para obras (será substituído por dados reais do banco)
       const mockWorks: Work[] = [
@@ -224,11 +175,11 @@ export default function ClientDetails() {
       ]
       setContracts(mockContracts)
 
-        setLoading(false)
-      }, 500) // Simular delay de 500ms
+      setLoading(false)
     } catch (err: any) {
-      console.error('Fetch client details error:', { message: err?.message, id })
-      setError(err?.message || 'Falha ao carregar dados do cliente')
+      console.error('Erro ao buscar cliente:', err)
+      setError(err?.message || 'Erro ao carregar dados do cliente')
+      addToast({ message: 'Erro ao carregar dados do cliente', type: 'error' })
       setLoading(false)
     }
   }
@@ -396,8 +347,8 @@ export default function ClientDetails() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div><span className="text-gray-500">Representante:</span> <span className="ml-2 font-medium">{client.rep_name || '-'}</span></div>
                   <div><span className="text-gray-500">Empresa:</span> <span className="ml-2 font-medium">{client.company_name || '-'}</span></div>
-                  <div><span className="text-gray-500">Razão Social:</span> <span className="ml-2 font-medium">{client.legal_name || '-'}</span></div>
-                  <div><span className="text-gray-500">Documento:</span> <span className="ml-2 font-medium">{client.document || '-'}</span></div>
+                  <div><span className="text-gray-500">Nome:</span> <span className="ml-2 font-medium">{client.name || '-'}</span></div>
+                  <div><span className="text-gray-500">CPF/CNPJ:</span> <span className="ml-2 font-medium">{client.cpf_cnpj || '-'}</span></div>
                   <div><span className="text-gray-500">Email:</span> <span className="ml-2 font-medium">{client.email || '-'}</span></div>
                   <div><span className="text-gray-500">Telefone:</span> <span className="ml-2 font-medium">{client.phone || '-'}</span></div>
                   <div><span className="text-gray-500">Contato Técnico:</span> <span className="ml-2 font-medium">{client.technical_contact || '-'}</span></div>
@@ -405,7 +356,7 @@ export default function ClientDetails() {
                   <div><span className="text-gray-500">Prazo Pagamento:</span> <span className="ml-2 font-medium">{client.payment_terms ? `${client.payment_terms} dias` : '-'}</span></div>
                   <div><span className="text-gray-500">Endereço:</span> <span className="ml-2 font-medium">{client.address || '-'}</span></div>
                   <div><span className="text-gray-500">Cidade/UF:</span> <span className="ml-2 font-medium">{client.city || '-'} / {client.state || '-'}</span></div>
-                  <div><span className="text-gray-500">CEP:</span> <span className="ml-2 font-medium">{client.cep || '-'}</span></div>
+                  <div><span className="text-gray-500">CEP:</span> <span className="ml-2 font-medium">{client.zip_code || '-'}</span></div>
                 </div>
               ) : (
                 <div>Nenhum cliente encontrado.</div>
@@ -574,7 +525,6 @@ export default function ClientDetails() {
                               <tr key={report.id} className="border-b border-gray-100">
                                 <td className="py-2">{report.report_number}</td>
                                 <td className="py-2">{format(new Date(report.date), 'dd/MM/yyyy')}</td>
-                                <td className="py-2">{report.pump_prefix ?? '-'}</td>
                                 <td className="py-2">{report.realized_volume ?? '-'}</td>
                                 <td className="py-2">{currency(report.total_value)}</td>
                                 <td className="py-2">

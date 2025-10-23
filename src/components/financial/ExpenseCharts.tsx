@@ -48,11 +48,8 @@ export function ExpenseCharts({ stats, loading = false }: ExpenseChartsProps) {
     color: COLORS.categories[category as keyof typeof COLORS.categories] || COLORS.default[0]
   }));
 
-  // Preparar dados para gráfico de barras (bombas)
-  const barData = stats.total_por_bomba.map(item => ({
-    bomba: item.bomba_prefix,
-    valor: item.total,
-    bomba_id: item.bomba_id
+    const barData = stats.total_por_bomba.map(item => ({
+    valor: item.total: item.bomba_id
   }));
 
   // Preparar dados para gráfico de linha (tempo)
@@ -114,7 +111,7 @@ export function ExpenseCharts({ stats, loading = false }: ExpenseChartsProps) {
         </CardContent>
       </Card>
 
-      {/* Gráfico de Barras - Despesas por Bomba */}
+      {}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

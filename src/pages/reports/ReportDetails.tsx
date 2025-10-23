@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 // Removido: Badge não é mais usado
 import { DatePicker } from '../../components/ui/date-picker';
-import { NotaFiscalFormSimple } from '../../components/NotaFiscalFormSimple'
-import { NotasFiscaisLista } from '../../components/NotasFiscaisLista'
+import { NotaFiscalFormSimple } from "../../components/notas-fiscais/NotaFiscalFormSimple"
+import { NotasFiscaisLista } from "../../components/notas-fiscais/NotasFiscaisLista"
 import { ReportWithRelations, ReportStatus, NoteData } from '../../types/reports'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { 
@@ -68,12 +68,10 @@ export default function ReportDetails() {
           reportData.clients = clientData
         }
         
-        // 3. Enriquecer com dados da bomba
-        if (reportData.pump_id) {
+                if (reportData.pump_id) {
           console.log('🔍 [REPORT_DETAILS] Carregando dados da bomba:', reportData.pump_id)
           
-          // Primeiro tentar buscar na tabela pumps (bombas internas)
-          const { data: pumpData } = await supabase
+                    const { data: pumpData } = await supabase
             .from('pumps')
             .select('*')
             .eq('id', reportData.pump_id)
@@ -83,8 +81,7 @@ export default function ReportDetails() {
             console.log('📊 [REPORT_DETAILS] Bomba interna carregada:', pumpData)
             reportData.pumps = pumpData
           } else {
-            // Se não encontrou na tabela pumps, tentar na tabela bombas_terceiras
-            const { data: bombaTerceiraData } = await supabase
+                        const { data: bombaTerceiraData } = await supabase
               .from('view_bombas_terceiras_com_empresa')
               .select('*')
               .eq('id', reportData.pump_id)
@@ -413,7 +410,6 @@ const handleWhatsApp = () => {
           <div className="space-y-3">
             <div>
               <span className="text-sm font-medium text-gray-700">Prefixo:</span>
-              <p className="text-gray-900">{report.pump_prefix || 'Não informado'}</p>
             </div>
             <div>
               <span className="text-sm font-medium text-gray-700">Modelo:</span>

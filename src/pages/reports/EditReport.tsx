@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { DatePicker } from '../../components/ui/date-picker'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency } from '../../utils/format'
 import { z } from 'zod'
 import { ReportStatus } from '../../types/reports'
 
@@ -171,9 +171,6 @@ export default function EditReport() {
           client_id: report.client_id || '',
           client_rep_name: report.client_rep_name || '',
           client_phone: report.whatsapp_digits || '',
-          work_address: report.work_address || '',
-          pump_id: report.pump_id || '',
-          pump_prefix: report.pump_prefix || '',
           pump_owner_company_id: '',
           service_company_id: report.service_company_id || '',
           planned_volume: report.planned_volume?.toString() || '',
@@ -209,8 +206,7 @@ export default function EditReport() {
           )
         }
 
-        // Bomba
-        if (report.pump_id) {
+                if (report.pump_id) {
           promises.push(
             supabase
               .from('pumps')
@@ -333,24 +329,21 @@ export default function EditReport() {
 
   const loadPumps = async () => {
     try {
-      // Carregar bombas internas
-      const { data: pumpsData, error: pumpsError } = await supabase
+            const { data: pumpsData, error: pumpsError } = await supabase
         .from('pumps')
         .select('id, prefix, model, brand, owner_company_id')
         .order('prefix')
 
       if (pumpsError) throw pumpsError
 
-      // Carregar bombas de terceiros
-      const { data: bombasTerceirasData, error: bombasTerceirasError } = await supabase
+            const { data: bombasTerceirasData, error: bombasTerceirasError } = await supabase
         .from('view_bombas_terceiras_com_empresa')
         .select('*')
         .order('prefixo')
 
       if (bombasTerceirasError) throw bombasTerceirasError
 
-      // Transformar bombas de terceiros para o formato esperado
-      const bombasTerceirasFormatted = (bombasTerceirasData || []).map((bomba: any) => ({
+            const bombasTerceirasFormatted = (bombasTerceirasData || []).map((bomba: any) => ({
         id: bomba.id,
         prefix: bomba.prefixo,
         model: bomba.modelo,
@@ -361,8 +354,7 @@ export default function EditReport() {
         valor_diaria: bomba.valor_diaria
       }))
 
-      // Combinar bombas internas e de terceiros
-      const allPumps = [
+            const allPumps = [
         ...(pumpsData || []).map(pump => ({ ...pump, is_terceira: false })),
         ...bombasTerceirasFormatted
       ]
@@ -427,7 +419,6 @@ export default function EditReport() {
     
     setFormData(prev => ({
       ...prev,
-      pump_id: pumpId,
       pump_prefix: pump?.prefix || '',
       pump_owner_company_id: pump?.owner_company_id || ''
     }))
@@ -496,9 +487,6 @@ export default function EditReport() {
         client_id: validatedData.client_id,
         client_rep_name: validatedData.client_rep_name,
         work_address: validatedData.work_address,
-        whatsapp_digits: validatedData.client_phone,
-        pump_id: validatedData.pump_id,
-        pump_prefix: validatedData.pump_prefix,
         planned_volume: validatedData.planned_volume ? parseFloat(validatedData.planned_volume) : null,
         realized_volume: parseFloat(validatedData.realized_volume),
         total_value: parseCurrency(validatedData.total_value),
@@ -700,12 +688,12 @@ export default function EditReport() {
           </div>
         </div>
 
-        {/* Seção: Informações da Bomba */}
+        {}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Informações da Bomba</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Bomba */}
+            {}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Bomba *
@@ -727,7 +715,7 @@ export default function EditReport() {
               )}
             </div>
 
-            {/* Prefixo da Bomba */}
+            {}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Prefixo da Bomba *
@@ -735,13 +723,9 @@ export default function EditReport() {
               <input
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.pump_prefix ?? ''}
                 disabled
                 placeholder="Preenchido automaticamente"
               />
-              {errors.pump_prefix && (
-                <p className="mt-1 text-sm text-red-600">{errors.pump_prefix}</p>
-              )}
             </div>
 
             {/* Empresa do Serviço */}

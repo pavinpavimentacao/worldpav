@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Layout } from '../components/Layout'
-import { KpiCard } from '../components/KpiCard'
+import { Layout } from "../components/layout/Layout"
+import { KpiCard } from "../components/cards/KpiCard"
 import { Link } from 'react-router-dom'
 import { 
   TrendingUp, 

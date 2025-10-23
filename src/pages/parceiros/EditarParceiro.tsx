@@ -3,10 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { Input } from '../../components/ui/input'
-import { Select } from '../../components/Select'
+import { Select } from "../../components/shared/Select"
 import { ArrowLeft, Save, AlertCircle, CheckCircle, X, Plus, Trash2 } from 'lucide-react'
 import { getParceiroById } from '../../lib/parceirosApi'
 import { 

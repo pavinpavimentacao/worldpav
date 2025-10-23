@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { Search, Tag, Calendar } from 'lucide-react'
-import { Select } from '../Select'
+import { Select } from "../shared/Select"
 import { DatePicker } from '../ui/date-picker'
 import { Input } from '../ui/input'
 

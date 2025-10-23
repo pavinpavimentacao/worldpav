@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { ProgramacaoAPI } from '../../lib/programacao-api';
 import { Programacao } from '../../types/programacao';
 import { toast } from '../../lib/toast-hooks';
-import { Layout } from '../../components/Layout';
-import { Loading } from '../../components/Loading';
-import { Button } from '../../components/Button';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { Layout } from "../../components/layout/Layout";
+import { Loading } from "../../components/shared/Loading";
+import { Button } from "../../components/shared/Button";
+import { ConfirmDialog } from "../../components/modals/ConfirmDialog";
 import { formatDateToBR } from '../../utils/date-utils';
 
 export default function ProgramacaoBoardSimple() {

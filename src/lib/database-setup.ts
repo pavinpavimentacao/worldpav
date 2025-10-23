@@ -60,8 +60,7 @@ export async function setupDatabase() {
       console.warn('Aviso ao criar tabela clients:', clientsError.message)
     }
 
-    // 4. Criar tabela de bombas
-    console.log('⚙️ Criando tabela pumps...')
+        console.log('⚙️ Criando tabela pumps...')
     const { error: pumpsError } = await supabase.rpc('exec_sql', {
       sql: `
         CREATE TABLE IF NOT EXISTS pumps (
@@ -88,8 +87,7 @@ export async function setupDatabase() {
         CREATE TABLE IF NOT EXISTS reports (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           report_number TEXT UNIQUE NOT NULL,
-          client_id UUID REFERENCES clients(id) NOT NULL,
-          pump_id UUID REFERENCES pumps(id) NOT NULL,
+          client_id UUID REFERENCES clients(id) NOT NULL UUID REFERENCES pumps(id) NOT NULL,
           company_id UUID REFERENCES companies(id) NOT NULL,
           start_date TIMESTAMPTZ NOT NULL,
           end_date TIMESTAMPTZ NOT NULL,
@@ -131,7 +129,7 @@ export async function setupDatabase() {
       .upsert([
         { 
           id: '00000000-0000-0000-0000-000000000001', 
-          name: 'Felix Mix' 
+          name: 'WorldPav' 
         }
       ], { 
         onConflict: 'id' 

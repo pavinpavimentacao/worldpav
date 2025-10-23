@@ -1,67 +1,17 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, CheckCircle, Clock, Circle, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
-import { Button } from '../Button'
+import { Plus, CheckCircle, Clock, Circle, Trash2 } from 'lucide-react'
+import { Button } from "../shared/Button"
 import { AdicionarRuaModal } from './AdicionarRuaModal'
 import { FinalizarRuaModal } from './FinalizarRuaModal'
 import { useToast } from '../../lib/toast-hooks'
-import type { ObraRua } from '../../types/obras-financeiro'
-import { formatarStatusRua, formatarMetragem } from '../../utils/financeiro-obras-utils'
 import { 
-  getObrasRuas, 
-  createRua, 
-  deleteRua, 
-  reordenarRuas,
-  contarRuasPorStatus 
+  getRuasByObra,
+  createRua,
+  deleteRua,
+  ObraRua,
+  ObraRuaInsertData
 } from '../../lib/obrasRuasApi'
-import { createFaturamentoRua } from '../../lib/obrasFinanceiroApi'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
-
-const mockRuas: ObraRua[] = [
-  {
-    id: '1',
-    obra_id: '1',
-    nome: 'Rua das Flores - Trecho A',
-    metragem_planejada: 1500,
-    status: 'finalizada',
-    ordem: 0,
-    observacoes: 'Primeira rua executada',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    obra_id: '1',
-    nome: 'Rua das Flores - Trecho B',
-    metragem_planejada: 1200,
-    status: 'em_andamento',
-    ordem: 1,
-    observacoes: 'Em execução',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: '3',
-    obra_id: '1',
-    nome: 'Rua Principal',
-    metragem_planejada: 2000,
-    status: 'pendente',
-    ordem: 2,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: '4',
-    obra_id: '1',
-    nome: 'Avenida Central',
-    metragem_planejada: 2500,
-    status: 'pendente',
-    ordem: 3,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-]
 
 interface ObraRuasTabProps {
   obraId: string
@@ -85,26 +35,16 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
     try {
       setLoading(true)
       
-      if (USE_MOCK) {
-        // Simular delay da API
-        await new Promise(resolve => setTimeout(resolve, 500))
-        setRuas(mockRuas)
-        
-        // Calcular contadores
-        const counts = {
-          pendente: mockRuas.filter(r => r.status === 'pendente').length,
-          em_andamento: mockRuas.filter(r => r.status === 'em_andamento').length,
-          finalizada: mockRuas.filter(r => r.status === 'finalizada').length
-        }
-        setStatusCounts(counts)
-      } else {
-        const [ruasData, counts] = await Promise.all([
-          getObrasRuas(obraId),
-          contarRuasPorStatus(obraId)
-        ])
-        setRuas(ruasData)
-        setStatusCounts(counts)
+      const ruasData = await getRuasByObra(obraId)
+      setRuas(ruasData)
+      
+      // Calcular contadores
+      const counts = {
+        pendente: ruasData.filter(r => r.status === 'planejada').length,
+        em_andamento: ruasData.filter(r => r.status === 'em_execucao').length,
+        finalizada: ruasData.filter(r => r.status === 'concluida').length
       }
+      setStatusCounts(counts)
     } catch (error) {
       console.error('Erro ao carregar ruas:', error)
       addToast({ message: 'Erro ao carregar ruas', type: 'error' })
@@ -116,31 +56,25 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
   const handleAdicionarRua = async (data: {
     nome: string
     metragem_planejada?: number
+    toneladas_previstas?: number
     observacoes?: string
+    imagem_trecho?: File
   }) => {
     try {
-      if (USE_MOCK) {
-        // Simular criação mock
-        await new Promise(resolve => setTimeout(resolve, 300))
-        const novaRua: ObraRua = {
-          id: String(Date.now()),
-          obra_id: obraId,
-          nome: data.nome,
-          metragem_planejada: data.metragem_planejada,
-          status: 'pendente',
-          ordem: ruas.length,
-          observacoes: data.observacoes,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        setRuas([...ruas, novaRua])
-      } else {
-        await createRua({
-          obra_id: obraId,
-          ...data
-        })
-        loadRuas()
+      // Calcular área baseado na metragem planejada
+      const area = data.metragem_planejada || null
+
+      const ruaData: ObraRuaInsertData = {
+        obra_id: obraId,
+        name: data.nome,
+        area: area,
+        observations: data.observacoes || null,
+        status: 'planejada'
       }
+
+      await createRua(ruaData)
+      await loadRuas()
+      
       addToast({ message: 'Rua adicionada com sucesso!', type: 'success' })
     } catch (error) {
       console.error('Erro ao adicionar rua:', error)
@@ -156,24 +90,12 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
     if (!ruaSelecionada) return
 
     try {
-      if (USE_MOCK) {
-        // Simular finalização mock
-        await new Promise(resolve => setTimeout(resolve, 300))
-        const ruasAtualizadas = ruas.map(r =>
-          r.id === ruaSelecionada.id ? { ...r, status: 'finalizada' as const } : r
-        )
-        setRuas(ruasAtualizadas)
-      } else {
-        await createFaturamentoRua({
-          obra_id: obraId,
-          rua_id: ruaSelecionada.id,
-          metragem_executada: data.metragem_executada,
-          toneladas_utilizadas: data.toneladas_utilizadas,
-          preco_por_m2: precoPorM2,
-          observacoes: data.observacoes
-        })
-        loadRuas()
-      }
+      // Por enquanto, apenas atualiza o status para concluída
+      // TODO: Implementar createFaturamentoRua quando necessário
+      const { updateRuaStatus } = await import('../../lib/obrasRuasApi')
+      await updateRuaStatus(ruaSelecionada.id, 'concluida')
+      await loadRuas()
+      
       addToast({ message: 'Rua finalizada com sucesso!', type: 'success' })
       setRuaSelecionada(null)
     } catch (error) {
@@ -182,18 +104,13 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
     }
   }
 
+
   const handleDeletarRua = async (rua: ObraRua) => {
-    if (!confirm(`Tem certeza que deseja deletar a rua "${rua.nome}"?`)) return
+    if (!confirm(`Tem certeza que deseja deletar a rua "${rua.name}"?`)) return
 
     try {
-      if (USE_MOCK) {
-        // Simular deleção mock
-        await new Promise(resolve => setTimeout(resolve, 300))
-        setRuas(ruas.filter(r => r.id !== rua.id))
-      } else {
-        await deleteRua(rua.id)
-        loadRuas()
-      }
+      await deleteRua(rua.id)
+      await loadRuas()
       addToast({ message: 'Rua deletada com sucesso', type: 'success' })
     } catch (error) {
       console.error('Erro ao deletar rua:', error)
@@ -201,42 +118,29 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
     }
   }
 
-  const handleMoverRua = async (index: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && index === 0) return
-    if (direction === 'down' && index === ruas.length - 1) return
-
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-    const newRuas = [...ruas]
-    const [movedRua] = newRuas.splice(index, 1)
-    newRuas.splice(newIndex, 0, movedRua)
-
-    // Atualizar ordens localmente primeiro para feedback visual
-    setRuas(newRuas)
-
-    if (!USE_MOCK) {
-      // Atualizar no backend
-      try {
-        await reordenarRuas(
-          newRuas.map((rua, idx) => ({ id: rua.id, ordem: idx }))
-        )
-      } catch (error) {
-        console.error('Erro ao reordenar ruas:', error)
-        addToast({ message: 'Erro ao reordenar ruas', type: 'error' })
-        loadRuas() // Recarregar em caso de erro
-      }
-    }
-  }
-
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pendente':
+      case 'planejada':
         return <Circle className="h-5 w-5 text-gray-400" />
-      case 'em_andamento':
+      case 'em_execucao':
         return <Clock className="h-5 w-5 text-blue-500" />
-      case 'finalizada':
+      case 'concluida':
         return <CheckCircle className="h-5 w-5 text-green-500" />
       default:
         return null
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'planejada':
+        return { label: 'Planejada', className: 'bg-gray-100 text-gray-800' }
+      case 'em_execucao':
+        return { label: 'Em Execução', className: 'bg-blue-100 text-blue-800' }
+      case 'concluida':
+        return { label: 'Concluída', className: 'bg-green-100 text-green-800' }
+      default:
+        return { label: 'Planejada', className: 'bg-gray-100 text-gray-800' }
     }
   }
 
@@ -331,39 +235,21 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {ruas.map((rua, index) => {
-                const statusInfo = formatarStatusRua(rua.status)
+                const statusInfo = getStatusBadge(rua.status)
                 return (
                   <tr key={rua.id} className="hover:bg-gray-50">
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-900">{index + 1}</span>
-                        <div className="flex flex-col gap-1 ml-2">
-                          <button
-                            onClick={() => handleMoverRua(index, 'up')}
-                            disabled={index === 0}
-                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <ChevronUp className="h-3 w-3" />
-                          </button>
-                          <button
-                            onClick={() => handleMoverRua(index, 'down')}
-                            disabled={index === ruas.length - 1}
-                            className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <ChevronDown className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
+                      <span className="text-sm text-gray-900">{index + 1}</span>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         {getStatusIcon(rua.status)}
-                        <span className="text-sm font-medium text-gray-900">{rua.nome}</span>
+                        <span className="text-sm font-medium text-gray-900">{rua.name}</span>
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-600">
-                        {rua.metragem_planejada ? formatarMetragem(rua.metragem_planejada) : '-'}
+                        {rua.area ? `${rua.area.toLocaleString('pt-BR')} m²` : '-'}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -373,7 +259,7 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {rua.status !== 'finalizada' && (
+                        {rua.status !== 'concluida' && (
                           <Button
                             variant="primary"
                             onClick={() => {
@@ -385,10 +271,11 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
                             Finalizar
                           </Button>
                         )}
-                        {rua.status === 'pendente' && (
+                        {rua.status === 'planejada' && (
                           <button
                             onClick={() => handleDeletarRua(rua)}
                             className="text-red-600 hover:text-red-800 p-1"
+                            title="Deletar rua"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -417,7 +304,7 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
           setRuaSelecionada(null)
         }}
         onSubmit={handleFinalizarRua}
-        ruaNome={ruaSelecionada?.nome || ''}
+        ruaNome={ruaSelecionada?.name || ''}
         precoPorM2={precoPorM2}
       />
     </div>

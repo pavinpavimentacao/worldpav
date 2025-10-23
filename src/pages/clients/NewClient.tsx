@@ -1,15 +1,18 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
 import { supabase } from '../../lib/supabase'
 import { useNavigate } from 'react-router-dom'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { ConfirmDialog } from "../../components/modals/ConfirmDialog"
 import { useToast } from '../../lib/toast-hooks'
 import { useViaCep } from '../../hooks/useViaCep'
 import { formatPhone, formatCep, validatePhone, validateCep } from '../../utils/masks'
+import { getOrCreateDefaultCompany } from '../../lib/company-utils'
+import { createCliente, type ClienteInsertData } from '../../lib/clientesApi'
 
 const schema = z.object({
   rep_name: z.string({ required_error: 'Obrigatório' }).trim().min(1, 'Obrigatório'),
@@ -37,7 +40,11 @@ const schema = z.object({
     .optional()
     .transform((v) => (v ? v.replace(/\D/g, '') : null))
     .refine((v) => !v || validateCep(v), { message: 'CEP deve ter 8 dígitos' }),
-  notes: z.string().optional().transform(v => v || null)
+  notes: z.string().optional().transform(v => v || null),
+  // Novos campos
+  tipo_cliente: z.string().optional().transform(v => v || null),
+  area_atuacao: z.string().optional().transform(v => v || null),
+  empresa_responsavel_id: z.string().optional().transform(v => v || null)
 })
 
 type FormValues = z.infer<typeof schema>
@@ -50,6 +57,22 @@ export default function NewClient() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingData, setPendingData] = useState<FormValues | null>(null)
   const [forceUpdate, setForceUpdate] = useState(0)
+  const [companyId, setCompanyId] = useState<string>('')
+
+  // Carregar company ID ao montar
+  useEffect(() => {
+    loadCompanyId()
+  }, [])
+
+  async function loadCompanyId() {
+    try {
+      const id = await getOrCreateDefaultCompany()
+      setCompanyId(id)
+    } catch (err) {
+      console.error('Erro ao carregar company ID:', err)
+      addToast({ message: 'Erro ao carregar empresa', type: 'error' })
+    }
+  }
 
   const {
     handleSubmit,
@@ -160,47 +183,48 @@ export default function NewClient() {
   }
 
   async function doInsert(values: FormValues) {
-    // Preparar dados para inserção, garantindo que o campo 'name' seja preenchido
-    const insertData = {
-      ...values,
-      // Garantir que o campo 'name' seja preenchido com company_name ou rep_name
-      name: values.company_name || values.rep_name || 'Cliente sem nome'
+    if (!companyId) {
+      throw new Error('Company ID não disponível')
     }
-    
-    console.log('Inserindo cliente:', insertData) // Debug log
-    console.log('Campos específicos:', {
-      name: insertData.name,
-      company_name: insertData.company_name,
-      email: insertData.email,
-      rep_name: insertData.rep_name,
-      phone: insertData.phone,
-      address: insertData.address,
-      city: insertData.city,
-      state: insertData.state
-    })
-    
-    const insertRes = await supabase
-      .from('clients')
-      .insert(insertData)
-      .select()
-      .single()
 
-    if (insertRes.error) {
-      console.error('Erro ao inserir cliente:', insertRes.error)
-      throw insertRes.error
+    // Preparar dados para inserção usando o tipo da API
+    const insertData: ClienteInsertData = {
+      company_id: companyId,
+      name: values.company_name || values.rep_name || 'Cliente sem nome',
+      cpf_cnpj: values.document,
+      email: values.email,
+      phone: values.phone,
+      address: values.address,
+      city: values.city,
+      state: values.state,
+      zip_code: values.cep,
+      observations: values.notes,
+      // Novos campos
+      representante: values.rep_name,
+      empresa: values.company_name,
+      tipo_cliente: values.tipo_cliente,
+      area_atuacao: values.area_atuacao,
+      empresa_responsavel_id: values.empresa_responsavel_id
     }
-    return insertRes.data
+    
+    console.log('Inserindo cliente via API:', insertData)
+    
+    // Usar a API padronizada
+    const created = await createCliente(insertData)
+    
+    console.log('Cliente criado com sucesso:', created)
+    return created
   }
 
   const onSubmit = async (values: FormValues) => {
     try {
-      // valida duplicidade por document (se informado)
+      // valida duplicidade por cpf_cnpj (se informado)
       if (values.document) {
         setCheckingDuplicate(true)
         const dup = await supabase
           .from('clients')
           .select('id')
-          .eq('document', values.document)
+          .eq('cpf_cnpj', values.document)
           .limit(1)
         setCheckingDuplicate(false)
         if (dup.error) throw dup.error
@@ -353,6 +377,85 @@ export default function NewClient() {
                     {errors.document && (
                       <p className="mt-1 text-sm text-red-600">{errors.document.message}</p>
                     )}
+                  </div>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Seção: Informações Adicionais */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
+            <h3 className="text-xl font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
+              Informações Adicionais
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Tipo de Cliente */}
+              <Controller
+                name="tipo_cliente"
+                control={control}
+                render={({ field }) => (
+                  <div>
+                    <Select
+                      label="Tipo de Cliente"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      options={[
+                        { value: '', label: 'Selecione o tipo' },
+                        { value: 'Pessoa Física', label: 'Pessoa Física' },
+                        { value: 'Pessoa Jurídica', label: 'Pessoa Jurídica' },
+                        { value: 'Construtora', label: 'Construtora' },
+                        { value: 'Prefeitura', label: 'Prefeitura' },
+                        { value: 'Empresa Privada', label: 'Empresa Privada' },
+                        { value: 'Incorporadora', label: 'Incorporadora' }
+                      ]}
+                      error={errors.tipo_cliente?.message}
+                    />
+                  </div>
+                )}
+              />
+
+              {/* Área de Atuação */}
+              <Controller
+                name="area_atuacao"
+                control={control}
+                render={({ field }) => (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Área de Atuação
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      placeholder="Ex: Construção Civil, Infraestrutura"
+                    />
+                    {errors.area_atuacao && (
+                      <p className="mt-1 text-sm text-red-600">{errors.area_atuacao.message}</p>
+                    )}
+                  </div>
+                )}
+              />
+
+              {/* Empresa Responsável */}
+              <Controller
+                name="empresa_responsavel_id"
+                control={control}
+                render={({ field }) => (
+                  <div className="md:col-span-2">
+                    <Select
+                      label="Empresa Responsável"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      options={[
+                        { value: '', label: 'Selecione a empresa responsável' },
+                        { value: companyId || '', label: 'WorldPav' },
+                        { value: '48cf8b61-6737-4aa5-af3f-51fba9f12346', label: 'Pavin' }
+                      ]}
+                      error={errors.empresa_responsavel_id?.message}
+                    />
                   </div>
                 )}
               />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout } from '../../components/Layout';
-import { ProgramacaoPavimentacaoForm } from '../../components/ProgramacaoPavimentacaoForm';
+import { Layout } from "../../components/layout/Layout";
+import { ProgramacaoPavimentacaoForm } from "../../components/programacao/ProgramacaoPavimentacaoForm";
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 

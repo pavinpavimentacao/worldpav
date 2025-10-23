@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { X } from 'lucide-react'
-import { Button } from '../Button'
+import React, { useState, useRef } from 'react'
+import { X, Upload, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { Button } from "../shared/Button"
 
 interface AdicionarRuaModalProps {
   isOpen: boolean
@@ -8,16 +8,57 @@ interface AdicionarRuaModalProps {
   onSubmit: (data: {
     nome: string
     metragem_planejada?: number
+    toneladas_previstas?: number
     observacoes?: string
+    imagem_trecho?: File
   }) => Promise<void>
 }
 
 export function AdicionarRuaModal({ isOpen, onClose, onSubmit }: AdicionarRuaModalProps) {
   const [nome, setNome] = useState('')
   const [metragemPlanejada, setMetragemPlanejada] = useState('')
+  const [toneladasPrevistas, setToneladasPrevistas] = useState('')
   const [observacoes, setObservacoes] = useState('')
+  const [imagemTrecho, setImagemTrecho] = useState<File | null>(null)
+  const [imagemPreview, setImagemPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validar tipo de arquivo
+      if (!file.type.startsWith('image/')) {
+        setError('Por favor, selecione apenas arquivos de imagem')
+        return
+      }
+      
+      // Validar tamanho (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('A imagem deve ter no máximo 5MB')
+        return
+      }
+
+      setImagemTrecho(file)
+      setError('')
+      
+      // Criar preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagemPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setImagemTrecho(null)
+    setImagemPreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   if (!isOpen) return null
 
@@ -36,13 +77,21 @@ export function AdicionarRuaModal({ isOpen, onClose, onSubmit }: AdicionarRuaMod
       await onSubmit({
         nome: nome.trim(),
         metragem_planejada: metragemPlanejada ? parseFloat(metragemPlanejada) : undefined,
-        observacoes: observacoes.trim() || undefined
+        toneladas_previstas: toneladasPrevistas ? parseFloat(toneladasPrevistas) : undefined,
+        observacoes: observacoes.trim() || undefined,
+        imagem_trecho: imagemTrecho || undefined
       })
 
       // Limpar formulário
       setNome('')
       setMetragemPlanejada('')
+      setToneladasPrevistas('')
       setObservacoes('')
+      setImagemTrecho(null)
+      setImagemPreview(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       onClose()
     } catch (err: any) {
       setError(err.message || 'Erro ao adicionar rua')
@@ -55,8 +104,14 @@ export function AdicionarRuaModal({ isOpen, onClose, onSubmit }: AdicionarRuaMod
     if (!isSubmitting) {
       setNome('')
       setMetragemPlanejada('')
+      setToneladasPrevistas('')
       setObservacoes('')
+      setImagemTrecho(null)
+      setImagemPreview(null)
       setError('')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
       onClose()
     }
   }
@@ -118,6 +173,24 @@ export function AdicionarRuaModal({ isOpen, onClose, onSubmit }: AdicionarRuaMod
             />
           </div>
 
+          {/* Toneladas Previstas */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Toneladas Previstas (t)
+              <span className="text-gray-500 text-xs ml-1">(opcional)</span>
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              value={toneladasPrevistas}
+              onChange={(e) => setToneladasPrevistas(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="Ex: 50.5"
+              disabled={isSubmitting}
+            />
+          </div>
+
           {/* Observações */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -130,6 +203,59 @@ export function AdicionarRuaModal({ isOpen, onClose, onSubmit }: AdicionarRuaMod
               onChange={(e) => setObservacoes(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
               placeholder="Informações adicionais sobre a rua..."
+              disabled={isSubmitting}
+            />
+          </div>
+
+          {/* Upload de Imagem */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Foto do Trecho
+              <span className="text-gray-500 text-xs ml-1">(opcional)</span>
+            </label>
+            
+            {!imagemPreview ? (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
+              >
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600 mb-1">
+                  Clique para selecionar uma imagem
+                </p>
+                <p className="text-xs text-gray-500">
+                  JPG, PNG, GIF até 5MB
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden">
+                  <img
+                    src={imagemPreview}
+                    alt="Preview do trecho"
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {imagemTrecho?.name} ({(imagemTrecho?.size! / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              </div>
+            )}
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
               disabled={isSubmitting}
             />
           </div>

@@ -10,7 +10,6 @@ export const clientSchema = z.object({
 
 export type ClientFormData = z.infer<typeof clientSchema>
 
-// Schema para validação de bombas
 export const pumpSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').max(255, 'Nome muito longo'),
   model: z.string().optional().or(z.literal('')),
@@ -25,8 +24,7 @@ export type PumpFormData = z.infer<typeof pumpSchema>
 
 // Schema para validação de relatórios
 export const reportSchema = z.object({
-  client_id: z.string().min(1, 'Cliente é obrigatório'),
-  pump_id: z.string().min(1, 'Bomba é obrigatória'),
+  client_id: z.string().min(1, 'Cliente é obrigatório'): z.string().min(1, 'Bomba é obrigatória'),
   company_id: z.string().min(1, 'ID da empresa é obrigatório'),
   start_date: z.string().min(1, 'Data de início é obrigatória'),
   end_date: z.string().min(1, 'Data de fim é obrigatória'),

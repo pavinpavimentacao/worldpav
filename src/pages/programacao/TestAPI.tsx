@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout } from '../../components/Layout';
+import { Layout } from "../../components/layout/Layout";
 import { supabase } from '../../lib/supabase';
 import { formatDateToBR } from '../../utils/date-utils';
 

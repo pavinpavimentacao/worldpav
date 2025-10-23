@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
-import { Table } from '../../components/Table';
-// import { FileDownloadButton } from '../../components/FileDownloadButton';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
+import { Table } from "../../components/shared/Table";
+// import { FileDownloadButton } from "../../components/exports/FileDownloadButton";
 import { formatCurrency } from '../../utils/format';
 import { formatDateSafe } from '../../utils/date-utils';
 import type { Database } from '../../lib/supabase';

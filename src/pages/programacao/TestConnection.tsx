@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
 import { formatDateToBR } from '../../utils/date-utils';
 
 export default function TestConnection() {

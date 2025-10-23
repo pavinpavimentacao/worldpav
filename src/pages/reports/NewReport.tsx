@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { DatePicker } from '../../components/ui/date-picker';
 import { generateReportNumber } from '../../utils/reportNumberGenerator'
 // import { CreateReportData } from '../../types/reports'
@@ -65,9 +65,7 @@ const baseReportSchema = z.object({
   client_id: z.string().min(1, 'Cliente é obrigatório'),
   client_rep_name: z.string().min(1, 'Nome do representante é obrigatório'),
   client_phone: z.string().min(1, 'Telefone do cliente é obrigatório'),
-  work_address: z.string().min(1, 'Endereço da obra é obrigatório'),
-  pump_id: z.string().min(1, 'Bomba é obrigatória'),
-  pump_prefix: z.string().min(1, 'Prefixo da bomba é obrigatório'),
+  work_address: z.string().min(1, 'Endereço da obra é obrigatório'): z.string().min(1, 'Bomba é obrigatória'): z.string().min(1, 'Prefixo da bomba é obrigatório'),
   pump_owner_company_id: z.string().min(1, 'Empresa proprietária é obrigatória'),
   service_company_id: z.string().min(1, 'Empresa do serviço é obrigatória'),
   planned_volume: z.string().min(1, 'Volume planejado é obrigatório'),
@@ -76,7 +74,6 @@ const baseReportSchema = z.object({
   observations: z.string().optional()
 })
 
-// Schema para bombas internas (com equipe obrigatória)
 const internalPumpSchema = baseReportSchema.extend({
   driver_id: z.string().min(1, 'Motorista é obrigatório para bombas internas'),
   assistants: z.array(z.object({
@@ -84,7 +81,6 @@ const internalPumpSchema = baseReportSchema.extend({
   })).min(1, 'Pelo menos um auxiliar é obrigatório para bombas internas')
 })
 
-// Schema para bombas terceiras (sem equipe obrigatória)
 const thirdPartyPumpSchema = baseReportSchema.extend({
   driver_id: z.string().optional(),
   assistants: z.array(z.object({
@@ -92,12 +88,10 @@ const thirdPartyPumpSchema = baseReportSchema.extend({
   })).optional()
 })
 
-// Função para criar schema dinâmico baseado no tipo de bomba
 const createReportSchema = (isThirdPartyPump: boolean) => {
   return isThirdPartyPump ? thirdPartyPumpSchema : internalPumpSchema
 }
 
-// Tipo união para ReportFormData que aceita tanto bombas internas quanto terceiras
 type ReportFormData = z.infer<typeof baseReportSchema> & {
   driver_id: string;
   assistants: Array<{ id: string }>;
@@ -149,9 +143,7 @@ export default function NewReport() {
     client_id: '',
     client_rep_name: '',
     client_phone: '',
-    work_address: '',
-    pump_id: '',
-    pump_prefix: '',
+    work_address: '': '': '',
     pump_owner_company_id: '',
     service_company_id: '',
     planned_volume: '',
@@ -216,8 +208,7 @@ export default function NewReport() {
 
   const loadPumps = async () => {
     try {
-      // Carregar bombas internas com dados da empresa
-      const { data: pumpsData, error: pumpsError } = await supabase
+            const { data: pumpsData, error: pumpsError } = await supabase
         .from('pumps')
         .select(`
           id, 
@@ -234,16 +225,14 @@ export default function NewReport() {
 
       if (pumpsError) throw pumpsError
 
-      // Carregar bombas de terceiros
-      const { data: bombasTerceirasData, error: bombasTerceirasError } = await supabase
+            const { data: bombasTerceirasData, error: bombasTerceirasError } = await supabase
         .from('view_bombas_terceiras_com_empresa')
         .select('*')
         .order('prefixo')
 
       if (bombasTerceirasError) throw bombasTerceirasError
 
-      // Transformar bombas de terceiros para o formato esperado
-      const bombasTerceirasFormatted = (bombasTerceirasData || []).map((bomba: any) => ({
+            const bombasTerceirasFormatted = (bombasTerceirasData || []).map((bomba: any) => ({
         id: bomba.id,
         prefix: bomba.prefixo,
         model: bomba.modelo,
@@ -254,8 +243,7 @@ export default function NewReport() {
         valor_diaria: bomba.valor_diaria
       }))
 
-      // Combinar bombas internas e de terceiros
-      const allPumps = [
+            const allPumps = [
         ...(pumpsData || []).map(pump => ({ 
           ...pump, 
           is_terceira: false,
@@ -330,11 +318,9 @@ export default function NewReport() {
       is_terceira: pump?.is_terceira
     })
     
-    // Limpar campos de equipe se for bomba terceira
-    const isThirdPartyPump = pump?.is_terceira || false
+        const isThirdPartyPump = pump?.is_terceira || false
     
-    // Buscar empresa do serviço baseada na empresa da bomba
-    let serviceCompanyId = ''
+        let serviceCompanyId = ''
     if (pump?.empresa_nome) {
       console.log('🔍 [DEBUG] Buscando empresa:', {
         empresa_nome: pump.empresa_nome,
@@ -357,18 +343,14 @@ export default function NewReport() {
     }
     
     setFormData(prev => ({
-      ...prev,
-      pump_id: pumpId,
-      pump_prefix: pump?.prefix || '',
+      ...prev: pumpId: pump?.prefix || '',
       pump_owner_company_id: pump?.owner_company_id || '',
       service_company_id: serviceCompanyId,
-      // Limpar campos de equipe para bombas terceiras
-      driver_id: isThirdPartyPump ? '' : prev.driver_id,
+            driver_id: isThirdPartyPump ? '' : prev.driver_id,
       assistants: isThirdPartyPump ? [] : prev.assistants
     }))
     
-    // Limpar erros relacionados à equipe quando trocar de bomba
-    if (isThirdPartyPump) {
+        if (isThirdPartyPump) {
       setErrors(prev => {
         const newErrors = { ...prev }
         delete newErrors.driver_id
@@ -379,8 +361,7 @@ export default function NewReport() {
   }
 
   const addAssistant = () => {
-    // Não permitir adicionar auxiliares para bombas terceiras
-    if (selectedPump?.is_terceira) return
+        if (selectedPump?.is_terceira) return
     
     setFormData(prev => ({
       ...prev,
@@ -389,11 +370,9 @@ export default function NewReport() {
   }
 
   const removeAssistant = (index: number) => {
-    // Para bombas terceiras, não há auxiliares para remover
-    if (selectedPump?.is_terceira) return
+        if (selectedPump?.is_terceira) return
     
-    // Para bombas internas, manter pelo menos um auxiliar
-    const currentAssistants = formData.assistants || []
+        const currentAssistants = formData.assistants || []
     if (currentAssistants.length > 1) {
       setFormData(prev => ({
         ...prev,
@@ -425,8 +404,7 @@ export default function NewReport() {
 
   const updatePumpTotalBilled = async (pumpId: string, amount: number) => {
     try {
-      // Verificar se é uma bomba terceira primeiro
-      const { data: bombaTerceira } = await supabase
+            const { data: bombaTerceira } = await supabase
         .from('bombas_terceiras')
         .select('id')
         .eq('id', pumpId)
@@ -434,8 +412,7 @@ export default function NewReport() {
 
       if (bombaTerceira) {
         console.log('Bomba terceira detectada - pulando atualização de total_billed')
-        return // Bombas terceiras não têm total_billed
-      }
+        return       }
 
       // Tentar usar RPC se existir
       const { error } = await supabase.rpc('increment_pump_total_billed', {
@@ -448,8 +425,7 @@ export default function NewReport() {
       console.log('RPC não disponível, atualizando manualmente')
     }
 
-    // Atualizar manualmente apenas para bombas internas
-    const { data: pump, error: fetchError } = await supabase
+        const { data: pump, error: fetchError } = await supabase
       .from('pumps')
       .select('total_billed')
       .eq('id', pumpId)
@@ -483,8 +459,7 @@ export default function NewReport() {
       // Validação prévia para garantir integridade dos dados
       const isThirdPartyPump = selectedPump?.is_terceira || false
       
-      // Para bombas internas, garantir que pelo menos um auxiliar seja selecionado
-      if (!isThirdPartyPump) {
+            if (!isThirdPartyPump) {
         const hasValidAssistant = formData.assistants?.some(assistant => assistant.id && assistant.id.trim() !== '')
         if (!hasValidAssistant) {
           setErrors({ assistants: 'Pelo menos um auxiliar deve ser selecionado para bombas internas' })
@@ -492,8 +467,7 @@ export default function NewReport() {
         }
       }
 
-      // Validar dados com schema dinâmico baseado no tipo de bomba
-      const dynamicSchema = createReportSchema(isThirdPartyPump)
+            const dynamicSchema = createReportSchema(isThirdPartyPump)
       const validatedData = dynamicSchema.parse(formData)
 
       // Gerar número do relatório
@@ -528,9 +502,6 @@ export default function NewReport() {
         client_id: validatedData.client_id,
         client_rep_name: validatedData.client_rep_name,
         work_address: validatedData.work_address,
-        whatsapp_digits: validatedData.client_phone,
-        pump_id: validatedData.pump_id,
-        pump_prefix: validatedData.pump_prefix,
         planned_volume: validatedData.planned_volume ? parseFloat(validatedData.planned_volume) : null,
         realized_volume: parseFloat(validatedData.realized_volume),
         total_value: parseCurrency(validatedData.total_value),
@@ -555,8 +526,7 @@ export default function NewReport() {
         throw new Error(`Erro ao inserir relatório: ${reportError.message}`)
       }
 
-      // Atualizar total faturado da bomba
-      await updatePumpTotalBilled(validatedData.pump_id, parseCurrency(validatedData.total_value))
+            await updatePumpTotalBilled(validatedData.pump_id, parseCurrency(validatedData.total_value))
 
       // Redirecionar para lista de relatórios
       window.location.href = '/reports'
@@ -727,12 +697,12 @@ export default function NewReport() {
           </div>
         </div>
 
-        {/* Seção: Informações da Bomba */}
+        {}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Informações da Bomba</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Bomba */}
+            {}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Bomba *
@@ -756,7 +726,7 @@ export default function NewReport() {
               )}
             </div>
 
-            {/* Prefixo da Bomba */}
+            {}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Prefixo da Bomba *
@@ -764,12 +734,9 @@ export default function NewReport() {
               <input
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={formData.pump_prefix ?? ''}
                 disabled
                 placeholder="Preenchido automaticamente"
               />
-              {errors.pump_prefix && (
-                <p className="mt-1 text-sm text-red-600">{errors.pump_prefix}</p>
               )}
             </div>
 
@@ -867,7 +834,7 @@ export default function NewReport() {
           </div>
         </div>
 
-        {/* Seção: Equipe - Ocultar para bombas terceiras */}
+        {}
         {!selectedPump?.is_terceira && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-6">Equipe</h3>
@@ -961,7 +928,7 @@ export default function NewReport() {
           </div>
         )}
 
-        {/* Aviso para bombas terceiras */}
+        {}
         {selectedPump?.is_terceira && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
             <div className="flex items-center">

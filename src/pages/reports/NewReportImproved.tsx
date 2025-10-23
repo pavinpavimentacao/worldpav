@@ -3,9 +3,9 @@ import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
 import { DatePicker } from '../../components/ui/date-picker'
 import { getAllObrasWithProgress } from '../../types/obras'
 import { 
@@ -36,7 +36,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-// Mock data para bombas
 const mockBombas = [
   { id: '1', prefix: 'WP-001', model: 'Vibroacabadora CAT AP1055F', status: 'active' },
   { id: '2', prefix: 'WP-002', model: 'Vibroacabadora Dynapac CA2500', status: 'active' },
@@ -260,7 +259,7 @@ export default function NewReportImproved() {
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Bomba */}
+              {}
               <Controller
                 name="bomba_id"
                 control={control}

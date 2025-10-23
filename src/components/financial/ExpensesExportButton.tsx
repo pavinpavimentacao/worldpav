@@ -20,7 +20,7 @@ interface ExpensesExportButtonProps {
   expenses: ExpenseWithRelations[];
   filters?: {
     company_id?: string;
-    pump_id?: string;
+
     categoria?: string[];
     tipo_custo?: string[];
     status?: string[];

@@ -3,7 +3,7 @@ import { Calendar, AlertTriangle, CheckCircle, DollarSign, Users, Clock, Truck }
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { ConfirmationModal } from "../../components/modals/ConfirmationModal";
 import { useToast } from '../../lib/toast-hooks';
 import { supabase } from '../../lib/supabase';
 import { formatDateToBR } from '../../utils/date-utils';
@@ -90,8 +90,7 @@ export function FolhaSalarial() {
       
       console.log('🔍 [FolhaSalarial] Iniciando carregamento...');
       
-      // Buscar todos os colaboradores e bombas
-      const [colaboradoresResult, bombasResult] = await Promise.all([
+            const [colaboradoresResult, bombasResult] = await Promise.all([
         supabase
           .from('colaboradores')
           .select('*')
@@ -244,8 +243,7 @@ export function FolhaSalarial() {
           : funcionarioParaPagar.data_pagamento_2;
       }
 
-      // Buscar o owner_company_id da bomba selecionada
-      const { data: bombaData, error: bombaError } = await supabase
+            const { data: bombaData, error: bombaError } = await supabase
         .from('pumps')
         .select('owner_company_id')
         .eq('id', bombaSelecionada.id)
@@ -265,10 +263,8 @@ export function FolhaSalarial() {
           categoria: 'Mão de obra',
           tipo_custo: 'fixo', // Adicionando tipo_custo obrigatório
           data_despesa: dataPagamento,
-          status: 'pago',
-          pump_id: bombaSelecionada.id,
-          company_id: bombaData.owner_company_id, // Usando owner_company_id da bomba (correto!)
-          created_at: new Date().toISOString(),
+          status: 'pago': bombaSelecionada.id,
+          company_id: bombaData.owner_company_id,           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         });
 
@@ -276,8 +272,7 @@ export function FolhaSalarial() {
 
       const tipoTexto = tipoPagamento === 'diaria' ? 'diária' : 'pagamento';
       console.log(`✅ ${tipoTexto === 'diária' ? 'Diária' : 'Pagamento'} de ${formatarSalario(valor)} registrado para ${funcionarioParaPagar.nome} na bomba ${bombaSelecionada.prefix}`);
-      // showToast(`${tipoTexto === 'diária' ? 'Diária' : 'Pagamento'} de ${formatarSalario(valor)} registrado para ${funcionarioParaPagar.nome} na bomba ${bombaSelecionada.prefix}`, 'success');
-      
+            
       // Recarregar dados
       await loadFolhaSalarial();
       
@@ -635,7 +630,7 @@ export function FolhaSalarial() {
             </CardContent>
           </Card>
 
-          {/* Modal de Seleção de Bomba */}
+          {}
           {showBombaModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">

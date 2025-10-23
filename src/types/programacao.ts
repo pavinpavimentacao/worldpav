@@ -22,7 +22,7 @@ export interface Programacao {
   slump?: string;
   motorista_operador?: string;
   auxiliares_bomba?: string[]; // Array de IDs dos auxiliares
-  bomba_id?: string;
+
   status: ProgramacaoStatus; // Status da programação
   company_id: string;
   created_at: string;
@@ -49,8 +49,7 @@ export interface ProgramacaoFormData {
   brita?: string;
   slump?: string;
   motorista_operador?: string;
-  auxiliares_bomba?: string[];
-  bomba_id?: string;
+
   status: ProgramacaoStatus; // Status da programação
   company_id: string;
 }
@@ -100,16 +99,7 @@ export interface ColaboradorOption {
   funcao: string;
 }
 
-export interface BombaOption {
-  id: string;
-  prefix: string;
-  model: string;
-  brand: string;
-  is_terceira?: boolean;
-  empresa_nome?: string;
-  valor_diaria?: number;
-  has_programacao?: boolean;
-}
+
 
 export interface ClienteOption {
   id: string;
@@ -126,7 +116,7 @@ export interface EmpresaOption {
 export interface ProgramacaoFilters {
   company_id?: string;
   cliente?: string;
-  bomba_id?: string;
+
   colaborador_id?: string;
   data_inicio?: string;
   data_fim?: string;

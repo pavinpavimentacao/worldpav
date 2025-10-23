@@ -2,6 +2,8 @@
  * Tipos para Programação de Pavimentação
  */
 
+export type StatusProgramacao = 'programada' | 'confirmada' | 'cancelada';
+
 export interface ProgramacaoPavimentacao {
   id: string;
   
@@ -28,6 +30,12 @@ export interface ProgramacaoPavimentacao {
   observacoes?: string;
   tipo_servico?: string; // "CBUQ", "Imprimação", etc.
   espessura?: string; // cm
+  
+  // Status e Confirmação
+  status: StatusProgramacao; // Status da programação
+  confirmada: boolean; // Se a obra foi confirmada/finalizada
+  data_confirmacao?: string; // Quando foi confirmada
+  relatorio_diario_id?: string; // ID do relatório gerado
   
   // Controle
   company_id: string;

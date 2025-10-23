@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import { ReportWithRelations } from '../types/reports'
-import { formatCurrency } from './formatters'
+import { formatCurrency } from './format'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 // import { formatDateSafe } from './date-utils'
@@ -98,7 +98,6 @@ export const formatReportsForExport = (reports: ReportWithRelations[]): any[] =>
     'Representante': report.client_rep_name || 'N/A',
     'Telefone': report.whatsapp_digits || 'N/A',
     'Endereço': report.work_address || 'N/A',
-    'Bomba': report.pumps?.prefix || report.pump_prefix || 'N/A',
     'Modelo Bomba': report.pumps?.model || 'N/A',
     'Empresa Bomba': report.pumps?.is_terceira ? 
       `${report.pumps.empresa_nome || 'N/A'} (Terceira)` : 
@@ -121,7 +120,7 @@ export const formatReportsForExport = (reports: ReportWithRelations[]): any[] =>
  */
 export const generateReportHeader = (data: ExportData): any[] => {
   const header = [
-    ['RELATÓRIO DE BOMBEAMENTOS - FÉLIX MIX / WORLD RENTAL'],
+    ['RELATÓRIO DE BOMBEAMENTOS - WORLDPAV'],
     [''],
     ['Data de Exportação:', data.exportDate],
     ['Total de Registros:', data.totalRecords.toString()],
@@ -145,10 +144,6 @@ export const generateReportHeader = (data: ExportData): any[] => {
     
     if (data.filters.searchTerm) {
       header.push(['Busca:', `${data.filters.searchTerm} (${data.filters.searchType})`])
-    }
-    
-    if (data.filters.pump_prefix) {
-      header.push(['Bomba:', data.filters.pump_prefix])
     }
     
     if (data.filters.client_id) {
@@ -178,7 +173,7 @@ export const exportToXLSX = (data: ExportData, options: ExportOptions = { format
     
     // Dados simples sem formatação complexa
     const simpleData = [
-      ['RELATÓRIO DE BOMBEAMENTOS - FÉLIX MIX / WORLD RENTAL'],
+      ['RELATÓRIO DE BOMBEAMENTOS - WORLDPAV'],
       [''],
       ['Data de Exportação:', data.exportDate],
       ['Total de Registros:', data.totalRecords.toString()],
@@ -192,7 +187,6 @@ export const exportToXLSX = (data: ExportData, options: ExportOptions = { format
         safeFormatDate(report.date),
         report.clients?.name || report.client_rep_name || 'N/A',
         report.work_address || 'N/A',
-        report.pumps?.prefix || report.pump_prefix || 'N/A',
         report.realized_volume || 0,
         report.total_value || 0,
         formatStatus(report.status)
@@ -264,7 +258,7 @@ export const exportToPDF = (data: ExportData, options: ExportOptions = { format:
     
     doc.setFontSize(14)
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2])
-    doc.text('FÉLIX MIX / WORLD RENTAL', pageWidth / 2, 35, { align: 'center' })
+    doc.text('WORLDPAV', pageWidth / 2, 35, { align: 'center' })
     
     // Informações básicas
     doc.setFontSize(10)
@@ -353,7 +347,6 @@ export const exportToPDF = (data: ExportData, options: ExportOptions = { format:
         safeFormatDate(report.date),
         (report.clients?.name || report.client_rep_name || 'N/A').substring(0, 12),
         (report.work_address || 'N/A').substring(0, 18),
-        report.pumps?.prefix || report.pump_prefix || 'N/A',
         (report.realized_volume || 0).toFixed(2),
         safeFormatCurrency(report.total_value),
         formatStatus(report.status)
@@ -373,7 +366,7 @@ export const exportToPDF = (data: ExportData, options: ExportOptions = { format:
     // Rodapé simples
     doc.setFontSize(8)
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2])
-    doc.text('Relatório gerado pelo Sistema de Gestão Félix Mix', 
+    doc.text('Relatório gerado pelo Sistema de Gestão WorldPav', 
              pageWidth / 2, pageHeight - 20, { align: 'center' })
     
     // Salvar arquivo

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '../Button';
+import { Button } from "../shared/Button";
 import { FileDown, Calendar, X } from 'lucide-react';
 import type { ProgramacaoPavimentacao } from '../../types/programacao-pavimentacao';
 import { formatDateBR } from '../../utils/date-format';

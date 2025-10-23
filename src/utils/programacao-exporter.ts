@@ -249,8 +249,7 @@ export class ProgramacaoExporter {
         id: p.id,
         data: p.data,
         horario: p.horario,
-        cliente: p.cliente,
-        bomba_id: p.bomba_id,
+        cliente: p.cliente: p.bomba_id,
         volume_previsto: p.volume_previsto,
         quantidade_material: p.quantidade_material,
         peca_concretada: p.peca_concretada,
@@ -331,7 +330,7 @@ export class ProgramacaoExporter {
     pdf.setFontSize(10);
     pdf.setTextColor(0, 0, 0);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('FÉLIX MIX / WORLD RENTAL', pageWidth / 2, 42, { align: 'center' });
+    pdf.text('WORLDPAV', pageWidth / 2, 42, { align: 'center' });
     
     // Linha separadora
     pdf.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -415,8 +414,7 @@ export class ProgramacaoExporter {
       const motoristaNome = this.getColaboradorName(programacao.motorista_operador, data.colaboradores);
       const auxiliaresNomes = this.getAuxiliaresNames(programacao.auxiliares_bomba, data.colaboradores);
       
-      // Buscar prefixo da bomba
-      const bombaPrefix = this.getBombaPrefix(programacao.bomba_id, data.bombas);
+            const bombaPrefix = this.getBombaPrefix(programacao.bomba_id, data.bombas);
       
       // Debug: Log dos dados da programação
       console.log('🔍 [PDF Debug] Programação:', {
@@ -507,7 +505,7 @@ export class ProgramacaoExporter {
     
     pdf.setFontSize(8);
     pdf.setTextColor(128, 128, 128);
-    pdf.text('Programação gerada pelo Sistema de Gestão Félix Mix', 
+    pdf.text('Programação gerada pelo Sistema de Gestão WorldPav', 
              pageWidth / 2, pageHeight - 15, { align: 'center' });
     
     const now = new Date();
@@ -706,7 +704,7 @@ export class ProgramacaoExporter {
     
     // Informações da empresa
     pdf.setFontSize(14);
-    pdf.text('Felix Mix / WorldRental', pageWidth / 2, 40, { align: 'center' });
+    pdf.text('WorldPav', pageWidth / 2, 40, { align: 'center' });
     
     // Estatísticas rápidas
     const totalProgramacoes = data.programacoes.length;
@@ -791,7 +789,7 @@ export class ProgramacaoExporter {
     pdf.text(dataGeracao, pageWidth / 2, pageHeight - 15, { align: 'center' });
     
     // Informações da empresa
-    pdf.text('Felix Mix / WorldRental - Sistema de Gestão', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.text('WorldPav - Sistema de Gestão', pageWidth / 2, pageHeight - 10, { align: 'center' });
   }
 
   private static generateFileName(data: ProgramacaoExportData, extension: string): string {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, AlertCircle } from 'lucide-react'
-import { Button } from '../Button'
+import { Button } from "../shared/Button"
 import { calcularEspessura, formatarEspessura, formatarMetragem, formatarToneladas } from '../../utils/financeiro-obras-utils'
 
 interface FinalizarRuaModalProps {

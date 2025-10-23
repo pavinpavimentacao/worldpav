@@ -1,5 +1,5 @@
 /**
- * Configuração centralizada de timezone para o sistema WorldRental – Felix Mix
+ * Configuração centralizada de timezone para o sistema WorldPav
  * Garante que todas as operações de data/hora sejam consistentes
  */
 

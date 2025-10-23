@@ -1,157 +1,223 @@
-/**
- * API para gerenciamento de ruas das obras
- */
-
 import { supabase } from './supabase'
-import type { 
-  ObraRua, 
-  CreateRuaInput, 
-  UpdateRuaInput,
-  RuaStatus 
-} from '../types/obras-financeiro'
 
-/**
- * Lista todas as ruas de uma obra
- */
-export async function getObrasRuas(obraId: string): Promise<ObraRua[]> {
-  const { data, error } = await supabase
-    .from('obras_ruas')
-    .select('*')
-    .eq('obra_id', obraId)
-    .order('ordem', { ascending: true })
-    .order('created_at', { ascending: true })
+// =====================================================
+// TIPOS E INTERFACES
+// =====================================================
 
-  if (error) {
-    console.error('Erro ao buscar ruas da obra:', error)
-    throw error
-  }
-
-  return data || []
+export interface ObraRua {
+  id: string
+  obra_id: string
+  name: string
+  length?: number | null
+  width?: number | null
+  area?: number | null
+  status: 'planejada' | 'em_execucao' | 'concluida'
+  start_date?: string | null
+  end_date?: string | null
+  observations?: string | null
+  created_at: string
+  deleted_at?: string | null
 }
 
-/**
- * Cria uma nova rua
- */
-export async function createRua(input: CreateRuaInput): Promise<ObraRua> {
-  // Buscar a maior ordem atual para a obra
-  const { data: maxOrdemData } = await supabase
-    .from('obras_ruas')
-    .select('ordem')
-    .eq('obra_id', input.obra_id)
-    .order('ordem', { ascending: false })
-    .limit(1)
-    .single()
-
-  const novaOrdem = input.ordem ?? (maxOrdemData?.ordem ?? -1) + 1
-
-  const { data, error } = await supabase
-    .from('obras_ruas')
-    .insert({
-      ...input,
-      ordem: novaOrdem,
-      status: 'pendente'
-    })
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Erro ao criar rua:', error)
-    throw error
-  }
-
-  return data
+export interface ObraRuaInsertData {
+  obra_id: string
+  name: string
+  length?: number | null
+  width?: number | null
+  area?: number | null
+  status?: 'planejada' | 'em_execucao' | 'concluida'
+  start_date?: string | null
+  end_date?: string | null
+  observations?: string | null
 }
 
-/**
- * Atualiza uma rua existente
- */
-export async function updateRua(id: string, input: UpdateRuaInput): Promise<ObraRua> {
-  const { data, error } = await supabase
-    .from('obras_ruas')
-    .update(input)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Erro ao atualizar rua:', error)
-    throw error
-  }
-
-  return data
+export interface ObraRuaUpdateData {
+  name?: string
+  length?: number | null
+  width?: number | null
+  area?: number | null
+  status?: 'planejada' | 'em_execucao' | 'concluida'
+  start_date?: string | null
+  end_date?: string | null
+  observations?: string | null
 }
 
-/**
- * Deleta uma rua
- */
-export async function deleteRua(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('obras_ruas')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    console.error('Erro ao deletar rua:', error)
-    throw error
-  }
-}
+// =====================================================
+// FUNÇÕES DA API
+// =====================================================
 
 /**
- * Atualiza apenas o status de uma rua
+ * Busca todas as ruas de uma obra
  */
-export async function updateRuaStatus(id: string, status: RuaStatus): Promise<ObraRua> {
-  return updateRua(id, { status })
-}
-
-/**
- * Reordena ruas de uma obra
- */
-export async function reordenarRuas(updates: Array<{ id: string; ordem: number }>): Promise<void> {
-  const promises = updates.map(update =>
-    supabase
+export async function getRuasByObra(obraId: string): Promise<ObraRua[]> {
+  try {
+    const { data, error } = await supabase
       .from('obras_ruas')
-      .update({ ordem: update.ordem })
-      .eq('id', update.id)
-  )
+      .select('*')
+      .eq('obra_id', obraId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
 
-  const results = await Promise.all(promises)
-  const errors = results.filter(r => r.error)
+    if (error) {
+      console.error('Erro ao buscar ruas:', error)
+      throw new Error(`Erro ao buscar ruas: ${error.message}`)
+    }
 
-  if (errors.length > 0) {
-    console.error('Erro ao reordenar ruas:', errors)
-    throw errors[0].error
+    return data || []
+  } catch (error) {
+    console.error('Erro ao buscar ruas:', error)
+    throw error
   }
 }
 
 /**
  * Busca uma rua específica por ID
  */
-export async function getRuaById(id: string): Promise<ObraRua | null> {
-  const { data, error } = await supabase
-    .from('obras_ruas')
-    .select('*')
-    .eq('id', id)
-    .single()
+export async function getRuaById(ruaId: string): Promise<ObraRua | null> {
+  try {
+    const { data, error } = await supabase
+      .from('obras_ruas')
+      .select('*')
+      .eq('id', ruaId)
+      .is('deleted_at', null)
+      .single()
 
-  if (error) {
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null
+      }
+      console.error('Erro ao buscar rua:', error)
+      throw new Error(`Erro ao buscar rua: ${error.message}`)
+    }
+
+    return data
+  } catch (error) {
     console.error('Erro ao buscar rua:', error)
-    return null
+    throw error
   }
-
-  return data
 }
 
 /**
- * Conta quantas ruas tem cada status
+ * Cria uma nova rua
  */
-export async function contarRuasPorStatus(obraId: string): Promise<Record<RuaStatus, number>> {
-  const ruas = await getObrasRuas(obraId)
+export async function createRua(ruaData: ObraRuaInsertData): Promise<ObraRua> {
+  try {
+    const { data, error } = await supabase
+      .from('obras_ruas')
+      .insert(ruaData)
+      .select('*')
+      .single()
 
-  return {
-    pendente: ruas.filter(r => r.status === 'pendente').length,
-    em_andamento: ruas.filter(r => r.status === 'em_andamento').length,
-    finalizada: ruas.filter(r => r.status === 'finalizada').length
+    if (error) {
+      console.error('Erro ao criar rua:', error)
+      throw new Error(`Erro ao criar rua: ${error.message}`)
+    }
+
+    return data
+  } catch (error) {
+    console.error('Erro ao criar rua:', error)
+    throw error
   }
 }
 
+/**
+ * Atualiza uma rua existente
+ */
+export async function updateRua(ruaId: string, ruaData: ObraRuaUpdateData): Promise<ObraRua> {
+  try {
+    const { data, error } = await supabase
+      .from('obras_ruas')
+      .update(ruaData)
+      .eq('id', ruaId)
+      .select('*')
+      .single()
 
+    if (error) {
+      console.error('Erro ao atualizar rua:', error)
+      throw new Error(`Erro ao atualizar rua: ${error.message}`)
+    }
+
+    return data
+  } catch (error) {
+    console.error('Erro ao atualizar rua:', error)
+    throw error
+  }
+}
+
+/**
+ * Exclui uma rua (soft delete)
+ */
+export async function deleteRua(ruaId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('obras_ruas')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', ruaId)
+
+    if (error) {
+      console.error('Erro ao excluir rua:', error)
+      throw new Error(`Erro ao excluir rua: ${error.message}`)
+    }
+  } catch (error) {
+    console.error('Erro ao excluir rua:', error)
+    throw error
+  }
+}
+
+/**
+ * Atualiza status de uma rua
+ */
+export async function updateRuaStatus(
+  ruaId: string, 
+  status: 'planejada' | 'em_execucao' | 'concluida'
+): Promise<ObraRua> {
+  try {
+    const updateData: ObraRuaUpdateData = { status }
+    
+    // Se está sendo concluída, definir data de conclusão
+    if (status === 'concluida') {
+      updateData.end_date = new Date().toISOString().split('T')[0]
+    }
+
+    return await updateRua(ruaId, updateData)
+  } catch (error) {
+    console.error('Erro ao atualizar status da rua:', error)
+    throw error
+  }
+}
+
+/**
+ * Alias para compatibilidade com código existente
+ */
+export const getObrasRuas = getRuasByObra
+export const getObraRuas = getRuasByObra
+
+/**
+ * Conta ruas por status
+ */
+export async function contarRuasPorStatus(obraId: string): Promise<{
+  pendente: number
+  em_andamento: number
+  finalizada: number
+}> {
+  try {
+    const ruas = await getRuasByObra(obraId)
+    
+    return {
+      pendente: ruas.filter(r => r.status === 'planejada').length,
+      em_andamento: ruas.filter(r => r.status === 'em_execucao').length,
+      finalizada: ruas.filter(r => r.status === 'concluida').length
+    }
+  } catch (error) {
+    console.error('Erro ao contar ruas por status:', error)
+    throw error
+  }
+}
+
+/**
+ * Reordena ruas (não implementado no banco - apenas para compatibilidade)
+ */
+export async function reordenarRuas(ordens: Array<{ id: string; ordem: number }>): Promise<void> {
+  // TODO: Implementar se necessário adicionar coluna 'ordem' na tabela
+  console.log('Reordenação de ruas não implementada ainda')
+}

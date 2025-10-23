@@ -17,7 +17,6 @@ interface CompanyFinancialCardProps {
   data?: CompanyFinancialData;
   isPositive?: boolean;
   showAllCompanies?: boolean;
-  filters?: { pump_prefix?: string };
 }
 
 export function CompanyFinancialCard({ data, isPositive, showAllCompanies = false, filters }: CompanyFinancialCardProps) {
@@ -43,29 +42,13 @@ export function CompanyFinancialCard({ data, isPositive, showAllCompanies = fals
   };
 
   const getCompanyColor = (companyName: string) => {
-    if (companyName.includes('FELIX') || companyName.includes('Félix')) {
-      return {
-        gradient: 'from-blue-50 to-blue-100',
-        border: 'border-blue-200',
-        title: 'text-blue-800',
-        icon: 'bg-blue-200',
-        iconEmoji: '🏢'
-      };
-    } else if (companyName.includes('WORLD RENTAL') || companyName.includes('World Rental')) {
-      return {
-        gradient: 'from-green-50 to-green-100',
-        border: 'border-green-200',
-        title: 'text-green-800',
-        icon: 'bg-green-200',
-        iconEmoji: '🌍'
-      };
-    }
+    // Paleta padrão WorldPav
     return {
-      gradient: 'from-gray-50 to-gray-100',
-      border: 'border-gray-200',
-      title: 'text-gray-800',
-      icon: 'bg-gray-200',
-      iconEmoji: '🏢'
+      gradient: 'from-blue-50 to-blue-100',
+      border: 'border-blue-200',
+      title: 'text-blue-800',
+      icon: 'bg-blue-200',
+      iconEmoji: '🏗️'
     };
   };
 

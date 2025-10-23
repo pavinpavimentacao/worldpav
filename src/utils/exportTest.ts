@@ -8,13 +8,11 @@ export const createTestReports = (): ReportWithRelations[] => {
       id: '1',
       report_number: 'RPT-20241201-0001',
       date: '2024-12-01',
-      client_id: 'client-1',
-      pump_id: 'pump-1',
+      client_id: 'client-1': 'pump-1',
       company_id: 'company-1',
       client_rep_name: 'João Silva',
       whatsapp_digits: '11999999999',
-      work_address: 'Rua das Flores, 123 - São Paulo/SP',
-      pump_prefix: 'WR-001',
+      work_address: 'Rua das Flores, 123 - São Paulo/SP': 'WR-001',
       planned_volume: 50.0,
       realized_volume: 48.5,
       driver_name: 'Carlos Santos',
@@ -41,20 +39,18 @@ export const createTestReports = (): ReportWithRelations[] => {
       },
       companies: {
         id: 'company-1',
-        name: 'World Rental'
+        name: 'WorldPav'
       }
     },
     {
       id: '2',
       report_number: 'RPT-20241201-0002',
       date: '2024-12-01',
-      client_id: 'client-2',
-      pump_id: 'pump-2',
+      client_id: 'client-2': 'pump-2',
       company_id: 'company-1',
       client_rep_name: 'Ana Costa',
       whatsapp_digits: '11888888888',
-      work_address: 'Av. Paulista, 1000 - São Paulo/SP',
-      pump_prefix: 'WR-002',
+      work_address: 'Av. Paulista, 1000 - São Paulo/SP': 'WR-002',
       planned_volume: 30.0,
       realized_volume: 32.0,
       driver_name: 'Roberto Lima',
@@ -81,7 +77,7 @@ export const createTestReports = (): ReportWithRelations[] => {
       },
       companies: {
         id: 'company-1',
-        name: 'World Rental'
+        name: 'WorldPav'
       }
     }
   ]

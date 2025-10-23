@@ -14,7 +14,11 @@ import {
   User,
   Handshake,
   Calendar,
-  UserCheck
+  UserCheck,
+  Shield,
+  ClipboardCheck,
+  CreditCard,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../lib/auth-hooks';
 
@@ -38,10 +42,14 @@ const navigationItems: NavigationItem[] = [
   { id: "obras", name: "Obras", icon: Construction, href: "/obras" },
   { id: "programacao", name: "Programação", icon: Calendar, href: "/programacao-pavimentacao" },
   { id: "colaboradores", name: "Colaboradores", icon: UserCheck, href: "/colaboradores" },
+  { id: "controle-diario", name: "Controle Diário", icon: ClipboardCheck, href: "/controle-diario" },
   { id: "relatorios-diarios", name: "Relatórios Diários", icon: ClipboardList, href: "/relatorios-diarios" },
+  { id: "recebimentos", name: "Recebimentos", icon: CreditCard, href: "/recebimentos" },
+  { id: "contas-pagar", name: "Contas a Pagar", icon: FileText, href: "/contas-pagar" },
   { id: "financeiro", name: "Financeiro", icon: Calculator, href: "/financial" },
   { id: "maquinarios", name: "Maquinários", icon: Settings, href: "/maquinarios" },
   { id: "parceiros", name: "Parceiros", icon: Handshake, href: "/parceiros" },
+  { id: "guardas", name: "Guardas", icon: Shield, href: "/guardas" },
 ];
 
 export function WorldPavModernSidebar({ className = "", onNavigate }: WorldPavModernSidebarProps) {
@@ -56,10 +64,14 @@ export function WorldPavModernSidebar({ className = "", onNavigate }: WorldPavMo
     if (path.startsWith('/obras')) return 'obras';
     if (path.startsWith('/programacao-pavimentacao')) return 'programacao';
     if (path.startsWith('/colaboradores')) return 'colaboradores';
+    if (path.startsWith('/controle-diario')) return 'controle-diario';
     if (path.startsWith('/relatorios-diarios')) return 'relatorios-diarios';
+    if (path.startsWith('/recebimentos')) return 'recebimentos';
+    if (path.startsWith('/contas-pagar')) return 'contas-pagar';
     if (path.startsWith('/financial')) return 'financeiro';
     if (path.startsWith('/maquinarios')) return 'maquinarios';
     if (path.startsWith('/parceiros')) return 'parceiros';
+    if (path.startsWith('/guardas')) return 'guardas';
     return 'dashboard';
   };
   

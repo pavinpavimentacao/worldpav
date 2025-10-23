@@ -1,5 +1,5 @@
 import { Calendar, DollarSign, TrendingDown, Ruler, Weight } from 'lucide-react'
-import { KpiCard } from '../KpiCard'
+import { KpiCard } from '../cards/KpiCard'
 import { ProximaProgramacaoCard } from './ProximaProgramacaoCard'
 import { ProgramacaoListItem } from './ProgramacaoListItem'
 import type { DashboardData } from '../../types/dashboard-pavimentacao'
@@ -161,4 +161,6 @@ export function DashboardDesktop({ data, loading }: DashboardDesktopProps) {
     </div>
   )
 }
+
+
 

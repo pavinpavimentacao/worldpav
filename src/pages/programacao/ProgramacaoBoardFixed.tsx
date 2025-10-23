@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { ProgramacaoAPI } from '../../lib/programacao-api';
 import { Programacao, ProgramacaoFilters } from '../../types/programacao';
 import { toast } from '../../lib/toast-hooks';
-import { Layout } from '../../components/Layout';
-import { Loading } from '../../components/Loading';
-import { Button } from '../../components/Button';
-import { Select } from '../../components/Select';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { Layout } from "../../components/layout/Layout";
+import { Loading } from "../../components/shared/Loading";
+import { Button } from "../../components/shared/Button";
+import { Select } from "../../components/shared/Select";
+import { ConfirmDialog } from "../../components/modals/ConfirmDialog";
 import { formatDateToBR } from '../../utils/date-utils';
 
 interface BoardColumn {
@@ -224,7 +224,7 @@ export default function ProgramacaoBoardFixed() {
                 </label>
                 <Select
                   value={filters.bomba_id || ''}
-                  onChange={(value) => setFilters(prev => ({ ...prev, bomba_id: value || undefined }))}
+                  onChange={(value) => setFilters(prev => ({ ...prev: value || undefined }))}
                   options={[
                     { value: '', label: 'Todas as bombas' },
                     ...bombas.map(bomba => ({

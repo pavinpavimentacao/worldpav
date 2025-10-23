@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
 import { Input } from '../../components/ui/input';
-import { Select } from '../../components/Select';
+import { Select } from "../../components/shared/Select";
 import { ArrowLeft, Save } from 'lucide-react';
 import {
   Colaborador,
@@ -14,7 +14,8 @@ import {
   getFuncoesOptions,
   validarFuncaoTipoEquipe,
 } from '../../types/colaboradores';
-import { getColaboradorById } from '../../mocks/colaboradores-mock';
+import { getColaboradorById, updateColaborador, toColaboradorLegacy, type ColaboradorSimples } from '../../lib/colaboradoresApi';
+import { toast } from '../../lib/toast-hooks';
 
 const ColaboradorEdit: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,28 +41,45 @@ const ColaboradorEdit: React.FC = () => {
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    if (id) {
-      const colaborador = getColaboradorById(id);
-      if (colaborador) {
-        setNome(colaborador.nome);
-        setTipoEquipe(colaborador.tipo_equipe);
-        setFuncao(colaborador.funcao);
-        setTipoContrato(colaborador.tipo_contrato);
-        setSalarioFixo(colaborador.salario_fixo.toString());
-        setDataPagamento1(colaborador.data_pagamento_1 || '');
-        setDataPagamento2(colaborador.data_pagamento_2 || '');
-        setValorPagamento1(colaborador.valor_pagamento_1?.toString() || '');
-        setValorPagamento2(colaborador.valor_pagamento_2?.toString() || '');
-        setRegistrado(colaborador.registrado);
-        setValeTransporte(colaborador.vale_transporte);
-        setQtdPassagens(colaborador.qtd_passagens_por_dia?.toString() || '');
-        setCpf(colaborador.cpf || '');
-        setTelefone(colaborador.telefone || '');
-        setEmail(colaborador.email || '');
+    const loadColaborador = async () => {
+      if (id) {
+        try {
+          const colaboradorData = await getColaboradorById(id);
+          if (colaboradorData) {
+            // Converter para formato legado
+            const colaborador = toColaboradorLegacy(colaboradorData);
+            
+            setNome(colaborador.nome);
+            setTipoEquipe(colaborador.tipo_equipe);
+            setFuncao(colaborador.funcao);
+            setTipoContrato(colaborador.tipo_contrato);
+            setSalarioFixo(colaborador.salario_fixo.toString());
+            setDataPagamento1(colaborador.data_pagamento_1 || '');
+            setDataPagamento2(colaborador.data_pagamento_2 || '');
+            setValorPagamento1(colaborador.valor_pagamento_1?.toString() || '');
+            setValorPagamento2(colaborador.valor_pagamento_2?.toString() || '');
+            setRegistrado(colaborador.registrado);
+            setValeTransporte(colaborador.vale_transporte);
+            setQtdPassagens(colaborador.qtd_passagens_por_dia?.toString() || '');
+            setCpf(colaborador.cpf || '');
+            setTelefone(colaborador.telefone || '');
+            setEmail(colaborador.email || '');
+          } else {
+            toast.error('Colaborador não encontrado');
+            navigate('/colaboradores');
+          }
+        } catch (error) {
+          console.error('Erro ao carregar colaborador:', error);
+          toast.error('Erro ao carregar colaborador');
+          navigate('/colaboradores');
+        } finally {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
-    }
-  }, [id]);
+    };
+
+    loadColaborador();
+  }, [id, navigate]);
 
   // Atualizar função quando tipo de equipe mudar
   useEffect(() => {
@@ -75,28 +93,49 @@ const ColaboradorEdit: React.FC = () => {
     e.preventDefault();
 
     if (!nome.trim()) {
-      alert('Nome é obrigatório');
+      toast.error('Nome é obrigatório');
       return;
     }
 
     if (!validarFuncaoTipoEquipe(funcao, tipoEquipe)) {
-      alert(`A função ${funcao} não é válida para equipe ${tipoEquipe}`);
+      toast.error(`A função ${funcao} não é válida para equipe ${tipoEquipe}`);
       return;
     }
 
     if (valeTransporte && (!qtdPassagens || parseInt(qtdPassagens) <= 0)) {
-      alert('Quantidade de passagens é obrigatória quando vale transporte está ativo');
+      toast.error('Quantidade de passagens é obrigatória quando vale transporte está ativo');
       return;
     }
 
-    setIsSaving(true);
+    try {
+      setIsSaving(true);
 
-    // Simular salvamento
-    setTimeout(() => {
-      alert('Colaborador atualizado com sucesso!\n\nEm produção, os dados seriam salvos no banco de dados.');
-      setIsSaving(false);
+      await updateColaborador(id!, {
+        nome,
+        tipo_equipe: tipoEquipe,
+        funcao,
+        tipo_contrato: tipoContrato,
+        salario_fixo: parseFloat(salarioFixo),
+        data_pagamento_1: dataPagamento1 || null,
+        data_pagamento_2: dataPagamento2 || null,
+        valor_pagamento_1: valorPagamento1 ? parseFloat(valorPagamento1) : null,
+        valor_pagamento_2: valorPagamento2 ? parseFloat(valorPagamento2) : null,
+        registrado,
+        vale_transporte: valeTransporte,
+        qtd_passagens_por_dia: qtdPassagens ? parseInt(qtdPassagens) : null,
+        cpf: cpf || null,
+        telefone: telefone || null,
+        email: email || null
+      });
+
+      toast.success('Colaborador atualizado com sucesso!');
       navigate(`/colaboradores/${id}`);
-    }, 1000);
+    } catch (error) {
+      console.error('Erro ao atualizar colaborador:', error);
+      toast.error('Erro ao atualizar colaborador');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const funcoesOptions = getFuncoesOptions(tipoEquipe);
@@ -362,4 +401,3 @@ const ColaboradorEdit: React.FC = () => {
 };
 
 export default ColaboradorEdit;
-

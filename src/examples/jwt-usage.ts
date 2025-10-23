@@ -4,9 +4,9 @@
  * Este arquivo demonstra como usar as funcionalidades JWT implementadas
  */
 
-import { JWTAuthService, LoginCredentials } from '../lib/jwt-auth-service'
-import { HTTPInterceptor } from '../lib/http-interceptor'
-import { useJWT, useJWTUser } from '../lib/jwt-hooks'
+import { JWTAuthService, LoginCredentials } from '../../lib/jwt-auth-service'
+import { HTTPInterceptor } from '../../lib/http-interceptor'
+import { useJWT, useJWTUser } from '../../lib/jwt-hooks'
 
 // ===== EXEMPLO 1: Login com JWT =====
 export async function exemploLogin() {

@@ -52,8 +52,6 @@ export interface PagamentoReceberIntegrado {
   empresa_nome: string  // Sempre preenchido, mesmo que seja "Empresa não informada"
   empresa_cnpj?: string
   
-  // Dados da bomba
-  bomba_prefix?: string
   bomba_model?: string
   bomba_brand?: string
   

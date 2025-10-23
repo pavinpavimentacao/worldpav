@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Layout } from '../../components/Layout';
+import { Layout } from "../../components/layout/Layout";
 import { formatDateToBR } from '../../utils/date-utils';
 
 interface Props {

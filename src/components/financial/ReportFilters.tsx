@@ -16,7 +16,7 @@ import { Calendar, Filter, X, Search, RefreshCw, CalendarDays, Building2, Truck 
 interface ReportFilters {
   search?: string;
   client_id?: string;
-  pump_id?: string;
+
   company_id?: string;
   status?: string[];
   data_inicio?: string;
@@ -86,8 +86,7 @@ export function ReportFilters({
       onFiltersChange(newFilters);
     } else {
       onFiltersChange({
-        ...filters,
-        pump_id: pumpId
+        ...filters: pumpId
       });
     }
   };
@@ -284,7 +283,7 @@ export function ReportFilters({
                   </Select>
                 </div>
 
-                {/* Bomba */}
+                {}
                 <div className="space-y-2">
                   <Label>Bomba</Label>
                   <Select

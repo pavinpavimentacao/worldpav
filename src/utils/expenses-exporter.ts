@@ -6,7 +6,7 @@ export interface ExpensesExportData {
   expenses: ExpenseWithRelations[];
   filters?: {
     company_id?: string;
-    pump_id?: string;
+
     categoria?: string[];
     tipo_custo?: string[];
     status?: string[];
@@ -128,7 +128,7 @@ export class ExpensesExporter {
     // Informações da empresa
     pdf.setFontSize(12);
     pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    pdf.text('Felix Mix / WorldRental', pageWidth / 2, 42, { align: 'center' });
+    pdf.text('WorldPav', pageWidth / 2, 42, { align: 'center' });
     
     // Estatísticas rápidas
     const totalDespesas = data.expenses.length;
@@ -704,8 +704,6 @@ export class ExpensesExporter {
     pdf.text(tipo, x, y + 1);
     x += colWidths[4];
     
-    // Bomba
-    pdf.text(expense.bomba_prefix || 'N/A', x, y + 1);
     x += colWidths[5];
     
     // Empresa
@@ -750,7 +748,7 @@ export class ExpensesExporter {
     const now = new Date();
     const timestamp = now.toLocaleString('pt-BR');
     
-    pdf.text(`Sistema de Gestão de Bombas - Felix Mix / WorldRental`, margin, pageHeight - 15);
+    pdf.text(`Sistema de Gestão - WorldPav`, margin, pageHeight - 15);
     pdf.text(`Gerado em: ${timestamp}`, pageWidth - margin, pageHeight - 15, { align: 'right' });
     
     // Número da página

@@ -65,7 +65,7 @@ export async function getFaturamentoMensal() {
     
     const { data, error } = await supabase
       .from('reports')
-      .select('total_value, realized_volume, date, status, pump_prefix')
+      .select('total_value, realized_volume, date, status')
       .gte('date', startOfMonthStr);
       // REMOVIDO: .eq('status', 'PAGO') - Agora busca TODOS os relatórios
 
@@ -110,24 +110,16 @@ export async function getFaturamentoMensal() {
 /**
  * Busca volume diário com bombas
  * CORRIGIDO: Agora busca TODOS os relatórios, não apenas os PAGOS
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getVolumeDiarioComBombas(filters?: { pump_prefix?: string }) {
+export async function getVolumeDiarioComBombas(filters?: any) {
   try {
     const today = new Date().toISOString().split('T')[0];
     console.log('🔍 [getVolumeDiarioComBombas] Buscando dados para:', today, filters);
     
     let query = supabase
       .from('reports')
-      .select('pump_prefix, realized_volume, total_value, date, status')
       .eq('date', today);
       // REMOVIDO: .eq('status', 'PAGO') - Agora busca TODOS os relatórios
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getVolumeDiarioComBombas] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
 
     const { data, error } = await query;
 
@@ -143,13 +135,12 @@ export async function getVolumeDiarioComBombas(filters?: { pump_prefix?: string 
       return [];
     }
 
-    // Agrupar por bomba
     const bombaData = data.reduce((acc, report) => {
-      const bombaPrefix = report.pump_prefix || 'N/A';
+      const bombaPrefix = report.pump_prefix || 'Desconhecido';
       
       if (!acc[bombaPrefix]) {
         acc[bombaPrefix] = {
-          pump_prefix: bombaPrefix,
+          bomba: bombaPrefix,
           volume_total: 0,
           total_servicos: 0,
           faturamento_total: 0
@@ -173,9 +164,8 @@ export async function getVolumeDiarioComBombas(filters?: { pump_prefix?: string 
 /**
  * Busca volume semanal com bombas
  * CORRIGIDO: Agora busca TODOS os relatórios, não apenas os PAGOS
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getVolumeSemanalComBombas(filters?: { pump_prefix?: string }) {
+export async function getVolumeSemanalComBombas(filters?: any) {
   try {
     const today = new Date();
     const dayOfWeek = today.getDay(); // 0 = domingo, 1 = segunda, ..., 6 = sábado
@@ -186,15 +176,8 @@ export async function getVolumeSemanalComBombas(filters?: { pump_prefix?: string
     
     let query = supabase
       .from('reports')
-      .select('pump_prefix, realized_volume, total_value, date, status')
       .gte('date', startOfWeekStr);
       // REMOVIDO: .eq('status', 'PAGO') - Agora busca TODOS os relatórios
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getVolumeSemanalComBombas] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
 
     const { data, error } = await query;
 
@@ -207,13 +190,12 @@ export async function getVolumeSemanalComBombas(filters?: { pump_prefix?: string
       return [];
     }
 
-    // Agrupar por bomba
     const bombaData = data.reduce((acc, report) => {
-      const bombaPrefix = report.pump_prefix || 'N/A';
+      const bombaPrefix = report.pump_prefix || 'Desconhecido';
       
       if (!acc[bombaPrefix]) {
         acc[bombaPrefix] = {
-          pump_prefix: bombaPrefix,
+          bomba: bombaPrefix,
           volume_total: 0,
           total_servicos: 0,
           faturamento_total: 0
@@ -237,26 +219,18 @@ export async function getVolumeSemanalComBombas(filters?: { pump_prefix?: string
 /**
  * Busca volume mensal com bombas
  * CORRIGIDO: Agora busca TODOS os relatórios, não apenas os PAGOS
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getVolumeMensalComBombas(filters?: { pump_prefix?: string }) {
+export async function getVolumeMensalComBombas(filters?: any) {
   try {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
     
     let query = supabase
       .from('reports')
-      .select('pump_prefix, realized_volume, total_value, date, status')
       .gte('date', startOfMonthStr);
       // REMOVIDO: .eq('status', 'PAGO') - Agora busca TODOS os relatórios
 
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getVolumeMensalComBombas] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
-
-    const { data, error } = await query;
+    const { data, error} = await query;
 
     if (error) {
       console.error('Erro ao buscar volume mensal:', error);
@@ -267,13 +241,12 @@ export async function getVolumeMensalComBombas(filters?: { pump_prefix?: string 
       return [];
     }
 
-    // Agrupar por bomba
     const bombaData = data.reduce((acc, report) => {
-      const bombaPrefix = report.pump_prefix || 'N/A';
+      const bombaPrefix = report.pump_prefix || 'Desconhecido';
       
       if (!acc[bombaPrefix]) {
         acc[bombaPrefix] = {
-          pump_prefix: bombaPrefix,
+          bomba: bombaPrefix,
           volume_total: 0,
           total_servicos: 0,
           faturamento_total: 0
@@ -380,7 +353,6 @@ export async function getExpenses(filters?: ExpenseFilters): Promise<ExpenseWith
   // Transformar dados para incluir relações
   return (data || []).map(expense => ({
     ...expense,
-    bomba_prefix: expense.pumps?.prefix,
     bomba_model: expense.pumps?.model,
     bomba_brand: expense.pumps?.brand,
     company_name: expense.companies?.name,
@@ -491,7 +463,6 @@ export async function getExpenseById(id: string): Promise<ExpenseWithRelations |
 
   return {
     ...data,
-    bomba_prefix: data.pumps?.prefix,
     bomba_model: data.pumps?.model,
     bomba_brand: data.pumps?.brand,
     company_name: data.companies?.name,
@@ -503,8 +474,7 @@ export async function getExpenseById(id: string): Promise<ExpenseWithRelations |
  * Cria uma nova transação financeira (despesa ou faturamento)
  */
 export async function createExpense(expenseData: CreateExpenseData): Promise<Expense> {
-  // Se pump_id foi fornecido, buscar o company_id da bomba
-  let finalCompanyId = expenseData.company_id;
+    let finalCompanyId = expenseData.company_id;
   
   if (expenseData.pump_id) {
     const { data: bombaData, error: bombaError } = await supabase
@@ -531,8 +501,7 @@ export async function createExpense(expenseData: CreateExpenseData): Promise<Exp
   const insertData = {
     ...expenseDataClean,
     valor: valorFinal,
-    company_id: finalCompanyId, // Usar company_id da bomba se disponível
-    created_at: new Date().toISOString(),
+    company_id: finalCompanyId,     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
 
@@ -616,7 +585,6 @@ export async function getFinancialStats(filters?: ExpenseFilters): Promise<Finan
     .select(`
       valor,
       categoria,
-      pump_id,
       company_id,
       tipo_custo,
       data_despesa,
@@ -666,8 +634,7 @@ export async function getFinancialStats(filters?: ExpenseFilters): Promise<Finan
     return acc;
   }, {} as Record<string, number>);
 
-  // Calcular total por bomba
-  const total_por_bomba = expenses.reduce((acc, expense) => {
+    const total_por_bomba = expenses.reduce((acc, expense) => {
     const pumpId = expense.pump_id;
     const existing = acc.find(item => item.pump_id === pumpId);
     
@@ -676,13 +643,12 @@ export async function getFinancialStats(filters?: ExpenseFilters): Promise<Finan
     } else {
       acc.push({
         pump_id: pumpId,
-        bomba_prefix: (expense.pumps as any)?.prefix || 'N/A',
         total: expense.valor
       });
     }
     
     return acc;
-  }, [] as Array<{ pump_id: string; bomba_prefix: string; total: number }>);
+  }, [] as Array<{ pump_id: string; total: number }>);
 
   // Calcular total por empresa
   const total_por_empresa = expenses.reduce((acc, expense) => {
@@ -812,7 +778,6 @@ export async function syncFaturamentoFromReports(): Promise<{ created: number; e
         report_number,
         total_value,
         date,
-        pump_id,
         client_id,
         pumps: pump_id (
           prefix,
@@ -919,7 +884,6 @@ export async function getPaidInvoices(): Promise<InvoiceIntegration[]> {
     data_vencimento: invoice.data_vencimento,
     status: invoice.status as 'Faturada' | 'Paga' | 'Cancelada',
     empresa_nome: (invoice.reports as any)?.clients?.companies?.name,
-    bomba_prefix: (invoice.reports as any)?.pumps?.prefix
   }));
 }
 
@@ -975,9 +939,8 @@ export async function createExpenseFromInvoice(
 
 /**
  * Busca faturamento bruto por empresa
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getFaturamentoBrutoPorEmpresa(filters?: { pump_prefix?: string }) {
+export async function getFaturamentoBrutoPorEmpresa(filters?: any) {
   try {
     console.log('🔍 [getFaturamentoBrutoPorEmpresa] Buscando faturamento por empresa...', filters);
     
@@ -986,16 +949,9 @@ export async function getFaturamentoBrutoPorEmpresa(filters?: { pump_prefix?: st
       .select(`
         total_value,
         company_id,
-        pump_prefix,
         companies:company_id(name)
       `)
       .eq('status', 'PAGO');
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getFaturamentoBrutoPorEmpresa] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
 
     const { data, error } = await query;
 
@@ -1035,9 +991,8 @@ export async function getFaturamentoBrutoPorEmpresa(filters?: { pump_prefix?: st
 
 /**
  * Busca despesas por empresa
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getDespesasPorEmpresa(filters?: { pump_prefix?: string }) {
+export async function getDespesasPorEmpresa(filters?: any) {
   try {
     console.log('🔍 [getDespesasPorEmpresa] Buscando despesas por empresa...', filters);
     
@@ -1046,14 +1001,12 @@ export async function getDespesasPorEmpresa(filters?: { pump_prefix?: string }) 
       .select(`
         valor,
         company_id,
-        pump_id,
         companies:company_id(name),
         pumps:pump_id(prefix)
       `);
 
-    // Aplicar filtro de bomba se fornecido
+    // Aplicar filtros se fornecidos
     if (filters?.pump_prefix) {
-      console.log('🚛 [getDespesasPorEmpresa] Filtrando por bomba:', filters.pump_prefix);
       // Primeiro, buscar o pump_id baseado no prefix
       const { data: pumpData, error: pumpError } = await supabase
         .from('pumps')
@@ -1109,9 +1062,8 @@ export async function getDespesasPorEmpresa(filters?: { pump_prefix?: string }) 
 
 /**
  * Busca dados financeiros completos por empresa
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getDadosFinanceirosPorEmpresa(filters?: { pump_prefix?: string }) {
+export async function getFinancialDataByCompany(filters?: any) {
   try {
     const [faturamentoData, despesasData] = await Promise.all([
       getFaturamentoBrutoPorEmpresa(filters),
@@ -1168,7 +1120,7 @@ export async function getDadosFinanceirosPorEmpresa(filters?: { pump_prefix?: st
 /**
  * Busca todas as entradas (relatórios) para lista completa
  */
-export async function getAllEntries(filters?: { pump_prefix?: string }) {
+export async function getAllEntries(filters?: any) {
   try {
     console.log('🔍 [getAllEntries] Buscando todas as entradas...', filters);
     
@@ -1179,11 +1131,9 @@ export async function getAllEntries(filters?: { pump_prefix?: string }) {
         report_number,
         total_value,
         date,
-        pump_prefix,
         status,
         realized_volume,
         client_id,
-        pump_id,
         clients: client_id (
           name,
           company_id,
@@ -1194,12 +1144,6 @@ export async function getAllEntries(filters?: { pump_prefix?: string }) {
       `)
       .eq('status', 'PAGO')
       .order('date', { ascending: false });
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getAllEntries] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
 
     const { data, error } = await query;
 
@@ -1216,7 +1160,6 @@ export async function getAllEntries(filters?: { pump_prefix?: string }) {
       description: `Relatório ${report.report_number}`,
       value: report.total_value || 0,
       date: report.date,
-      pump_prefix: report.pump_prefix,
       status: report.status,
       realized_volume: report.realized_volume,
       client_name: (report.clients as any)?.name || 'N/A',
@@ -1233,7 +1176,7 @@ export async function getAllEntries(filters?: { pump_prefix?: string }) {
 /**
  * Busca todas as saídas (despesas) para lista completa
  */
-export async function getAllExits(filters?: { pump_prefix?: string }) {
+export async function getAllExits(filters: any) {
   try {
     console.log('🔍 [getAllExits] Buscando todas as saídas...', filters);
     
@@ -1247,25 +1190,21 @@ export async function getAllExits(filters?: { pump_prefix?: string }) {
         categoria,
         tipo_custo,
         status,
-        pump_id,
         company_id
       `)
       .order('data_despesa', { ascending: false });
 
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getAllExits] Filtrando por bomba:', filters.pump_prefix);
+    if (filters.bombaPrefixo) {
       try {
         // Primeiro, buscar o pump_id baseado no prefix
         const { data: pumpData, error: pumpError } = await supabase
           .from('pumps')
           .select('id')
-          .eq('prefix', filters.pump_prefix)
+          .eq('prefix', filters.bombaPrefixo)
           .single();
         
         if (pumpError) {
           console.error('❌ [getAllExits] Erro ao buscar bomba por prefix:', pumpError);
-          // Continuar sem filtro de bomba se não conseguir encontrar
           console.log('⚠️ [getAllExits] Continuando sem filtro de bomba');
         } else if (pumpData) {
           console.log('✅ [getAllExits] Bomba encontrada:', pumpData.id);
@@ -1275,7 +1214,6 @@ export async function getAllExits(filters?: { pump_prefix?: string }) {
         }
       } catch (error) {
         console.error('❌ [getAllExits] Erro na busca da bomba:', error);
-        // Continuar sem filtro de bomba
       }
     }
 
@@ -1294,8 +1232,7 @@ export async function getAllExits(filters?: { pump_prefix?: string }) {
       type: 'saida',
       description: expense.descricao,
       value: Math.abs(expense.valor), // Saídas são sempre positivas para exibição
-      date: expense.data_despesa,
-      pump_prefix: 'N/A', // Simplificado para evitar problemas de relação
+      date: expense.data_despesa || 'N/A', // Simplificado para evitar problemas de relação
       status: 'Descontado', // Todas as despesas aparecem como "Descontado"
       categoria: expense.categoria,
       tipo_custo: expense.tipo_custo,
@@ -1312,7 +1249,7 @@ export async function getAllExits(filters?: { pump_prefix?: string }) {
 /**
  * Busca lista completa de entradas e saídas combinadas
  */
-export async function getAllEntriesAndExits(filters?: { pump_prefix?: string }) {
+export async function getAllEntriesAndExits(filters: any) {
   try {
     console.log('🔍 [getAllEntriesAndExits] Buscando entradas e saídas...', filters);
     
@@ -1429,23 +1366,16 @@ export async function getFuelStatsForPump(pumpId: string, dateRange?: { inicio: 
 /**
  * Busca estatísticas de faturamento bruto
  * CORRIGIDO: Busca apenas relatórios PAGOS para KPIs de faturamento bruto
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getFaturamentoBrutoStats(filters?: { pump_prefix?: string }) {
+export async function getFaturamentoBrutoStats(filters?: any) {
   try {
     console.log('🔍 [getFaturamentoBrutoStats] Buscando estatísticas de faturamento...', filters);
     
     // Buscar dados diretamente da tabela reports - APENAS relatórios PAGOS para faturamento bruto
     let query = supabase
       .from('reports')
-      .select('total_value, realized_volume, date, status, pump_prefix')
+      .select('total_value, realized_volume, date, status')
       .eq('status', 'PAGO'); // RESTAURADO: Apenas relatórios PAGOS para faturamento bruto
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getFaturamentoBrutoStats] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
 
     const { data, error } = await query;
 
@@ -1479,14 +1409,8 @@ export async function getFaturamentoBrutoStats(filters?: { pump_prefix?: string 
     // Buscar volume total de todos os relatórios separadamente, aplicando filtro se necessário
     let volumeQuery = supabase
       .from('reports')
-      .select('realized_volume, pump_prefix')
+      .select('realized_volume')
       .not('realized_volume', 'is', null);
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getFaturamentoBrutoStats] Filtrando volume por bomba:', filters.pump_prefix);
-      volumeQuery = volumeQuery.eq('pump_prefix', filters.pump_prefix);
-    }
 
     const { data: allReportsData, error: volumeError } = await volumeQuery;
     
@@ -1504,13 +1428,12 @@ export async function getFaturamentoBrutoStats(filters?: { pump_prefix?: string 
     
     const relatoriosHoje = data.filter(report => report.date === today).length;
 
-    // Calcular faturamento por bomba
+    // Agrupar faturamento por bomba (usando ID genérico já que não temos pump_prefix nos dados)
     const faturamentoPorBomba = data.reduce((acc, report) => {
-      const pumpPrefix = report.pump_prefix || 'N/A';
+      const pumpPrefix = 'Geral'; // Chave genérica já que os dados não incluem pump_prefix
       
       if (!acc[pumpPrefix]) {
         acc[pumpPrefix] = {
-          bomba_prefix: pumpPrefix,
           total_faturado: 0,
           total_relatorios: 0,
           faturado_hoje: 0,
@@ -1523,7 +1446,6 @@ export async function getFaturamentoBrutoStats(filters?: { pump_prefix?: string 
       acc[pumpPrefix].total_relatorios += 1;
       acc[pumpPrefix].volume_total += report.realized_volume || 0;
       
-      // Faturamento de hoje por bomba
       if (report.date === today) {
         acc[pumpPrefix].faturado_hoje += report.total_value || 0;
         acc[pumpPrefix].relatorios_hoje += 1;
@@ -1586,7 +1508,7 @@ export async function getFaturamentoBruto(limit: number = 50) {
  * Busca faturamento detalhado por bomba com filtros opcionais
  */
 export async function getFaturamentoDetalhadoPorBomba(filters?: {
-  pump_prefix?: string;
+
   data_inicio?: string;
   data_fim?: string;
   limit?: number;
@@ -1601,7 +1523,6 @@ export async function getFaturamentoDetalhadoPorBomba(filters?: {
         report_number,
         total_value,
         date,
-        pump_prefix,
         status,
         realized_volume,
         client_id,
@@ -1622,10 +1543,6 @@ export async function getFaturamentoDetalhadoPorBomba(filters?: {
       .order('date', { ascending: false });
 
     // Aplicar filtros
-    if (filters?.pump_prefix) {
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
-
     if (filters?.data_inicio) {
       query = query.gte('date', filters.data_inicio);
     }
@@ -1651,8 +1568,6 @@ export async function getFaturamentoDetalhadoPorBomba(filters?: {
       id: report.id,
       report_number: report.report_number,
       total_value: report.total_value,
-      date: report.date,
-      pump_prefix: report.pump_prefix,
       realized_volume: report.realized_volume,
       client_name: (report.clients as any)?.name || 'N/A',
       company_name: (report.clients as any)?.companies?.name || 'N/A',
@@ -1720,21 +1635,14 @@ export async function getFaturamentoPorBomba() {
 
 /**
  * Busca estatísticas de pagamentos a receber
- * NOVO: Aceita filtro de pump_prefix para filtrar por bomba específica
  */
-export async function getPagamentosReceberStats(filters?: { pump_prefix?: string }) {
+export async function getPagamentosReceberStats(filters?: any) {
   try {
     console.log('🔍 [getPagamentosReceberStats] Buscando estatísticas de pagamentos a receber...', filters);
     
     let query = supabase
       .from('pagamentos_receber')
-      .select('status, valor_total, prazo_data, pump_prefix');
-
-    // Aplicar filtro de bomba se fornecido
-    if (filters?.pump_prefix) {
-      console.log('🚛 [getPagamentosReceberStats] Filtrando por bomba:', filters.pump_prefix);
-      query = query.eq('pump_prefix', filters.pump_prefix);
-    }
+      .select('status, valor_total, prazo_data');
 
     const { data, error } = await query;
 

@@ -46,8 +46,7 @@ const expenseSchema = z.object({
   tipo_transacao: z.enum(['Entrada', 'Saída'], {
     required_error: 'Selecione um tipo de transação'
   }),
-  data_despesa: z.string().min(1, 'Data é obrigatória'),
-  pump_id: z.string().min(1, 'Selecione uma bomba'),
+  data_despesa: z.string().min(1, 'Data é obrigatória'): z.string().min(1, 'Selecione uma bomba'),
   company_id: z.string().min(1, 'Selecione uma empresa'),
   quilometragem_atual: z.number().min(0).optional(),
   quantidade_litros: z.number().min(0).optional(),
@@ -92,8 +91,7 @@ export function ExpenseForm({
       valor: expense?.valor || 0,
       tipo_custo: expense?.tipo_custo || 'variável',
       tipo_transacao: expense?.tipo_transacao || 'Saída',
-      data_despesa: expense?.data_despesa || getCurrentDateString(),
-      pump_id: expense?.pump_id || '',
+      data_despesa: expense?.data_despesa || getCurrentDateString(): expense?.pump_id || '',
       company_id: expense?.company_id || '',
       quilometragem_atual: expense?.quilometragem_atual || 0,
       quantidade_litros: expense?.quantidade_litros || 0,
@@ -347,7 +345,7 @@ export function ExpenseForm({
               )}
             />
 
-            {/* Bomba */}
+            {}
             <div className="space-y-2">
               <Label>Bomba *</Label>
               <Controller
@@ -539,7 +537,6 @@ export function ExpenseView({ expense, onEdit, onDelete, onClose }: ExpenseViewP
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm text-gray-600">Bomba</Label>
-              <p className="text-lg font-medium">{expense.bomba_prefix || 'N/A'}</p>
             </div>
             <div>
               <Label className="text-sm text-gray-600">Empresa</Label>

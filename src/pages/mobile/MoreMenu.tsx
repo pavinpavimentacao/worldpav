@@ -9,7 +9,7 @@ import {
   ChevronRight 
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
+import { Layout } from "../../components/layout/Layout"
 import { useAuth } from '../../lib/auth'
 
 interface MenuItem {
@@ -160,4 +160,6 @@ export default function MoreMenu() {
     </Layout>
   )
 }
+
+
 

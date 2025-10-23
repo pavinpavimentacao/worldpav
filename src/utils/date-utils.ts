@@ -1,6 +1,6 @@
 /**
  * Utilitários para manipulação de datas com fuso horário America/Sao_Paulo
- * Padronizado para o sistema WorldRental – Felix Mix
+ * Padronizado para o sistema WorldPav
  */
 
 import { format, formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';

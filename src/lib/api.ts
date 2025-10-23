@@ -65,7 +65,7 @@ export class ApiService {
    */
   static async generateNote(payload: {
     report_id: string;
-    company_logo: 'felixmix' | 'worldrental';
+    company_logo?: string;
     phone: string;
     nf_date: string;
     nf_due_date: string;

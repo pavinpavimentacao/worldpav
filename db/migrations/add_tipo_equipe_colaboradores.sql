@@ -38,9 +38,7 @@ CREATE TYPE funcao_colaborador_enum AS ENUM (
     'RH',
     'Programador',
     'Admin',
-    -- Manter funções antigas para compatibilidade (opcional)
-    'Motorista Operador de Bomba',
-    'Auxiliar de Bomba',
+    -- Funções adicionais
     'Administrador Financeiro',
     'Fiscal de Obras',
     'Mecânico'
@@ -72,8 +70,6 @@ WHERE tipo_equipe IS NULL;
 UPDATE colaboradores
 SET funcao = CASE
     WHEN funcao = 'Administrador Financeiro' THEN 'Financeiro'
-    WHEN funcao = 'Motorista Operador de Bomba' THEN 'Motorista de Caminhão Espargidor'
-    WHEN funcao = 'Auxiliar de Bomba' THEN 'Ajudante'
     ELSE funcao
 END;
 
@@ -119,8 +115,6 @@ BEGIN
             'Motorista de Caminhão Espargidor',
             'Mangueirista',
             'Encarregado',
-            'Motorista Operador de Bomba',
-            'Auxiliar de Bomba',
             'Fiscal de Obras',
             'Mecânico'
         ) THEN

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
-import { ProgramacaoCalendar } from '../../components/ProgramacaoCalendar';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
+import { ProgramacaoCalendar } from "../../components/shared/ProgramacaoCalendar";
 import { useNavigate } from 'react-router-dom';
 import { format, addDays } from 'date-fns';
 import { exportarProgramacaoDiaPDF } from '../../utils/pdfExport';

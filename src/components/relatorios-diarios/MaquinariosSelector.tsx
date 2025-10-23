@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Truck, Building, ChevronDown, ChevronUp } from 'lucide-react'
-import { Button } from '../Button'
+import { Button } from "../shared/Button"
 import { MaquinarioSelecionavel } from '../../types/relatorios-diarios'
 import { getMaquinariosParceiros } from '../../lib/parceirosApi'
 

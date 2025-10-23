@@ -1,98 +1,133 @@
-/**
- * Formata um valor numérico como moeda brasileira (R$)
- */
-export function formatCurrency(value: number): string {
-  // Usar formatação nativa que já inclui o sinal de menos no lugar correto
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(value);
-}
+// Utilitários de formatação para inputs
 
 /**
- * Formata uma data para o formato ISO8601
+ * Formata CPF: 000.000.000-00
  */
-export function formatDateISO(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  return dateObj.toISOString()
-}
-
-/**
- * Remove todos os caracteres não numéricos de um telefone
- * e adiciona o código do país (55) se necessário
- */
-export function phoneToDigits(phone: string): string {
-  // Remove todos os caracteres não numéricos
-  const digits = phone.replace(/\D/g, '')
+export const formatCPF = (value: string): string => {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '');
   
-  // Se tem 10 ou 11 dígitos, adiciona o código do país (55)
-  if (digits.length === 10 || digits.length === 11) {
-    return `55${digits}`
+  // Limita a 11 dígitos
+  const limited = numbers.slice(0, 11);
+  
+  // Aplica a máscara
+  return limited
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+};
+
+/**
+ * Formata RG: 00.000.000-0
+ */
+export const formatRG = (value: string): string => {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '');
+  
+  // Limita a 9 dígitos
+  const limited = numbers.slice(0, 9);
+  
+  // Aplica a máscara
+  return limited
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+};
+
+/**
+ * Formata telefone: (00) 00000-0000 ou (00) 0000-0000
+ */
+export const formatPhone = (value: string): string => {
+  // Remove tudo que não é dígito
+  const numbers = value.replace(/\D/g, '');
+  
+  // Limita a 11 dígitos
+  const limited = numbers.slice(0, 11);
+  
+  // Aplica a máscara baseada no tamanho
+  if (limited.length <= 10) {
+    // Telefone fixo: (00) 0000-0000
+    return limited
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d{1,4})$/, '$1-$2');
+  } else {
+    // Celular: (00) 00000-0000
+    return limited
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{5})(\d{1,4})$/, '$1-$2');
   }
+};
+
+/**
+ * Valida e formata email
+ */
+export const formatEmail = (value: string): string => {
+  // Remove espaços e converte para minúsculo
+  return value.trim().toLowerCase();
+};
+
+/**
+ * Remove formatação de CPF (apenas números)
+ */
+export const unformatCPF = (value: string): string => {
+  return value.replace(/\D/g, '');
+};
+
+/**
+ * Remove formatação de RG (apenas números)
+ */
+export const unformatRG = (value: string): string => {
+  return value.replace(/\D/g, '');
+};
+
+/**
+ * Remove formatação de telefone (apenas números)
+ */
+export const unformatPhone = (value: string): string => {
+  return value.replace(/\D/g, '');
+};
+
+/**
+ * Valida CPF
+ */
+export const isValidCPF = (cpf: string): boolean => {
+  const numbers = unformatCPF(cpf);
   
-  return digits
-}
-
-/**
- * Gera um número de relatório único
- * Formato: RPT-YYYYMMDD-XXXX (onde XXXX são 4 dígitos aleatórios)
- */
-export function generateReportNumber(date: Date, sequence: number): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const seq = String(sequence).padStart(4, '0')
+  if (numbers.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(numbers)) return false; // Todos os dígitos iguais
   
-  return `RPT-${year}${month}${day}-${seq}`
-}
+  // Validação do dígito verificador
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(numbers[i]) * (10 - i);
+  }
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(numbers[9])) return false;
+  
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(numbers[i]) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(numbers[10])) return false;
+  
+  return true;
+};
 
 /**
- * Formata uma data para exibição brasileira
+ * Valida email
  */
-export function formatDateBR(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  return new Intl.DateTimeFormat('pt-BR').format(dateObj)
-}
+export const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
 /**
- * Formata uma data e hora para exibição brasileira
+ * Valida telefone brasileiro
  */
-export function formatDateTimeBR(date: string | Date): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short'
-  }).format(dateObj)
-}
-
-/**
- * Calcula a diferença em horas entre duas datas
- */
-export function calculateHoursBetween(startDate: Date, endDate: Date): number {
-  const diffInMs = endDate.getTime() - startDate.getTime()
-  return Math.round(diffInMs / (1000 * 60 * 60)) // Converte para horas
-}
-
-/**
- * Valida se um email tem formato válido
- */
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-/**
- * Valida se um telefone tem formato válido (mínimo 10 dígitos)
- */
-export function isValidPhone(phone: string): boolean {
-  const digits = phone.replace(/\D/g, '')
-  return digits.length >= 10 && digits.length <= 15
-}
-
-
-
-
-
-
-
-
+export const isValidPhone = (phone: string): boolean => {
+  const numbers = unformatPhone(phone);
+  return numbers.length >= 10 && numbers.length <= 11;
+};

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Layout } from '../../components/Layout'
+import { Layout } from "../../components/layout/Layout"
 import { Calendar, DollarSign, TrendingUp, TrendingDown, Filter, Wallet } from 'lucide-react'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
 import { DatePicker } from '../../components/ui/date-picker'
 import { Input } from '../../components/ui/input'
 import { ResumoGeralTab } from '../../components/financial/ResumoGeralTab'

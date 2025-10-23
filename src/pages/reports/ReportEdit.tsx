@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { DatePicker } from '../../components/ui/date-picker';
-import { Select } from '../../components/Select'
+import { Select } from "../../components/shared/Select"
 import { ReportWithRelations, ReportStatus } from '../../types/reports'
-import { Loading } from '../../components/Loading'
+import { Loading } from "../../components/shared/Loading"
 import { GenericError } from '../errors/GenericError'
 
 const STATUS_OPTIONS = [
@@ -31,9 +31,7 @@ export default function ReportEdit() {
   const [formData, setFormData] = useState({
     date: '',
     client_id: '',
-    client_rep_name: '',
-    pump_id: '',
-    pump_prefix: '',
+    client_rep_name: '': '': '',
     realized_volume: '',
     total_value: '',
     status: 'PENDENTE' as ReportStatus,
@@ -80,10 +78,8 @@ export default function ReportEdit() {
           reportData.clients = clientData
         }
         
-        // 3. Enriquecer com dados da bomba
-        if (reportData.pump_id) {
-          // Primeiro tentar buscar na tabela pumps (bombas internas)
-          const { data: pumpData } = await supabase
+                if (reportData.pump_id) {
+                    const { data: pumpData } = await supabase
             .from('pumps')
             .select('*')
             .eq('id', reportData.pump_id)
@@ -92,8 +88,7 @@ export default function ReportEdit() {
           if (pumpData) {
             reportData.pumps = pumpData
           } else {
-            // Se não encontrou na tabela pumps, tentar na tabela bombas_terceiras
-            const { data: bombaTerceiraData } = await supabase
+                        const { data: bombaTerceiraData } = await supabase
               .from('view_bombas_terceiras_com_empresa')
               .select('*')
               .eq('id', reportData.pump_id)
@@ -132,9 +127,6 @@ export default function ReportEdit() {
         setFormData({
           date: reportData.date || '',
           client_id: reportData.client_id || '',
-          client_rep_name: reportData.client_rep_name || '',
-          pump_id: reportData.pump_id || '',
-          pump_prefix: reportData.pump_prefix || '',
           realized_volume: reportData.realized_volume?.toString() || '',
           total_value: reportData.total_value?.toString() || '',
           status: reportData.status || 'PENDENTE',
@@ -163,8 +155,7 @@ export default function ReportEdit() {
         .order('name')
       setClients(clientsData || [])
 
-      // Carregar bombas
-      const { data: pumpsData } = await supabase
+            const { data: pumpsData } = await supabase
         .from('pumps')
         .select('id, prefix')
         .order('prefix')
@@ -191,9 +182,6 @@ export default function ReportEdit() {
       const updateData = {
         date: formData.date,
         client_id: formData.client_id || null,
-        client_rep_name: formData.client_rep_name,
-        pump_id: formData.pump_id || null,
-        pump_prefix: formData.pump_prefix,
         realized_volume: parseFloat(formData.realized_volume) || null,
         total_value: parseFloat(formData.total_value) || null,
         status: formData.status,
@@ -224,14 +212,11 @@ export default function ReportEdit() {
     setFormData(prev => {
       const newData = { ...prev, [field]: value }
       
-      // Se mudou a bomba, preencher automaticamente prefixo e empresa do serviço
-      if (field === 'pump_id') {
+            if (field === 'pump_id') {
         const pump = pumps.find(p => p.id === value)
         if (pump) {
-          newData.pump_prefix = pump.prefix || ''
           
-          // Buscar empresa do serviço baseada na empresa da bomba
-          if (pump.empresa_nome) {
+                    if (pump.empresa_nome) {
             const serviceCompany = companies.find(c => c.name === pump.empresa_nome)
             if (serviceCompany) {
               newData.service_company_id = serviceCompany.id
@@ -339,7 +324,7 @@ export default function ReportEdit() {
               </div>
             </div>
 
-            {/* Informações da Bomba */}
+            {}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h2 className="text-lg font-semibold mb-4">Informações da Bomba</h2>
               <div className="space-y-4">
@@ -353,8 +338,6 @@ export default function ReportEdit() {
                 
                 <FormField
                   label="Prefixo da Bomba"
-                  value={formData.pump_prefix}
-                  onChange={(e) => handleInputChange('pump_prefix', e.target.value)}
                   required
                 />
               </div>

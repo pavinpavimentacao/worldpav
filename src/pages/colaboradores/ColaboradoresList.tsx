@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
+import { useNavigate } from 'react-router-dom';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
 import { Input } from '../../components/ui/input';
-import { Select } from '../../components/Select';
-import { ColaboradorForm } from '../../components/ColaboradorForm';
+import { Select } from "../../components/shared/Select";
+import { ColaboradorForm } from "../../components/forms/ColaboradorForm";
 import {
   Plus,
   Search,
@@ -20,6 +21,14 @@ import { supabase } from '../../lib/supabase';
 import { toast } from '../../lib/toast-hooks';
 import { formatCurrency } from '../../types/financial';
 import {
+  getColaboradores,
+  deleteColaborador,
+  getEstatisticasColaboradores,
+  toColaboradorLegacy,
+  type ColaboradorSimples,
+  type ColaboradorFilters as ApiFilters
+} from '../../lib/colaboradoresApi';
+import {
   Colaborador,
   TipoEquipe,
   FuncaoColaborador,
@@ -29,6 +38,8 @@ import {
 } from '../../types/colaboradores';
 
 const ColaboradoresList: React.FC = () => {
+  const navigate = useNavigate();
+  
   // State
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +60,7 @@ const ColaboradoresList: React.FC = () => {
   useEffect(() => {
     if (companyId) {
       loadColaboradores();
+      loadStats();
     }
   }, [companyId]);
 
@@ -79,14 +91,17 @@ const ColaboradoresList: React.FC = () => {
   const loadColaboradores = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('colaboradores')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('nome');
-
-      if (error) throw error;
-      setColaboradores(data || []);
+      
+      // Buscar todos os colaboradores - os filtros são aplicados localmente no useMemo
+      const filters: ApiFilters = {
+        status: 'todos'
+      };
+      
+      const data = await getColaboradores(companyId, filters);
+      
+      // Converter para formato legado para manter compatibilidade
+      const colaboradoresLegacy = data.map(toColaboradorLegacy);
+      setColaboradores(colaboradoresLegacy);
     } catch (error) {
       console.error('Erro ao carregar colaboradores:', error);
       toast.error('Erro ao carregar colaboradores');
@@ -106,9 +121,7 @@ const ColaboradoresList: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase.from('colaboradores').delete().eq('id', id);
-
-      if (error) throw error;
+      await deleteColaborador(id);
       toast.success('Colaborador excluído com sucesso!');
       loadColaboradores();
     } catch (error: any) {
@@ -133,7 +146,13 @@ const ColaboradoresList: React.FC = () => {
 
     // Filtro por tipo de equipe
     if (tipoEquipeFilter !== 'todas') {
-      filtered = filtered.filter((colab) => colab.tipo_equipe === tipoEquipeFilter);
+      filtered = filtered.filter((colab) => {
+        // Mapear os valores corretos do tipo de equipe
+        if (tipoEquipeFilter === 'equipe_a') return colab.tipo_equipe === 'equipe_a';
+        if (tipoEquipeFilter === 'equipe_b') return colab.tipo_equipe === 'equipe_b';
+        if (tipoEquipeFilter === 'escritorio') return colab.tipo_equipe === 'escritorio';
+        return false;
+      });
     }
 
     // Filtro por tipo de contrato
@@ -156,13 +175,30 @@ const ColaboradoresList: React.FC = () => {
     return filtered;
   }, [colaboradores, searchTerm, tipoEquipeFilter, tipoContratoFilter]);
 
-  // Estatísticas
-  const totalColaboradores = colaboradores.length;
-  const equipeMassa = colaboradores.filter((c) => c.tipo_equipe === 'massa').length;
-  const equipeAdministrativa = colaboradores.filter(
-    (c) => c.tipo_equipe === 'administrativa'
-  ).length;
-  const registrados = colaboradores.filter((c) => c.registrado).length;
+  // Estatísticas - usar dados da API real
+  const [stats, setStats] = useState({
+    total: 0,
+    massa: 0,
+    administrativa: 0,
+    ativos: 0,
+    inativos: 0
+  });
+
+  const loadStats = async () => {
+    try {
+      const data = await getEstatisticasColaboradores(companyId);
+      setStats(data);
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    }
+  };
+
+  // Estatísticas para exibição
+  const totalColaboradores = stats.total;
+  const equipeA = stats.massa; // Equipe de massa = equipe A
+  const equipeB = 0; // Não temos equipe B no novo sistema
+  const equipeAdministrativa = stats.administrativa;
+  const registrados = stats.ativos; // Assumindo que ativos = registrados
 
   return (
     <Layout>
@@ -186,7 +222,7 @@ const ColaboradoresList: React.FC = () => {
         </div>
 
         {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <div className="card flex items-center p-4">
             <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
               <Users className="h-6 w-6 text-blue-600" />
@@ -202,8 +238,18 @@ const ColaboradoresList: React.FC = () => {
               <HardHat className="h-6 w-6 text-orange-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Equipe de Massa</p>
-              <p className="text-xl font-semibold text-gray-900">{equipeMassa}</p>
+              <p className="text-sm font-medium text-gray-500">Equipe A</p>
+              <p className="text-xl font-semibold text-gray-900">{equipeA}</p>
+            </div>
+          </div>
+
+          <div className="card flex items-center p-4">
+            <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
+              <HardHat className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Equipe B</p>
+              <p className="text-xl font-semibold text-gray-900">{equipeB}</p>
             </div>
           </div>
 
@@ -335,8 +381,10 @@ const ColaboradoresList: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              colaborador.tipo_equipe === 'massa'
+                              colaborador.tipo_equipe === 'equipe_a'
                                 ? 'bg-orange-100 text-orange-800'
+                                : colaborador.tipo_equipe === 'equipe_b'
+                                ? 'bg-red-100 text-red-800'
                                 : 'bg-purple-100 text-purple-800'
                             }`}
                           >
@@ -374,10 +422,11 @@ const ColaboradoresList: React.FC = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleEdit(colaborador)}
-                              title="Editar"
+                              onClick={() => navigate(`/colaboradores/${colaborador.id}`)}
+                              title="Ver Detalhes"
                             >
-                              <Edit className="h-4 w-4" />
+                              <Eye className="h-4 w-4 mr-1.5" />
+                              Detalhes
                             </Button>
                             <Button
                               variant="outline"

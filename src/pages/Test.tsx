@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-// import { supabase } from '../lib/supabase' // Removido import não utilizado
-import { createTables, testConnection, getSetupInstructions } from '../lib/simple-db-setup'
-import { Layout } from '../components/Layout'
-import { Button } from '../components/Button'
-import { useToast } from '../lib/toast-hooks'
+// import { supabase } from '../../lib/supabase' // Removido import não utilizado
+import { createTables, testConnection, getSetupInstructions } from '../../lib/simple-db-setup'
+import { Layout } from "../components/layout/Layout"
+import { Button } from "../components/shared/Button"
+import { useToast } from '../../lib/toast-hooks'
 
 export default function Test() {
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking')

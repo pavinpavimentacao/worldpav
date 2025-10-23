@@ -1,90 +1,34 @@
-import React, { useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
-import { formatDateToBR } from '../../utils/date-utils'
+import React, { useState, useEffect } from 'react'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
 import { Link } from 'react-router-dom'
 import { Plus, Search, Filter, Eye, Edit, CheckCircle } from 'lucide-react'
+import { getObras, getEstatisticasObras, Obra, ObraStats } from '../../lib/obrasApi'
+import { useToast } from '../../lib/toast-hooks'
+import { getOrCreateDefaultCompany } from '../../lib/company-utils'
 
-interface Obra {
-  id: string
+// Interface local para compatibilidade com a UI existente
+interface ObraDisplay extends Obra {
   nome: string
   cliente: string
-  status: 'planejada' | 'em_andamento' | 'concluida' | 'cancelada'
   empresa: 'WorldPav' | 'Pavin'
   previsaoConclusao: string
   valorTotal: number
-  // Informações técnicas da obra
-  metragemFeita: number // em m²
-  metragemPlanejada: number // em m²
-  toneladasAplicadas: number // em toneladas
-  toneladasPlanejadas: number // em toneladas
-  espessuraMedia: number // em cm
-  ruasFeitas: number // quantidade de ruas concluídas
-  totalRuas: number // total de ruas planejadas
-  faturamentoBruto: number // em R$
+  metragemFeita: number
+  metragemPlanejada: number
+  toneladasAplicadas: number
+  toneladasPlanejadas: number
+  espessuraMedia: number
+  ruasFeitas: number
+  totalRuas: number
+  faturamentoBruto: number
 }
-
-// Dados mock para demonstração
-// Regra de negócio: 1000 m² = 100 toneladas (divisão por 10) | Espessura média base: 3,5 cm
-const mockObras: Obra[] = [
-  {
-    id: '1',
-    nome: 'Pavimentação Rua das Flores - Osasco',
-    cliente: 'Prefeitura de Osasco',
-    status: 'em_andamento',
-    empresa: 'WorldPav',
-    previsaoConclusao: '2024-02-15',
-    valorTotal: 125000,
-    metragemFeita: 3250,
-    metragemPlanejada: 5000,
-    toneladasAplicadas: 325,        // 3250 ÷ 10 = 325 ton
-    toneladasPlanejadas: 500,       // 5000 ÷ 10 = 500 ton
-    espessuraMedia: 3.5,            // Base padrão
-    ruasFeitas: 4,
-    totalRuas: 6,
-    faturamentoBruto: 81250
-  },
-  {
-    id: '2',
-    nome: 'Recapeamento Avenida Central - São Paulo',
-    cliente: 'Construtora ABC',
-    status: 'planejada',
-    empresa: 'Pavin',
-    previsaoConclusao: '2024-03-01',
-    valorTotal: 89000,
-    metragemFeita: 0,
-    metragemPlanejada: 4200,
-    toneladasAplicadas: 0,
-    toneladasPlanejadas: 420,       // 4200 ÷ 10 = 420 ton
-    espessuraMedia: 0,              // Obra ainda não iniciada
-    ruasFeitas: 0,
-    totalRuas: 3,
-    faturamentoBruto: 0
-  },
-  {
-    id: '3',
-    nome: 'Pavimentação Condomínio Residencial',
-    cliente: 'Empresa XYZ',
-    status: 'concluida',
-    empresa: 'WorldPav',
-    previsaoConclusao: '2024-01-20',
-    valorTotal: 45000,
-    metragemFeita: 1800,
-    metragemPlanejada: 1800,
-    toneladasAplicadas: 180,        // 1800 ÷ 10 = 180 ton
-    toneladasPlanejadas: 180,       // 1800 ÷ 10 = 180 ton
-    espessuraMedia: 3.5,            // Base padrão
-    ruasFeitas: 2,
-    totalRuas: 2,
-    faturamentoBruto: 45000
-  }
-]
 
 const getStatusBadge = (status: Obra['status']) => {
   const statusConfig = {
-    planejada: { label: 'Planejada', className: 'status-planejada' },
-    em_andamento: { label: 'Em Andamento', className: 'status-em-andamento' },
+    planejamento: { label: 'Planejamento', className: 'status-planejada' },
+    andamento: { label: 'Em Andamento', className: 'status-em-andamento' },
     concluida: { label: 'Concluída', className: 'status-concluida' },
     cancelada: { label: 'Cancelada', className: 'status-cancelada' }
   }
@@ -93,16 +37,91 @@ const getStatusBadge = (status: Obra['status']) => {
   return <span className={config.className}>{config.label}</span>
 }
 
-const getEmpresaColor = (empresa: Obra['empresa']) => {
+const getEmpresaColor = (empresa: string) => {
   return empresa === 'WorldPav' ? 'empresa-worldpav' : 'empresa-pavin'
 }
 
+// Função para converter Obra da API para ObraDisplay da UI
+const convertObraToDisplay = (obra: Obra): ObraDisplay => {
+  return {
+    ...obra,
+    nome: obra.name,
+    cliente: obra.client?.name || 'Cliente não informado',
+    empresa: 'WorldPav', // Por enquanto, sempre WorldPav
+    previsaoConclusao: obra.expected_end_date || '',
+    valorTotal: obra.contract_value || 0,
+    // Dados técnicos - por enquanto usando valores padrão
+    metragemFeita: 0,
+    metragemPlanejada: 0,
+    toneladasAplicadas: 0,
+    toneladasPlanejadas: 0,
+    espessuraMedia: 0,
+    ruasFeitas: 0,
+    totalRuas: 0,
+    faturamentoBruto: obra.executed_value || 0
+  }
+}
+
 export default function ObrasList() {
-  const [obras] = useState<Obra[]>(mockObras)
+  const { addToast } = useToast()
+  const [obras, setObras] = useState<ObraDisplay[]>([])
+  const [stats, setStats] = useState<ObraStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [companyId, setCompanyId] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [empresaFilter, setEmpresaFilter] = useState<string>('all')
   const [clienteFilter, setClienteFilter] = useState<string>('all')
+
+  // Carregar company ID
+  useEffect(() => {
+    loadCompanyId()
+  }, [])
+
+  // Carregar dados quando companyId mudar
+  useEffect(() => {
+    if (companyId) {
+      loadData()
+    }
+  }, [companyId, searchTerm, statusFilter, empresaFilter, clienteFilter])
+
+  async function loadCompanyId() {
+    try {
+      const id = await getOrCreateDefaultCompany()
+      setCompanyId(id)
+    } catch (err) {
+      console.error('Erro ao carregar company ID:', err)
+      addToast({ message: 'Erro ao carregar empresa', type: 'error' })
+    }
+  }
+
+  async function loadData() {
+    if (!companyId) return
+
+    try {
+      setLoading(true)
+      
+      // Carregar obras e estatísticas em paralelo
+      const [obrasResult, statsResult] = await Promise.all([
+        getObras(companyId, {
+          search: searchTerm || undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          page: 1,
+          limit: 100
+        }),
+        getEstatisticasObras(companyId)
+      ])
+
+      const obrasDisplay = obrasResult.data.map(convertObraToDisplay)
+      setObras(obrasDisplay)
+      setStats(statsResult)
+    } catch (error) {
+      console.error('Erro ao carregar obras:', error)
+      addToast({ message: 'Erro ao carregar obras', type: 'error' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Obter lista única de clientes
   const clientesUnicos = Array.from(new Set(obras.map(obra => obra.cliente))).sort()
@@ -172,13 +191,13 @@ export default function ObrasList() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 text-sm font-bold">M²</span>
+                  <span className="text-blue-600 text-sm font-bold">#</span>
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Metragem Total</p>
+                <p className="text-sm font-medium text-gray-500">Total de Obras</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {formatArea(filteredObras.reduce((total, obra) => total + obra.metragemFeita, 0))}
+                  {loading ? '...' : (stats?.total || 0)}
                 </p>
               </div>
             </div>
@@ -188,35 +207,13 @@ export default function ObrasList() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                  <span className="text-orange-600 text-sm font-bold">T</span>
+                  <span className="text-orange-600 text-sm font-bold">▶</span>
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Toneladas Total</p>
+                <p className="text-sm font-medium text-gray-500">Em Andamento</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {formatWeight(filteredObras.reduce((total, obra) => total + obra.toneladasAplicadas, 0))}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-purple-600 text-sm font-bold">CM</span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Espessura Média</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {(() => {
-                    const obrasComEspessura = filteredObras.filter(obra => obra.espessuraMedia > 0)
-                    const espessuraMedia = obrasComEspessura.length > 0 
-                      ? obrasComEspessura.reduce((total, obra) => total + obra.espessuraMedia, 0) / obrasComEspessura.length
-                      : 0
-                    return espessuraMedia > 0 ? formatThickness(espessuraMedia) : '-'
-                  })()}
+                  {loading ? '...' : (stats?.andamento || 0)}
                 </p>
               </div>
             </div>
@@ -226,13 +223,29 @@ export default function ObrasList() {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-sm font-bold">R$</span>
+                  <span className="text-green-600 text-sm font-bold">✓</span>
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Faturamento Total</p>
+                <p className="text-sm font-medium text-gray-500">Concluídas</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {loading ? '...' : (stats?.concluida || 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-sm border">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 text-sm font-bold">R$</span>
+                </div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Valor Total</p>
                 <p className="text-lg font-semibold text-green-600">
-                  {formatCurrency(filteredObras.reduce((total, obra) => total + obra.faturamentoBruto, 0))}
+                  {loading ? '...' : formatCurrency(stats?.valor_total_contratos || 0)}
                 </p>
               </div>
             </div>
@@ -261,8 +274,8 @@ export default function ObrasList() {
               placeholder="Todos os Status"
               options={[
                 { value: 'all', label: 'Todos os Status' },
-                { value: 'planejada', label: 'Planejada' },
-                { value: 'em_andamento', label: 'Em Andamento' },
+                { value: 'planejamento', label: 'Planejamento' },
+                { value: 'andamento', label: 'Em Andamento' },
                 { value: 'concluida', label: 'Concluída' },
                 { value: 'cancelada', label: 'Cancelada' }
               ]}
@@ -298,8 +311,16 @@ export default function ObrasList() {
 
         {/* Lista de Obras */}
         <div className="bg-white shadow-sm rounded-lg border">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="text-gray-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+                <p>Carregando obras...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -405,19 +426,20 @@ export default function ObrasList() {
                 ))}
               </tbody>
             </table>
-          </div>
 
-          {filteredObras.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-gray-500">
-                <Filter className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Nenhuma obra encontrada
-                </h3>
-                <p className="text-gray-500">
-                  Tente ajustar os filtros ou criar uma nova obra.
-                </p>
+            {filteredObras.length === 0 && !loading && (
+              <div className="text-center py-12">
+                <div className="text-gray-500">
+                  <Filter className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Nenhuma obra encontrada
+                  </h3>
+                  <p className="text-gray-500">
+                    Tente ajustar os filtros ou criar uma nova obra.
+                  </p>
+                </div>
               </div>
+            )}
             </div>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { Programacao } from '../types/programacao';
 
 export interface SubscriptionOptions {

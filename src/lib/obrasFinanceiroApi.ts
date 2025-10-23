@@ -8,28 +8,24 @@ import type {
   ObraFaturamento,
   ObraDespesa,
   ObraResumoFinanceiro,
+  ObraRua,
   CreateFaturamentoInput,
-  UpdateFaturamentoStatusInput,
   CreateDespesaInput,
-  FaturamentoFilters,
-  DespesaFilters,
-  FaturamentoStatus
+  DespesaFilters
 } from '../types/obras-financeiro'
 import { calcularEspessura, calcularFaturamentoRua, agruparPorMesCivil } from '../utils/financeiro-obras-utils'
 import { updateRuaStatus } from './obrasRuasApi'
+import { calcularFaturamentoPrevisto } from '../utils/notas-fiscais-utils'
 
 // ============================================
 // FATURAMENTOS
 // ============================================
 
 /**
- * Lista faturamentos de uma obra com filtros opcionais
+ * Lista faturamentos de uma obra
  */
-export async function getObraFaturamentos(
-  obraId: string,
-  filters?: FaturamentoFilters
-): Promise<ObraFaturamento[]> {
-  let query = supabase
+export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamento[]> {
+  const { data, error } = await supabase
     .from('obras_financeiro_faturamentos')
     .select(`
       *,
@@ -37,20 +33,6 @@ export async function getObraFaturamentos(
     `)
     .eq('obra_id', obraId)
     .order('data_finalizacao', { ascending: false })
-
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
-  }
-
-  if (filters?.data_inicio) {
-    query = query.gte('data_finalizacao', filters.data_inicio)
-  }
-
-  if (filters?.data_fim) {
-    query = query.lte('data_finalizacao', filters.data_fim)
-  }
-
-  const { data, error } = await query
 
   if (error) {
     console.error('Erro ao buscar faturamentos:', error)
@@ -90,7 +72,6 @@ export async function createFaturamentoRua(input: CreateFaturamentoInput): Promi
       espessura_calculada,
       preco_por_m2: input.preco_por_m2,
       valor_total,
-      status: 'pendente',
       data_finalizacao,
       observacoes: input.observacoes
     })
@@ -110,42 +91,6 @@ export async function createFaturamentoRua(input: CreateFaturamentoInput): Promi
     await updateRuaStatus(input.rua_id, 'finalizada')
   } catch (err) {
     console.error('Erro ao atualizar status da rua:', err)
-  }
-
-  return data
-}
-
-/**
- * Atualiza o status de um faturamento (pendente -> pago)
- */
-export async function updateFaturamentoStatus(
-  id: string,
-  input: UpdateFaturamentoStatusInput
-): Promise<ObraFaturamento> {
-  const updateData: any = {
-    status: input.status
-  }
-
-  if (input.status === 'pago') {
-    updateData.data_pagamento = input.data_pagamento || new Date().toISOString().split('T')[0]
-    if (input.nota_fiscal) {
-      updateData.nota_fiscal = input.nota_fiscal
-    }
-  }
-
-  const { data, error } = await supabase
-    .from('obras_financeiro_faturamentos')
-    .update(updateData)
-    .eq('id', id)
-    .select(`
-      *,
-      rua:obras_ruas(*)
-    `)
-    .single()
-
-  if (error) {
-    console.error('Erro ao atualizar status do faturamento:', error)
-    throw error
   }
 
   return data
@@ -307,13 +252,8 @@ export async function getObraResumoFinanceiro(
     })
   }
 
-  const total_faturado = faturamentos
-    .filter(f => f.status === 'pago')
-    .reduce((sum, f) => sum + f.valor_total, 0)
-
-  const total_pendente = faturamentos
-    .filter(f => f.status === 'pendente')
-    .reduce((sum, f) => sum + f.valor_total, 0)
+  // Total faturado = soma de todas as ruas finalizadas
+  const total_faturado = faturamentos.reduce((sum, f) => sum + f.valor_total, 0)
 
   const total_despesas = despesas.reduce((sum, d) => sum + d.valor, 0)
 
@@ -326,7 +266,7 @@ export async function getObraResumoFinanceiro(
 
   return {
     total_faturado,
-    total_pendente,
+    total_pendente: 0, // Não usado mais, mantido para compatibilidade
     total_despesas,
     lucro_liquido,
     despesas_por_categoria
@@ -343,18 +283,21 @@ export async function getObraFinanceiroMensal(
   faturamentos_por_mes: Array<{ mes: string; valor: number }>
   despesas_por_mes: Array<{ mes: string; valor: number }>
 }> {
-  const faturamentos = await getObraFaturamentos(obraId, {
-    data_inicio: `${ano}-01-01`,
-    data_fim: `${ano}-12-31`
-  })
+  const faturamentos = await getObraFaturamentos(obraId)
 
   const despesas = await getObraDespesas(obraId, {
     data_inicio: `${ano}-01-01`,
     data_fim: `${ano}-12-31`
   })
 
+  // Filtrar faturamentos do ano especificado
+  const faturamentosDoAno = faturamentos.filter(f => {
+    const data = new Date(f.data_finalizacao)
+    return data.getFullYear() === ano
+  })
+
   const faturamentosAgrupados = agruparPorMesCivil(
-    faturamentos.filter(f => f.status === 'pago'),
+    faturamentosDoAno,
     'data_finalizacao'
   )
 
@@ -400,6 +343,24 @@ export async function getFaturamentoById(id: string): Promise<ObraFaturamento | 
   }
 
   return data
+}
+
+/**
+ * Calcula o faturamento previsto de uma obra
+ * Baseado nas ruas planejadas × preço por m²
+ */
+export async function getFaturamentoPrevisto(obraId: string, precoPorM2: number): Promise<number> {
+  const { data: ruas, error } = await supabase
+    .from('obras_ruas')
+    .select('metragem_planejada')
+    .eq('obra_id', obraId)
+  
+  if (error) {
+    console.error('Erro ao buscar ruas para calcular faturamento previsto:', error)
+    return 0
+  }
+  
+  return calcularFaturamentoPrevisto(ruas as ObraRua[], precoPorM2)
 }
 
 

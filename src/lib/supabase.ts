@@ -693,6 +693,71 @@ export type Database = {
           updated_at?: string
         }
       }
+      contas_pagar: {
+        Row: {
+          id: string
+          numero_nota: string
+          valor: number
+          data_emissao: string
+          data_vencimento: string
+          status: 'Pendente' | 'Paga' | 'Atrasada' | 'Cancelada'
+          fornecedor: string | null
+          descricao: string | null
+          categoria: string | null
+          data_pagamento: string | null
+          valor_pago: number | null
+          forma_pagamento: string | null
+          observacoes: string | null
+          anexo_url: string | null
+          anexo_nome: string | null
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          numero_nota: string
+          valor: number
+          data_emissao: string
+          data_vencimento: string
+          status?: 'Pendente' | 'Paga' | 'Atrasada' | 'Cancelada'
+          fornecedor?: string | null
+          descricao?: string | null
+          categoria?: string | null
+          data_pagamento?: string | null
+          valor_pago?: number | null
+          forma_pagamento?: string | null
+          observacoes?: string | null
+          anexo_url?: string | null
+          anexo_nome?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          numero_nota?: string
+          valor?: number
+          data_emissao?: string
+          data_vencimento?: string
+          status?: 'Pendente' | 'Paga' | 'Atrasada' | 'Cancelada'
+          fornecedor?: string | null
+          descricao?: string | null
+          categoria?: string | null
+          data_pagamento?: string | null
+          valor_pago?: number | null
+          forma_pagamento?: string | null
+          observacoes?: string | null
+          anexo_url?: string | null
+          anexo_nome?: string | null
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+      }
     }
   }
 }

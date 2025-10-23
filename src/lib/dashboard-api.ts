@@ -7,31 +7,14 @@ export interface DashboardStats {
     hora: string
     endereco: string
     responsavel: string
-    bomba_prefix?: string
     motorista?: string
-    auxiliares?: string[]
   }>
   programacao_amanha: Array<{
     hora: string
     endereco: string
     responsavel: string
-    bomba_prefix?: string
     motorista?: string
-    auxiliares?: string[]
   }>
-  proxima_bomba: {
-    hora: string
-    endereco: string
-    responsavel: string
-    bomba_prefix?: string
-    motorista?: string
-    auxiliares?: string[]
-    tempo_restante?: string
-  } | null
-  bombeados_dia: {
-    total: number
-    por_cliente: Record<string, number>
-  }
   volume_previsto_dia: number
   volume_bombeado_semana: number
   faturamento_dia: number
@@ -89,7 +72,6 @@ export class DashboardApi {
       const [
         programacaoHojeResult,
         programacaoAmanhaResult,
-        bombeadosResult,
         volumePrevistoResult,
         volumeBombeadoSemanaResult,
         faturamentoDiaResult,
@@ -109,8 +91,6 @@ export class DashboardApi {
         // Programação de amanhã
         this.getProgramacaoDia(tomorrow),
         
-        // Bombeados do dia
-        this.getBombeadosDia(today),
         
         // Volume previsto do dia
         this.getVolumePrevistoDia(today),
@@ -151,21 +131,15 @@ export class DashboardApi {
         // Relatórios por status
         this.getRelatoriosPorStatus()
       ])
-
-      // Calcular próxima bomba
-      const proximaBomba = this.calcularProximaBomba(programacaoHojeResult)
       
       console.log('📊 [DashboardAPI] Resultados:', {
         programacaoHoje: programacaoHojeResult.length,
-        programacaoAmanha: programacaoAmanhaResult.length,
-        proximaBomba: proximaBomba ? 'Encontrada' : 'Não encontrada'
+        programacaoAmanha: programacaoAmanhaResult.length
       })
 
       return {
         programacao_hoje: programacaoHojeResult,
         programacao_amanha: programacaoAmanhaResult,
-        proxima_bomba: proximaBomba,
-        bombeados_dia: bombeadosResult,
         volume_previsto_dia: volumePrevistoResult,
         volume_bombeado_semana: volumeBombeadoSemanaResult,
         faturamento_dia: faturamentoDiaResult,
@@ -213,9 +187,7 @@ export class DashboardApi {
           numero,
           bairro,
           responsavel,
-          motorista_operador,
-          auxiliares_bomba,
-          bomba_id
+          motorista_operador
         `)
         .eq('data', date)
         .order('horario')
@@ -231,17 +203,9 @@ export class DashboardApi {
         return []
       }
 
-      // Buscar dados das bombas
-      const bombaIds = [...new Set(programacaoData.map(p => p.bomba_id).filter(Boolean))]
-      const { data: bombasData } = await supabase
-        .from('pumps')
-        .select('id, prefix')
-        .in('id', bombaIds)
-
-      // Buscar dados dos colaboradores (motoristas e auxiliares)
+      // Buscar dados dos colaboradores (motoristas)
       const colaboradorIds = [
-        ...new Set(programacaoData.map(p => p.motorista_operador).filter(Boolean)),
-        ...new Set(programacaoData.flatMap(p => p.auxiliares_bomba || []))
+        ...new Set(programacaoData.map(p => p.motorista_operador).filter(Boolean))
       ]
       
       const { data: colaboradoresData } = await supabase
@@ -255,29 +219,16 @@ export class DashboardApi {
           .filter(Boolean)
           .join(', ') || 'Endereço não informado'
 
-        // Buscar prefixo da bomba
-        const bomba = bombasData?.find(b => b.id === item.bomba_id)
-        const bomba_prefix = bomba?.prefix || 'N/A'
-
         // Buscar nome do motorista
         const motorista = item.motorista_operador ? 
           colaboradoresData?.find(c => c.id === item.motorista_operador)?.nome || 'Motorista não definido' : 
           'Motorista não definido'
 
-        // Buscar nomes dos auxiliares
-        const auxiliares = item.auxiliares_bomba && item.auxiliares_bomba.length > 0 ?
-          item.auxiliares_bomba
-            .map((id: string) => colaboradoresData?.find(c => c.id === id)?.nome)
-            .filter(Boolean) || [] :
-          []
-
         return {
           hora: item.horario || '--:--',
           endereco,
           responsavel: item.responsavel || 'Não definido',
-          bomba_prefix,
-          motorista,
-          auxiliares
+          motorista
         }
       })
     } catch (error) {
@@ -286,87 +237,6 @@ export class DashboardApi {
     }
   }
 
-  /**
-   * Calcular próxima bomba a sair
-   */
-  private static calcularProximaBomba(programacaoHoje: Array<{
-    hora: string
-    endereco: string
-    responsavel: string
-    bomba_prefix?: string
-    motorista?: string
-    auxiliares?: string[]
-  }>) {
-    const agora = new Date()
-    const horaAtual = agora.getHours() * 60 + agora.getMinutes()
-
-    // Filtrar apenas programações futuras
-    const programacoesFuturas = programacaoHoje.filter(item => {
-      const [hora, minuto] = item.hora.split(':').map(Number)
-      const horaProgramacao = hora * 60 + minuto
-      return horaProgramacao > horaAtual
-    })
-
-    if (programacoesFuturas.length === 0) {
-      return null
-    }
-
-    // Pegar a primeira programação futura
-    const proxima = programacoesFuturas[0]
-    const [hora, minuto] = proxima.hora.split(':').map(Number)
-    const horaProgramacao = hora * 60 + minuto
-    const tempoRestante = horaProgramacao - horaAtual
-
-    // Formatar tempo restante
-    const horas = Math.floor(tempoRestante / 60)
-    const minutos = tempoRestante % 60
-    
-    let tempoFormatado = ''
-    if (horas > 0) {
-      tempoFormatado = `${horas}h ${minutos}min`
-    } else {
-      tempoFormatado = `${minutos}min`
-    }
-
-    return {
-      ...proxima,
-      tempo_restante: tempoFormatado
-    }
-  }
-
-  /**
-   * Buscar bombeados do dia
-   */
-  private static async getBombeadosDia(date: string) {
-    try {
-      const { data, error } = await supabase
-        .from('reports')
-        .select(`
-          realized_volume,
-          client_rep_name
-        `)
-        .eq('date', date)
-
-      if (error) throw error
-
-      const total = (data || []).reduce((sum, item) => sum + (Number(item.realized_volume) || 0), 0)
-      
-      const porCliente = (data || []).reduce((acc, item) => {
-        const cliente = item.client_rep_name || 'Cliente não identificado'
-        const volume = Number(item.realized_volume) || 0
-        acc[cliente] = (acc[cliente] || 0) + volume
-        return acc
-      }, {} as Record<string, number>)
-
-      return {
-        total,
-        por_cliente: porCliente
-      }
-    } catch (error) {
-      console.error('Erro ao buscar bombeados:', error)
-      return { total: 0, por_cliente: {} }
-    }
-  }
 
   /**
    * Buscar volume previsto do dia

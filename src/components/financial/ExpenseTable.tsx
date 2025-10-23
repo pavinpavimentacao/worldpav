@@ -340,7 +340,6 @@ export function ExpenseTable({
                   
                   <TableCell className="w-[80px]">
                     <span className="text-sm font-medium">
-                      {expense.bomba_prefix || 'N/A'}
                     </span>
                   </TableCell>
                   

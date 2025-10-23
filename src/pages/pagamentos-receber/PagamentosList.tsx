@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
-import { Loading } from '../../components/Loading'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
+import { Loading } from "../../components/shared/Loading"
 import { GenericError } from '../errors/GenericError'
-import { PagamentoReceberCardIntegrado } from '../../components/PagamentoReceberCardIntegrado'
+import { PagamentoReceberCardIntegrado } from "../../components/cards/PagamentoReceberCardIntegrado"
 import { PagamentoReceberStatsIntegrado } from '../../components/PagamentoReceberStatsIntegrado'
 import { usePagamentosReceberIntegrado } from '../../lib/pagamentos-receber-api-integrado'
 import { PagamentoReceberIntegrado, KPIsFinanceirosIntegrados, FormaPagamento } from '../../lib/pagamentos-receber-api-integrado'
@@ -69,17 +69,12 @@ export default function PagamentosList() {
     ]
   }
 
-  // Função para extrair opções únicas de bombas
-  const getBombasOptions = () => {
-    // Criar um mapa único de bombas com identificação completa
-    const bombasMap = new Map<string, { prefix: string; model?: string; brand?: string }>()
+    const getBombasOptions = () => {
+        const bombasMap = new Map<string, { prefix: string; model?: string; brand?: string }>()
     
     pagamentos.forEach(p => {
-      if (p.bomba_prefix) {
-        const key = p.bomba_prefix
         if (!bombasMap.has(key)) {
           bombasMap.set(key, {
-            prefix: p.bomba_prefix,
             model: p.bomba_model,
             brand: p.bomba_brand
           })
@@ -233,7 +228,6 @@ export default function PagamentosList() {
     // Filtros específicos (comparação exata)
     const matchEmpresa = !filtros.empresa || pagamento.empresa_nome === filtros.empresa
     const matchCliente = !filtros.cliente || pagamento.cliente_nome === filtros.cliente
-    const matchBomba = !filtros.bomba || pagamento.bomba_prefix === filtros.bomba
     
     const matchNotaFiscal = !filtros.nota_fiscal || 
       (filtros.nota_fiscal === 'com_nota' && pagamento.tem_nota_fiscal) ||
@@ -357,7 +351,7 @@ export default function PagamentosList() {
               />
             </div>
 
-            {/* Bomba */}
+            {}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Bomba

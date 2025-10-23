@@ -1,27 +1,34 @@
 // Service Worker para notificações push
-// WorldRental FelixMix PWA
+// WorldPav PWA
 
-const CACHE_NAME = 'worldrental-v1';
+const CACHE_NAME = 'worldpav-v1';
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon.svg'
 ];
 
 // Instalar Service Worker
 self.addEventListener('install', function(event) {
+  console.log('Service Worker: Instalando...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(function(cache) {
         console.log('Service Worker: Cache aberto');
-        return cache.addAll(urlsToCache);
+        // Tentar adicionar URLs ao cache, mas não falhar se algum não existir
+        return Promise.allSettled(
+          urlsToCache.map(url => 
+            cache.add(url).catch(err => console.log('Não foi possível cachear:', url))
+          )
+        );
       })
+      .then(() => self.skipWaiting())
   );
 });
 
 // Ativar Service Worker
 self.addEventListener('activate', function(event) {
+  console.log('Service Worker: Ativando...');
   event.waitUntil(
     caches.keys().then(function(cacheNames) {
       return Promise.all(
@@ -32,19 +39,26 @@ self.addEventListener('activate', function(event) {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 // Interceptar requisições
 self.addEventListener('fetch', function(event) {
+  // Ignorar requisições que não são GET ou que são para APIs externas
+  if (event.request.method !== 'GET' || event.request.url.includes('supabase.co')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
         // Retornar do cache ou buscar da rede
-        return response || fetch(event.request);
-      }
-    )
+        return response || fetch(event.request).catch(() => {
+          // Se falhar, não retornar nada (evita erros no console)
+          console.log('Falha ao buscar:', event.request.url);
+        });
+      })
   );
 });
 

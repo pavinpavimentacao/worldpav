@@ -16,6 +16,9 @@ export interface Rua {
   status: RuaStatus
   volume_previsto: number
   volume_realizado: number
+  metragem_planejada?: number
+  toneladas_previstas?: number
+  imagem_trecho?: string // URL da imagem
   data_liberacao?: string
   data_inicio?: string
   data_conclusao?: string

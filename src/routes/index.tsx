@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
-import { RequireAuth } from '../components/RequireAuth'
+import { RequireAuth } from '../components/layout/RequireAuth'
 import { GenericError } from '../pages/errors/GenericError'
 
 // ==================== IMPORTS DE PÁGINAS ====================
@@ -24,7 +24,7 @@ import DetalhesMaquinario from '../pages/maquinarios/DetalhesMaquinario'
 
 // Colaboradores
 import ColaboradoresList from '../pages/colaboradores/ColaboradoresListMock'
-import ColaboradorDetails from '../pages/colaboradores/ColaboradorDetails'
+import ColaboradorDetalhes from '../pages/colaboradores/ColaboradorDetalhes'
 import ColaboradorEdit from '../pages/colaboradores/ColaboradorEdit'
 import NovoColaborador from '../pages/colaboradores/NovoColaborador'
 
@@ -40,9 +40,9 @@ import { NewNote } from '../pages/notes/NewNote'
 import { NotesPendingReports } from '../pages/notes/NotesPendingReports'
 import { NoteDetails } from '../pages/notes/NoteDetails'
 
-// Pagamentos a Receber
-import PagamentosList from '../pages/pagamentos-receber/PagamentosList'
-import PagamentoDetails from '../pages/pagamentos-receber/PagamentoDetails'
+// Recebimentos
+import RecebimentosIndex from '../pages/recebimentos/RecebimentosIndex'
+import { RecebimentosPage } from '../pages/recebimentos/RecebimentosPage'
 
 // Programação de Pavimentação
 import ProgramacaoPavimentacaoList from '../pages/programacao/ProgramacaoPavimentacaoList'
@@ -72,8 +72,19 @@ import NovoParceiro from '../pages/parceiros/NovoParceiro'
 import EditarParceiro from '../pages/parceiros/EditarParceiro'
 import NovoCarregamento from '../pages/parceiros/NovoCarregamento'
 
+// Guardas
+import GuardasIndex from '../pages/guardas/GuardasIndex'
+
+// Controle Diário
+import ControleDiarioIndex from '../pages/controle-diario/ControleDiarioIndex'
+import NovaRelacaoDiaria from '../pages/controle-diario/NovaRelacaoDiaria'
+
+// Contas a Pagar
+import ContasPagarList from '../pages/contas-pagar/ContasPagarList'
+import ContaPagarForm from '../pages/contas-pagar/ContaPagarForm'
+import ContaPagarDetails from '../pages/contas-pagar/ContaPagarDetails'
+
 // Demos (Desenvolvimento)
-import WorldPavColorDemo from '../components/WorldPavColorDemo'
 import ModernSidebarDemo from '../pages/ModernSidebarDemo'
 
 export const router = createBrowserRouter([
@@ -213,7 +224,7 @@ export const router = createBrowserRouter([
     path: '/colaboradores/:id',
     element: (
       <RequireAuth>
-        <ColaboradorDetails />
+        <ColaboradorDetalhes />
       </RequireAuth>
     ),
     errorElement: <GenericError />
@@ -304,21 +315,21 @@ export const router = createBrowserRouter([
     errorElement: <GenericError />
   },
 
-  // ==================== PAGAMENTOS A RECEBER ====================
+  // ==================== RECEBIMENTOS ====================
   {
     path: '/pagamentos-receber',
     element: (
       <RequireAuth>
-        <PagamentosList />
+        <RecebimentosIndex />
       </RequireAuth>
     ),
     errorElement: <GenericError />
   },
   {
-    path: '/pagamentos-receber/:id',
+    path: '/recebimentos',
     element: (
       <RequireAuth>
-        <PagamentoDetails />
+        <RecebimentosPage />
       </RequireAuth>
     ),
     errorElement: <GenericError />
@@ -486,16 +497,76 @@ export const router = createBrowserRouter([
     errorElement: <GenericError />
   },
 
-  // ==================== DEMOS (DESENVOLVIMENTO) ====================
+  // ==================== GUARDAS ====================
   {
-    path: '/worldpav-demo',
+    path: '/guardas',
     element: (
       <RequireAuth>
-        <WorldPavColorDemo />
+        <GuardasIndex />
       </RequireAuth>
     ),
     errorElement: <GenericError />
   },
+
+  // ==================== CONTROLE DIÁRIO ====================
+  {
+    path: '/controle-diario',
+    element: (
+      <RequireAuth>
+        <ControleDiarioIndex />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/controle-diario/nova-relacao',
+    element: (
+      <RequireAuth>
+        <NovaRelacaoDiaria />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+
+  // ==================== CONTAS A PAGAR ====================
+  {
+    path: '/contas-pagar',
+    element: (
+      <RequireAuth>
+        <ContasPagarList />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/contas-pagar/nova',
+    element: (
+      <RequireAuth>
+        <ContaPagarForm />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/contas-pagar/:id',
+    element: (
+      <RequireAuth>
+        <ContaPagarDetails />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/contas-pagar/:id/editar',
+    element: (
+      <RequireAuth>
+        <ContaPagarForm />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+
+  // ==================== DEMOS (DESENVOLVIMENTO) ====================
   {
     path: '/modern-sidebar-demo',
     element: (
@@ -506,6 +577,14 @@ export const router = createBrowserRouter([
     errorElement: <GenericError />
   },
 ])
+
+
+
+
+
+
+
+
 
 
 

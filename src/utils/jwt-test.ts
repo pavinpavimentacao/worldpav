@@ -3,9 +3,9 @@
  * Execute este arquivo para verificar se tudo está funcionando
  */
 
-import { JWTAuthService } from '../lib/jwt-auth-service'
-import { generateJWT, verifyJWT, decodeJWT } from '../lib/jwt-utils'
-import { HTTPInterceptor } from '../lib/http-interceptor'
+import { JWTAuthService } from '../../lib/jwt-auth-service'
+import { generateJWT, verifyJWT, decodeJWT } from '../../lib/jwt-utils'
+import { HTTPInterceptor } from '../../lib/http-interceptor'
 
 export class JWTTestSuite {
   /**

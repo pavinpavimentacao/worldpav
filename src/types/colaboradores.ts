@@ -10,7 +10,7 @@
 /**
  * Tipo de equipe do colaborador
  */
-export type TipoEquipe = 'massa' | 'administrativa';
+export type TipoEquipe = 'equipe_a' | 'equipe_b' | 'escritorio';
 
 /**
  * Funções da Equipe de Massa (Operacional)
@@ -21,7 +21,7 @@ export type FuncaoEquipeMassa =
   | 'Operador de Rolo Chapa Chapa'
   | 'Operador de Rolo Pneu Pneu'
   | 'Operador de VibroAcabadora'
-  | 'Operador de Mesa da VibroAcabadora'
+  | 'Mesista'
   | 'Motorista de Caminhão Espargidor'
   | 'Mangueirista'
   | 'Encarregado'
@@ -100,6 +100,8 @@ export interface Colaborador {
   cpf?: string | null;
   telefone?: string | null;
   email?: string | null;
+  equipe_id?: string; // ID da equipe à qual o colaborador pertence
+  ativo?: boolean; // Se o colaborador está ativo ou inativo
   company_id: string;
   created_at: string;
   updated_at: string;
@@ -267,7 +269,8 @@ export interface ColaboradorCompleto extends Colaborador {
  */
 export interface ColaboradorStats {
   total: number;
-  equipe_massa: number;
+  equipe_a: number;
+  equipe_b: number;
   equipe_administrativa: number;
   ativos: number;
   inativos: number;
@@ -285,8 +288,9 @@ export interface ColaboradorStats {
  * Opções para o select de Tipo de Equipe
  */
 export const TIPO_EQUIPE_OPTIONS: SelectOption[] = [
-  { value: 'massa', label: 'Equipe de Massa' },
-  { value: 'administrativa', label: 'Equipe Administrativa' },
+  { value: 'equipe_a', label: 'Equipe A' },
+  { value: 'equipe_b', label: 'Equipe B' },
+  { value: 'escritorio', label: 'Escritório' },
 ];
 
 /**
@@ -298,7 +302,7 @@ export const FUNCOES_EQUIPE_MASSA: SelectOption[] = [
   { value: 'Operador de Rolo Chapa Chapa', label: 'Operador de Rolo Chapa Chapa' },
   { value: 'Operador de Rolo Pneu Pneu', label: 'Operador de Rolo Pneu Pneu' },
   { value: 'Operador de VibroAcabadora', label: 'Operador de VibroAcabadora' },
-  { value: 'Operador de Mesa da VibroAcabadora', label: 'Operador de Mesa da VibroAcabadora' },
+  { value: 'Mesista', label: 'Mesista' },
   { value: 'Motorista de Caminhão Espargidor', label: 'Motorista de Caminhão Espargidor' },
   { value: 'Mangueirista', label: 'Mangueirista' },
   { value: 'Encarregado', label: 'Encarregado' },
@@ -348,16 +352,27 @@ export const TIPO_DIA_OPTIONS: SelectOption[] = [
  * Retorna as opções de função baseado no tipo de equipe
  */
 export function getFuncoesOptions(tipoEquipe: TipoEquipe): SelectOption[] {
-  return tipoEquipe === 'massa'
-    ? FUNCOES_EQUIPE_MASSA
-    : FUNCOES_EQUIPE_ADMINISTRATIVA;
+  return tipoEquipe === 'escritorio'
+    ? FUNCOES_EQUIPE_ADMINISTRATIVA
+    : FUNCOES_EQUIPE_MASSA; // equipe_a e equipe_b usam funções de massa
 }
 
 /**
- * Retorna o label do tipo de equipe
+ * Retorna o label do tipo de equipe (mapeando valores do banco para labels do frontend)
  */
-export function getTipoEquipeLabel(tipoEquipe: TipoEquipe): string {
-  const option = TIPO_EQUIPE_OPTIONS.find(opt => opt.value === tipoEquipe);
+export function getTipoEquipeLabel(tipoEquipe: string): string {
+  // Mapear valores do banco de dados para valores do frontend
+  const mapeamentoBancoParaFrontend: { [key: string]: string } = {
+    'pavimentacao': 'equipe_a',
+    'maquinas': 'equipe_b',
+    'apoio': 'escritorio'
+  };
+  
+  // Se o valor já é do frontend (equipe_a, equipe_b, escritorio), usa direto
+  // Se é do banco (pavimentacao, maquinas, apoio), mapeia primeiro
+  const valorFrontend = mapeamentoBancoParaFrontend[tipoEquipe] || tipoEquipe;
+  
+  const option = TIPO_EQUIPE_OPTIONS.find(opt => opt.value === valorFrontend);
   return option?.label || tipoEquipe;
 }
 
@@ -381,7 +396,7 @@ export function validarFuncaoTipoEquipe(
   funcao: FuncaoColaborador,
   tipoEquipe: TipoEquipe
 ): boolean {
-  if (tipoEquipe === 'massa') {
+  if (tipoEquipe === 'equipe_a' || tipoEquipe === 'equipe_b') {
     return FUNCOES_EQUIPE_MASSA.some(opt => opt.value === funcao);
   } else {
     return FUNCOES_EQUIPE_ADMINISTRATIVA.some(opt => opt.value === funcao);
@@ -400,7 +415,7 @@ export function getFuncaoColor(funcao: FuncaoColaborador): { bg: string; text: s
     'Operador de Rolo Chapa Chapa': { bg: 'bg-orange-100', text: 'text-orange-800' },
     'Operador de Rolo Pneu Pneu': { bg: 'bg-orange-100', text: 'text-orange-800' },
     'Operador de VibroAcabadora': { bg: 'bg-red-100', text: 'text-red-800' },
-    'Operador de Mesa da VibroAcabadora': { bg: 'bg-pink-100', text: 'text-pink-800' },
+    'Mesista': { bg: 'bg-pink-100', text: 'text-pink-800' },
     'Motorista de Caminhão Espargidor': { bg: 'bg-blue-100', text: 'text-blue-800' },
     'Mangueirista': { bg: 'bg-cyan-100', text: 'text-cyan-800' },
     'Encarregado': { bg: 'bg-emerald-100', text: 'text-emerald-800' },
@@ -422,3 +437,258 @@ export function getFuncaoColor(funcao: FuncaoColaborador): { bg: string; text: s
   return colorMap[funcao] || { bg: 'bg-gray-100', text: 'text-gray-800' };
 }
 
+// ============================================
+// NOVOS TIPOS PARA DETALHAMENTO
+// ============================================
+
+/**
+ * Categoria CNH
+ */
+export type CategoriaCNH = 'A' | 'B' | 'C' | 'D' | 'E' | 'AB' | 'AC' | 'AD' | 'AE';
+
+/**
+ * Tipo de Documento NR
+ */
+export type TipoDocumentoNR = 
+  | 'NR-01' 
+  | 'NR-06' 
+  | 'NR-11' 
+  | 'NR-12' 
+  | 'NR-18' 
+  | 'MOPI' 
+  | 'ASO' 
+  | 'Ficha de Registro';
+
+/**
+ * Status de Documento
+ */
+export type StatusDocumento = 'valido' | 'vencido' | 'vence_em_30_dias';
+
+/**
+ * Status de Multa
+ */
+export type StatusMulta = 'pago' | 'pendente' | 'em_recurso';
+
+/**
+ * Interface para Documento NR
+ */
+export interface ColaboradorDocumentoNR {
+  id: string;
+  colaborador_id: string;
+  tipo_documento: TipoDocumentoNR;
+  data_validade: string;
+  arquivo_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Interface para criação de Documento NR
+ */
+export interface ColaboradorDocumentoNRInsert {
+  id?: string;
+  colaborador_id: string;
+  tipo_documento: TipoDocumentoNR;
+  data_validade: string;
+  arquivo_url?: string | null;
+}
+
+/**
+ * Interface para atualização de Documento NR
+ */
+export interface ColaboradorDocumentoNRUpdate {
+  tipo_documento?: TipoDocumentoNR;
+  data_validade?: string;
+  arquivo_url?: string | null;
+}
+
+/**
+ * Interface para Certificado
+ */
+export interface ColaboradorCertificado {
+  id: string;
+  colaborador_id: string;
+  nome_curso: string;
+  instituicao?: string | null;
+  data_emissao?: string | null;
+  data_validade?: string | null;
+  arquivo_url?: string | null;
+  created_at: string;
+}
+
+/**
+ * Interface para criação de Certificado
+ */
+export interface ColaboradorCertificadoInsert {
+  id?: string;
+  colaborador_id: string;
+  nome_curso: string;
+  instituicao?: string | null;
+  data_emissao?: string | null;
+  data_validade?: string | null;
+  arquivo_url?: string | null;
+}
+
+/**
+ * Interface para atualização de Certificado
+ */
+export interface ColaboradorCertificadoUpdate {
+  nome_curso?: string;
+  instituicao?: string | null;
+  data_emissao?: string | null;
+  data_validade?: string | null;
+  arquivo_url?: string | null;
+}
+
+/**
+ * Interface para Multa
+ */
+export interface ColaboradorMulta {
+  id: string;
+  colaborador_id: string;
+  tipo_infracao: string;
+  descricao?: string | null;
+  valor?: number | null;
+  pontos_carteira?: number | null;
+  data_infracao: string;
+  data_vencimento?: string | null;
+  local_infracao?: string | null;
+  status: StatusMulta;
+  comprovante_url?: string | null;
+  created_at: string;
+}
+
+/**
+ * Interface para criação de Multa
+ */
+export interface ColaboradorMultaInsert {
+  id?: string;
+  colaborador_id: string;
+  tipo_infracao: string;
+  descricao?: string | null;
+  valor?: number | null;
+  pontos_carteira?: number | null;
+  data_infracao: string;
+  data_vencimento?: string | null;
+  local_infracao?: string | null;
+  status?: StatusMulta;
+  comprovante_url?: string | null;
+}
+
+/**
+ * Interface para atualização de Multa
+ */
+export interface ColaboradorMultaUpdate {
+  tipo_infracao?: string;
+  descricao?: string | null;
+  valor?: number | null;
+  pontos_carteira?: number | null;
+  data_infracao?: string;
+  data_vencimento?: string | null;
+  local_infracao?: string | null;
+  status?: StatusMulta;
+  comprovante_url?: string | null;
+}
+
+/**
+ * Interface para Arquivo Geral
+ */
+export interface ColaboradorArquivo {
+  id: string;
+  colaborador_id: string;
+  nome_arquivo: string;
+  tipo_arquivo?: string | null;
+  tamanho: number;
+  arquivo_url: string;
+  created_at: string;
+}
+
+/**
+ * Interface para criação de Arquivo
+ */
+export interface ColaboradorArquivoInsert {
+  id?: string;
+  colaborador_id: string;
+  nome_arquivo: string;
+  tipo_arquivo?: string | null;
+  tamanho: number;
+  arquivo_url: string;
+}
+
+/**
+ * Colaborador com campos expandidos
+ * Nota: campos data_admissao e observacoes foram removidos pois não existem no banco
+ */
+export interface ColaboradorExpandido extends Colaborador {
+  // Interface vazia por enquanto, pode adicionar campos futuros se necessário
+}
+
+/**
+ * Opções para Categoria CNH
+ */
+export const CATEGORIA_CNH_OPTIONS: SelectOption[] = [
+  { value: 'A', label: 'A - Motocicletas' },
+  { value: 'B', label: 'B - Automóveis' },
+  { value: 'C', label: 'C - Caminhões' },
+  { value: 'D', label: 'D - Ônibus' },
+  { value: 'E', label: 'E - Carretas' },
+  { value: 'AB', label: 'AB - A + B' },
+  { value: 'AC', label: 'AC - A + C' },
+  { value: 'AD', label: 'AD - A + D' },
+  { value: 'AE', label: 'AE - A + E' },
+];
+
+/**
+ * Opções para Tipo de Documento NR
+ */
+export const TIPO_DOCUMENTO_NR_OPTIONS: Array<{ value: TipoDocumentoNR; label: string; descricao: string }> = [
+  { 
+    value: 'NR-01', 
+    label: 'NR-01', 
+    descricao: 'Gerenciamento de Riscos Ocupacionais' 
+  },
+  { 
+    value: 'NR-06', 
+    label: 'NR-06', 
+    descricao: 'Equipamentos de Proteção Individual' 
+  },
+  { 
+    value: 'NR-11', 
+    label: 'NR-11', 
+    descricao: 'Transporte, Movimentação e Manuseio de Materiais' 
+  },
+  { 
+    value: 'NR-12', 
+    label: 'NR-12', 
+    descricao: 'Segurança no Trabalho em Máquinas e Equipamentos' 
+  },
+  { 
+    value: 'NR-18', 
+    label: 'NR-18', 
+    descricao: 'Condições e Meio Ambiente na Indústria da Construção' 
+  },
+  { 
+    value: 'MOPI', 
+    label: 'MOPI', 
+    descricao: 'Manual de Operação de Equipamentos' 
+  },
+  { 
+    value: 'ASO', 
+    label: 'ASO', 
+    descricao: 'Atestado de Saúde Ocupacional' 
+  },
+  { 
+    value: 'Ficha de Registro', 
+    label: 'Ficha de Registro', 
+    descricao: 'Ficha de Registro do Colaborador' 
+  },
+];
+
+/**
+ * Opções para Status de Multa
+ */
+export const STATUS_MULTA_OPTIONS: SelectOption[] = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'pago', label: 'Pago' },
+  { value: 'em_recurso', label: 'Em Recurso' },
+];

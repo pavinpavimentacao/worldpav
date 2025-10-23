@@ -23,7 +23,7 @@ export async function createTables() {
       .upsert([
         { 
           id: '00000000-0000-0000-0000-000000000001', 
-          name: 'Felix Mix' 
+          name: 'WorldPav' 
         }
       ], { 
         onConflict: 'id' 
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS companies (
 
 -- Inserir empresa padrão
 INSERT INTO companies (id, name) 
-VALUES ('00000000-0000-0000-0000-000000000001', 'Felix Mix')
+VALUES ('00000000-0000-0000-0000-000000000001', 'WorldPav')
 ON CONFLICT (id) DO NOTHING;
     `
   }

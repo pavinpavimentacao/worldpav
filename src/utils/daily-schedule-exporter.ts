@@ -76,7 +76,7 @@ export class DailyScheduleExporter {
     
     // Informações da empresa
     pdf.setFontSize(12);
-    pdf.text('Felix Mix / WorldRental', pageWidth / 2, 40, { align: 'center' });
+    pdf.text('WorldPav', pageWidth / 2, 40, { align: 'center' });
     
     // Estatísticas rápidas
     const totalProgramacoes = data.programacoes.length;
@@ -214,8 +214,7 @@ export class DailyScheduleExporter {
       pdf.text(`${index + 1}. Programação ${programacao.prefixo_obra || 'S/N'}`, margin, currentY);
       currentY += 7;
 
-      // 1. Prefixo equipamento (Bomba)
-      const bomba = data.bombas.find(b => b.id === programacao.bomba_id);
+            const bomba = data.bombas.find(b => b.id === programacao.bomba_id);
       if (bomba) {
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
@@ -317,7 +316,7 @@ export class DailyScheduleExporter {
     pdf.text(dataGeracao, pageWidth / 2, pageHeight - 15, { align: 'center' });
     
     // Informações da empresa
-    pdf.text('Felix Mix / WorldRental - Sistema de Gestão', pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.text('WorldPav - Sistema de Gestão', pageWidth / 2, pageHeight - 10, { align: 'center' });
   }
 
   /**

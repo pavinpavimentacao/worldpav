@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth-hooks'
-import { Button } from '../../components/Button'
+import { Button } from "../../components/shared/Button"
 import { APP_CONFIG } from '../../utils/constants'
 
 export function Login() {

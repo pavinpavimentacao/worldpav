@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Layout } from '../../components/Layout'
+import { Layout } from "../../components/layout/Layout"
 import { Link } from 'react-router-dom'
-import { Button } from '../../components/Button'
-import { PhotoModal } from '../../components/PhotoModal'
+import { Button } from "../../components/shared/Button"
+import { PhotoModal } from "../../components/modals/PhotoModal"
 import { Plus, Search, Eye, Edit, Trash2, Settings } from 'lucide-react'
 
 // Dados mock para demonstração

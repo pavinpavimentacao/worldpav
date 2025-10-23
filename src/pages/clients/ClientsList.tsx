@@ -1,137 +1,40 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus, Search, Eye, Edit2 } from 'lucide-react'
-
-type ClientRow = {
-  id: string
-  rep_name?: string | null
-  company_name?: string | null
-  phone?: string | null
-  email?: string | null
-  // Novos campos
-  client_type?: 'construtora' | 'prefeitura' | 'empresa_privada' | 'incorporadora' | null
-  work_area?: 'residencial' | 'comercial' | 'industrial' | 'publico' | null
-  work_type?: 'pavimentacao_nova' | 'recapeamento' | 'manutencao' | null
-  responsible_company?: 'WorldPav' | 'Pavin' | null
-  estimated_volume?: string | null
-  payment_terms?: '30' | '60' | '90' | null
-  technical_contact?: string | null
-  financial_contact?: string | null
-  equipment_preferences?: string[] | null
-  documentation_requirements?: string | null
-  notes?: string | null
-}
+import { useToast } from '../../lib/toast-hooks'
+import { getOrCreateDefaultCompany } from '../../lib/company-utils'
+import { 
+  getClientes, 
+  getEstatisticasClientes, 
+  type Cliente,
+  type ClienteFilters 
+} from '../../lib/clientesApi'
 
 const PAGE_SIZE = 20
 
-// Mock data para demonstração
-const mockClients: ClientRow[] = [
-  {
-    id: '1',
-    rep_name: 'João Silva',
-    company_name: 'Construtora ABC Ltda',
-    phone: '11999887766',
-    email: 'joao@construtoraabc.com',
-    client_type: 'construtora',
-    work_area: 'residencial',
-    work_type: 'pavimentacao_nova',
-    responsible_company: 'WorldPav',
-    estimated_volume: '500m²',
-    payment_terms: '30',
-    technical_contact: 'Carlos Engenheiro',
-    financial_contact: 'Maria Financeiro',
-    equipment_preferences: ['Vibroacabadora CAT AP1055F', 'Rolo Compactador Chapa Dynapac CA2500'],
-    documentation_requirements: 'ART, NR-12, NR-18, Alvará de Construção',
-    notes: 'Cliente preferencial, sempre pontual nos pagamentos'
-  },
-  {
-    id: '2',
-    rep_name: 'Maria Santos',
-    company_name: 'Prefeitura Municipal de São Paulo',
-    phone: '1133334444',
-    email: 'maria@prefeitura.sp.gov.br',
-    client_type: 'prefeitura',
-    work_area: 'publico',
-    work_type: 'recapeamento',
-    responsible_company: 'Pavin',
-    estimated_volume: '2000m²',
-    payment_terms: '60',
-    technical_contact: 'Pedro Fiscal',
-    financial_contact: 'Ana Contabilidade',
-    equipment_preferences: ['Espargidor de Emulsão Volvo FMX', 'Vibroacabadora CAT AP1055F'],
-    documentation_requirements: 'Licitação, Contrato, NR-12, NR-18, ART',
-    notes: 'Obras públicas, seguir cronograma rigoroso'
-  },
-  {
-    id: '3',
-    rep_name: 'Roberto Lima',
-    company_name: 'Shopping Center XYZ',
-    phone: '1155556666',
-    email: 'roberto@shoppingxyz.com.br',
-    client_type: 'empresa_privada',
-    work_area: 'comercial',
-    work_type: 'manutencao',
-    responsible_company: 'WorldPav',
-    estimated_volume: '800m²',
-    payment_terms: '30',
-    technical_contact: 'Fernando Manutenção',
-    financial_contact: 'Lucia Administração',
-    equipment_preferences: ['Vibroacabadora CAT AP1055F', 'Rolo Compactador Chapa Dynapac CA2500', 'Rolo Pneumático Bomag BW213'],
-    documentation_requirements: 'Contrato, NR-12, Seguro, Alvará',
-    notes: 'Manutenção preventiva mensal'
-  },
-  {
-    id: '4',
-    rep_name: 'Ana Costa',
-    company_name: 'Incorporadora DEF',
-    phone: '1177778888',
-    email: 'ana@incorporadoradef.com',
-    client_type: 'incorporadora',
-    work_area: 'residencial',
-    work_type: 'pavimentacao_nova',
-    responsible_company: 'WorldPav',
-    estimated_volume: '1200m²',
-    payment_terms: '60',
-    technical_contact: 'José Projetista',
-    financial_contact: 'Paulo Financeiro',
-    equipment_preferences: ['Espargidor de Emulsão Volvo FMX', 'Vibroacabadora CAT AP1055F'],
-    documentation_requirements: 'Projeto Aprovado, ART, NR-12, NR-18',
-    notes: 'Empreendimento de alto padrão'
-  },
-  {
-    id: '5',
-    rep_name: 'Carlos Oliveira',
-    company_name: 'Indústria GHI Ltda',
-    phone: '1199990000',
-    email: 'carlos@industriaghi.com.br',
-    client_type: 'empresa_privada',
-    work_area: 'industrial',
-    work_type: 'recapeamento',
-    responsible_company: 'Pavin',
-    estimated_volume: '3000m²',
-    payment_terms: '60',
-    technical_contact: 'Marcos Engenheiro',
-    financial_contact: 'Sandra Contabilidade',
-    equipment_preferences: ['Vibroacabadora CAT AP1055F', 'Rolo Compactador Chapa Dynapac CA2500'],
-    documentation_requirements: 'Contrato, NR-12, NR-18, Licença Ambiental',
-    notes: 'Área industrial, horário restrito'
-  }
-]
-
 export default function ClientsList() {
   const navigate = useNavigate()
+  const { addToast } = useToast()
   const [query, setQuery] = useState('')
   const [debounced, setDebounced] = useState('')
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [clients, setClients] = useState<ClientRow[]>([])
-  const [totalCount, setTotalCount] = useState(mockClients.length)
+  const [clients, setClients] = useState<Cliente[]>([])
+  const [allClients, setAllClients] = useState<Cliente[]>([])
+  const [companyId, setCompanyId] = useState<string>('')
   const [tipoFilter, setTipoFilter] = useState('')
   const [empresaFilter, setEmpresaFilter] = useState('')
+
+  // Estatísticas
+  const [stats, setStats] = useState({
+    total: 0,
+    worldpav: 0,
+    pavin: 0
+  })
 
   // debounce 350ms
   const timer = useRef<number | null>(null)
@@ -143,7 +46,83 @@ export default function ClientsList() {
     }
   }, [query])
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalCount / PAGE_SIZE)), [totalCount])
+  // Carregar company ID
+  useEffect(() => {
+    loadCompanyId()
+  }, [])
+
+  // Carregar clientes quando company ID mudar
+  useEffect(() => {
+    if (companyId) {
+      fetchClientes()
+      fetchStats()
+    }
+  }, [companyId])
+
+  async function loadCompanyId() {
+    try {
+      const id = await getOrCreateDefaultCompany()
+      setCompanyId(id)
+    } catch (err) {
+      console.error('Erro ao carregar company ID:', err)
+      addToast({ message: 'Erro ao carregar empresa', type: 'error' })
+    }
+  }
+
+  async function fetchClientes() {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const filters: ClienteFilters = {
+        searchTerm: debounced || undefined,
+        client_type: tipoFilter && tipoFilter !== 'todos' ? tipoFilter as any : undefined,
+        responsible_company: empresaFilter && empresaFilter !== 'todos' ? empresaFilter as any : undefined
+      }
+
+      const data = await getClientes(companyId, filters)
+      setAllClients(data)
+      setLoading(false)
+    } catch (err: any) {
+      console.error('Erro ao buscar clientes:', err)
+      setError(err?.message || 'Falha ao carregar clientes')
+      setLoading(false)
+      addToast({ message: 'Erro ao carregar clientes', type: 'error' })
+    }
+  }
+
+  async function fetchStats() {
+    try {
+      const data = await getEstatisticasClientes(companyId)
+      setStats({
+        total: data.total,
+        worldpav: data.worldpav,
+        pavin: data.pavin
+      })
+    } catch (err) {
+      console.error('Erro ao buscar estatísticas:', err)
+    }
+  }
+
+  // Recarregar quando filtros mudarem
+  useEffect(() => {
+    if (companyId) {
+      fetchClientes()
+    }
+  }, [debounced, tipoFilter, empresaFilter])
+
+  // Aplicar paginação local
+  const paginatedClients = useMemo(() => {
+    const startIndex = (page - 1) * PAGE_SIZE
+    const endIndex = startIndex + PAGE_SIZE
+    return allClients.slice(startIndex, endIndex)
+  }, [allClients, page])
+
+  useEffect(() => {
+    setClients(paginatedClients)
+  }, [paginatedClients])
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(allClients.length / PAGE_SIZE)), [allClients.length])
 
   function formatPhone(value?: string | null) {
     const digits = (value || '').replace(/\D/g, '')
@@ -224,58 +203,6 @@ export default function ClientsList() {
     return <span className="text-gray-500">-</span>
   }
 
-  // Aplicar filtros
-  const filteredClients = useMemo(() => {
-    let filtered = mockClients
-
-    // Filtro de busca
-    if (debounced) {
-      filtered = filtered.filter(client => 
-        (client.rep_name?.toLowerCase().includes(debounced.toLowerCase())) ||
-        (client.company_name?.toLowerCase().includes(debounced.toLowerCase()))
-      )
-    }
-
-    // Filtro de tipo
-    if (tipoFilter) {
-      filtered = filtered.filter(client => client.client_type === tipoFilter)
-    }
-
-    // Filtro de empresa
-    if (empresaFilter) {
-      filtered = filtered.filter(client => client.responsible_company === empresaFilter)
-    }
-
-    return filtered
-  }, [debounced, tipoFilter, empresaFilter])
-
-  function fetchData() {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      // Simular delay de carregamento
-      setTimeout(() => {
-        // Aplicar paginação nos dados filtrados
-        const startIndex = (page - 1) * PAGE_SIZE
-        const endIndex = startIndex + PAGE_SIZE
-        const paginatedClients = filteredClients.slice(startIndex, endIndex)
-
-        setClients(paginatedClients)
-        setTotalCount(filteredClients.length)
-        setLoading(false)
-      }, 300) // Simular delay de 300ms
-    } catch (err: any) {
-      console.error('Fetch clients error:', { message: err?.message, page, debounced })
-      setError(err?.message || 'Falha ao carregar clientes')
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchData()
-  }, [debounced, page, tipoFilter, empresaFilter, filteredClients])
-
   function exportCsv() {
     const headers = ['rep_name', 'company_name', 'phone', 'email']
     const rows = clients.map((c) => [c.rep_name ?? '', c.company_name ?? '', c.phone ?? '', c.email ?? ''])
@@ -297,7 +224,7 @@ export default function ClientsList() {
             <div className="text-red-500 text-6xl mb-4">⚠️</div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Erro ao carregar clientes</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => fetchData()}>Tentar Novamente</Button>
+            <Button onClick={() => fetchClientes()}>Tentar Novamente</Button>
           </div>
         </div>
       </Layout>
@@ -339,7 +266,7 @@ export default function ClientsList() {
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-500">Total de Clientes</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {filteredClients.length}
+                  {stats.total}
                 </p>
               </div>
             </div>
@@ -355,7 +282,7 @@ export default function ClientsList() {
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-500">WorldPav</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {filteredClients.filter(c => c.responsible_company === 'WorldPav').length}
+                  {stats.worldpav}
                 </p>
               </div>
             </div>
@@ -371,7 +298,7 @@ export default function ClientsList() {
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-500">Pavin</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {filteredClients.filter(c => c.responsible_company === 'Pavin').length}
+                  {stats.pavin}
                 </p>
               </div>
             </div>
@@ -387,7 +314,7 @@ export default function ClientsList() {
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-500">Ativos</p>
                 <p className="text-lg font-semibold text-green-600">
-                  {filteredClients.filter(c => c.phone || c.email).length}
+                  {allClients.filter(c => c.phone || c.email).length}
                 </p>
               </div>
             </div>
@@ -488,23 +415,25 @@ export default function ClientsList() {
                   clients.map((client) => (
                     <tr key={client.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{client.rep_name || '-'}</div>
+                        <div className="text-sm font-medium text-gray-900">{client.representante || '-'}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{client.company_name || '-'}</div>
+                        <div className="text-sm font-medium text-gray-900">{client.empresa || '-'}</div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                          {getClientTypeLabel(client.client_type)}
+                          {client.tipo_cliente || '-'}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {getWorkAreaLabel(client.work_area)}
+                          {client.area_atuacao || '-'}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {getCompanyBadge(client.responsible_company)}
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          {client.empresa_responsavel?.name || '-'}
+                        </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600">
@@ -543,8 +472,34 @@ export default function ClientsList() {
 
         </div>
 
+        {/* Paginação */}
+        {!loading && clients.length > 0 && totalPages > 1 && (
+          <div className="bg-white shadow-sm rounded-lg border p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Página <span className="font-medium">{page}</span> de{' '}
+                <span className="font-medium">{totalPages}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mensagem de Nenhum Resultado */}
-        {!loading && filteredClients.length === 0 && (
+        {!loading && allClients.length === 0 && (
           <div className="bg-white shadow-sm rounded-lg border p-12 text-center">
             <div className="text-gray-400 text-5xl mb-4">👥</div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">

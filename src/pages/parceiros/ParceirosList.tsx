@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
 import { Plus, Search, Building2, Phone, Mail, MapPin, Eye, DollarSign, Layers } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getParceiros } from '../../lib/parceirosApi'
@@ -275,4 +275,7 @@ const ParceirosList = () => {
 }
 
 export default ParceirosList
+
+
+
 

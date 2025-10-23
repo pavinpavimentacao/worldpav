@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Layout } from '../../components/Layout'
+import { Layout } from "../../components/layout/Layout"
 import { Link } from 'react-router-dom'
-import { Button } from '../../components/Button'
-import { PhotoUpload } from '../../components/PhotoUpload'
+import { Button } from "../../components/shared/Button"
+import { PhotoUpload } from "../../components/shared/PhotoUpload"
 import { ArrowLeft, Save, Plus, Settings, AlertCircle } from 'lucide-react'
 
 // Tipos de maquinário pré-definidos com suas configurações

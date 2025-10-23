@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { X, Plus } from 'lucide-react'
-import { Button } from '../Button'
-import { Select } from '../Select'
+import { Button } from "../shared/Button"
+import { Select } from "../shared/Select"
 import { Input } from '../ui/input'
 import { FaixaAsfalto, faixaAsfaltoLabels, PrecoFaixa } from '../../types/parceiros'
 

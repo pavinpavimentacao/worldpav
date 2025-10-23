@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { Input } from '../../components/ui/input'
-import { Select } from '../../components/Select'
+import { Select } from "../../components/shared/Select"
 import { Textarea } from '../../components/ui/textarea'
 import { 
   ArrowLeft, 

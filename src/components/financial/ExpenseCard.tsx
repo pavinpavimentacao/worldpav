@@ -91,11 +91,10 @@ export function ExpenseCard({
             </span>
           </div>
 
-          {/* Bomba e Empresa */}
+          {}
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
               <span className="text-gray-600">Bomba:</span>
-              <p className="font-medium">{expense.bomba_prefix || 'N/A'}</p>
             </div>
             <div>
               <span className="text-gray-600">Empresa:</span>

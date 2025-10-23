@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Truck, Calendar, FileText } from 'lucide-react'
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, AlertCircle, Info } from 'lucide-react'
-import { Button } from '../Button'
-import { Select } from '../Select'
+import { Button } from "../shared/Button"
+import { Select } from "../shared/Select"
 import { DatePicker } from '../ui/date-picker'
 import { calcularValorAbastecimento } from '../../utils/diesel-calculations'
 import { supabase } from '../../lib/supabase'

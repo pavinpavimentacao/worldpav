@@ -1,95 +1,90 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react'
 
 interface CurrencyInputProps {
-  value: number;
-  onChange: (value: number) => void;
-  placeholder?: string;
-  className?: string;
-  id?: string;
-  required?: boolean;
-  disabled?: boolean;
+  value: number
+  onChange: (value: number) => void
+  placeholder?: string
+  className?: string
+  disabled?: boolean
+  error?: boolean
 }
 
-export const CurrencyInput: React.FC<CurrencyInputProps> = ({
-  value,
-  onChange,
-  placeholder = "R$ 0,00",
+export function CurrencyInput({ 
+  value, 
+  onChange, 
+  placeholder = "0,00", 
   className = "",
-  id,
-  required = false,
-  disabled = false
-}) => {
-  const [displayValue, setDisplayValue] = useState("");
-  const isInternalUpdate = useRef(false);
+  disabled = false,
+  error = false
+}: CurrencyInputProps) {
+  const [displayValue, setDisplayValue] = useState('')
 
-  // Função para formatar valor de entrada (quando usuário digita)
-  const formatCurrencyInput = (inputValue: string): string => {
-    // Remove todos os caracteres não numéricos
-    const numbers = inputValue.replace(/\D/g, '');
-    
-    if (!numbers) return '';
-    
-    // Converte para número e divide por 100 para ter centavos
-    const amount = parseInt(numbers) / 100;
-    
-    // Formata como moeda brasileira
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
+  // Atualiza o valor de exibição quando o valor prop muda
+  useEffect(() => {
+    if (value > 0) {
+      setDisplayValue(formatCurrencyDisplay(value))
+    } else {
+      setDisplayValue('')
+    }
+  }, [value])
+
+  const formatCurrencyDisplay = (val: number): string => {
+    return val.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(amount);
-  };
-
-  // Função para converter valor formatado de volta para número
-  const parseCurrency = (formattedValue: string): number => {
-    if (!formattedValue) return 0;
-    
-    // Remove símbolos e espaços, mantém apenas números e vírgula
-    const cleanValue = formattedValue.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
-    const parsed = parseFloat(cleanValue);
-    return isNaN(parsed) ? 0 : parsed;
-  };
-
-  // Só atualizar displayValue se não for uma atualização interna
-  useEffect(() => {
-    if (!isInternalUpdate.current) {
-      const formatted = formatCurrencyInput(value.toString());
-      setDisplayValue(formatted);
-    }
-    isInternalUpdate.current = false;
-  }, [value]);
-
-  // Inicializar o displayValue na montagem
-  useEffect(() => {
-    const formatted = formatCurrencyInput(value.toString());
-    setDisplayValue(formatted);
-  }, []);
+    })
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    const formatted = formatCurrencyInput(inputValue);
-    
-    setDisplayValue(formatted);
-    
-    // Marcar como atualização interna
-    isInternalUpdate.current = true;
-    
-    // Converter para número e chamar onChange
-    const numericValue = parseCurrency(formatted);
-    onChange(numericValue);
-  };
+    let inputValue = e.target.value
+
+    // Remove tudo que não é dígito ou vírgula
+    inputValue = inputValue.replace(/[^\d,]/g, '')
+
+    // Garante apenas uma vírgula
+    const parts = inputValue.split(',')
+    if (parts.length > 2) {
+      inputValue = parts[0] + ',' + parts.slice(1).join('')
+    }
+
+    // Limita a 2 casas decimais após a vírgula
+    if (parts[1] && parts[1].length > 2) {
+      inputValue = parts[0] + ',' + parts[1].substring(0, 2)
+    }
+
+    setDisplayValue(inputValue)
+
+    // Converte para número e chama onChange
+    const numericValue = inputValue ? parseFloat(inputValue.replace(',', '.')) : 0
+    onChange(numericValue)
+  }
+
+  const handleBlur = () => {
+    // Formata o valor quando o usuário sai do campo
+    if (value > 0) {
+      setDisplayValue(formatCurrencyDisplay(value))
+    }
+  }
+
+  const handleFocus = () => {
+    // Remove a formatação quando o usuário foca no campo para facilitar a edição
+    if (value > 0) {
+      setDisplayValue(value.toString().replace('.', ','))
+    }
+  }
 
   return (
     <input
       type="text"
-      id={id}
-      required={required}
       value={displayValue}
       onChange={handleChange}
+      onBlur={handleBlur}
+      onFocus={handleFocus}
       placeholder={placeholder}
-      className={className}
       disabled={disabled}
+      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+        error ? 'border-red-300' : 'border-gray-300'
+      } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''} ${className}`}
     />
-  );
-};
+  )
+}

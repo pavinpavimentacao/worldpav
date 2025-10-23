@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Layout } from '../../components/Layout'
+import { Layout } from "../../components/layout/Layout"
 import { Link, useParams } from 'react-router-dom'
-import { Button } from '../../components/Button'
-import { PhotoModal } from '../../components/PhotoModal'
+import { Button } from "../../components/shared/Button"
+import { PhotoModal } from "../../components/modals/PhotoModal"
 import { DieselTab } from '../../components/maquinarios/DieselTab'
+import { SeguroTab } from '../../components/maquinarios/SeguroTab'
+import { LicencasTab } from '../../components/maquinarios/LicencasTab'
 import { 
   ArrowLeft, 
   Edit, 
@@ -20,8 +22,19 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
-  Droplets
+  Droplets,
+  Shield,
+  FileText,
+  FileCheck
 } from 'lucide-react'
+
+type TabType = 'informacoes' | 'obras' | 'diesel' | 'seguro' | 'licencas' | 'cola';
+
+interface Tab {
+  id: TabType;
+  label: string;
+  icon: React.ReactNode;
+}
 
 // Dados mock para demonstração - diferentes maquinários por ID
 const mockMaquinarios = {
@@ -185,6 +198,7 @@ const DetalhesMaquinario = () => {
   const [consumoCola, setConsumoCola] = useState(mockConsumoCola)
   const [selectedPhoto, setSelectedPhoto] = useState<{url: string, title: string} | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<TabType>('informacoes')
 
   useEffect(() => {
     const loadData = async () => {
@@ -249,6 +263,20 @@ const DetalhesMaquinario = () => {
   const isEspargidor = maquinario.tipo.includes('Espargidor')
   const alertaEstoqueBaixo = isEspargidor && (estoqueAtualCola < 1000 || estoqueAtualCola < (totalCarregamentosCola * 0.2))
 
+  // Definir tabs baseado no tipo de maquinário
+  const tabs: Tab[] = [
+    { id: 'informacoes', label: 'Informações', icon: <Settings className="h-4 w-4" /> },
+    { id: 'obras', label: 'Obras', icon: <MapPin className="h-4 w-4" /> },
+    { id: 'diesel', label: 'Diesel', icon: <Fuel className="h-4 w-4" /> },
+    { id: 'seguro', label: 'Seguro', icon: <Shield className="h-4 w-4" /> },
+    { id: 'licencas', label: 'Licenças', icon: <FileCheck className="h-4 w-4" /> },
+  ]
+  
+  // Adicionar aba de cola apenas para espargidor
+  if (isEspargidor) {
+    tabs.push({ id: 'cola', label: 'Controle de Cola', icon: <Droplets className="h-4 w-4" /> })
+  }
+
   if (isLoading) {
     return (
       <Layout>
@@ -267,7 +295,7 @@ const DetalhesMaquinario = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="md:flex md:items-center md:justify-between">
           <div className="min-w-0 flex-1">
@@ -276,10 +304,10 @@ const DetalhesMaquinario = () => {
               Voltar para Maquinários
             </Link>
             <h2 className="mt-2 text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-              Detalhes do Maquinário
+              {maquinario.nome}
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              Informações completas do equipamento de pavimentação.
+              {maquinario.tipo}
             </p>
           </div>
           <div className="mt-4 flex space-x-3 md:ml-4 md:mt-0">
@@ -296,8 +324,40 @@ const DetalhesMaquinario = () => {
           </div>
         </div>
 
-        {/* Informações Principais */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tabs Navigation */}
+        <div className="card overflow-hidden">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px overflow-x-auto">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`group inline-flex items-center px-6 py-4 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`mr-2 ${
+                      activeTab === tab.id ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'
+                    }`}
+                  >
+                    {tab.icon}
+                  </span>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-6">
+            {/* Aba Informações */}
+            {activeTab === 'informacoes' && (
+              <div className="space-y-6">
+                {/* Informações Principais */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Foto e Informações Básicas */}
           <div className="lg:col-span-2">
             <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -413,10 +473,15 @@ const DetalhesMaquinario = () => {
               </div>
             </div>
           </div>
-        </div>
+                </div>
+              </div>
+            )}
 
-        {/* Obras que Participa */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            {/* Aba Obras */}
+            {activeTab === 'obras' && (
+              <div className="space-y-6">
+                {/* Obras que Participa */}
+                <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg leading-6 font-medium text-gray-900 flex items-center">
@@ -480,23 +545,32 @@ const DetalhesMaquinario = () => {
               </tbody>
             </table>
           </div>
-        </div>
+                </div>
+              </div>
+            )}
 
-        {/* Consumo de Diesel - Componente Integrado */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 flex items-center">
-              <Fuel className="h-5 w-5 mr-2 text-primary-600" />
-              Controle de Diesel
-            </h3>
-          </div>
-          <div className="px-4 py-5 sm:p-6">
-            <DieselTab maquinarioId={id || '1'} />
-          </div>
-        </div>
+            {/* Aba Diesel */}
+            {activeTab === 'diesel' && (
+              <DieselTab maquinarioId={id || '1'} />
+            )}
 
-        {/* Controle de Cola - Apenas para Espargidor */}
-        {isEspargidor && (
+            {/* Aba Seguro */}
+            {activeTab === 'seguro' && (
+              <SeguroTab maquinarioId={id || '1'} maquinarioNome={maquinario.nome} />
+            )}
+
+            {/* Aba Licenças */}
+            {activeTab === 'licencas' && (
+              <LicencasTab 
+                maquinarioId={id || '1'} 
+                maquinarioNome={maquinario.nome}
+                maquinarioTipo={maquinario.tipo}
+              />
+            )}
+
+            {/* Aba Controle de Cola - Apenas para Espargidor */}
+            {activeTab === 'cola' && isEspargidor && (
+              <div className="space-y-6">
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -616,8 +690,11 @@ const DetalhesMaquinario = () => {
                 </div>
               </div>
             </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Modal de Foto */}
         <PhotoModal

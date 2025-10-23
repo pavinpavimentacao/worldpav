@@ -46,7 +46,6 @@ export interface ExpenseWithRelations extends Expense {
     numero_nota: string
   }
   // Campos calculados
-  pump_prefix?: string
   company_name?: string
   nota_numero?: string
 }
@@ -124,7 +123,6 @@ export interface InvoiceIntegration {
   valor: number
   data_emissao: string
   relatorio_id?: string
-  bomba_prefix?: string
 }
 
 // ============================================================================
@@ -353,7 +351,6 @@ export const expenseFormSchema = {
   valor: { required: true, min: 0.01 },
   tipo_custo: { required: true },
   data_despesa: { required: true },
-  pump_id: { required: true },
   company_id: { required: true },
   quilometragem_atual: { min: 0 },
   quantidade_litros: { min: 0 },

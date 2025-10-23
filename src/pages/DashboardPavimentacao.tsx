@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMediaQuery } from '../hooks/use-media-query'
-import { Layout } from '../components/Layout'
+import { Layout } from "../components/layout/Layout"
 import { DashboardDesktop } from '../components/dashboard/DashboardDesktop'
 import { DashboardMobile } from '../components/dashboard/DashboardMobile'
 import { DashboardPavimentacaoApi } from '../lib/dashboard-pavimentacao-api'
@@ -80,4 +80,6 @@ export default function DashboardPavimentacao() {
     </Layout>
   )
 }
+
+
 

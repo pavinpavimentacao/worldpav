@@ -1,4 +1,3 @@
-// Status das bombas
 export const PUMP_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
@@ -11,7 +10,6 @@ export const PUMP_STATUS_LABELS = {
   [PUMP_STATUS.MAINTENANCE]: 'Manutenção'
 } as const
 
-// Cores para os status das bombas
 export const PUMP_STATUS_COLORS = {
   [PUMP_STATUS.ACTIVE]: 'green',
   [PUMP_STATUS.INACTIVE]: 'gray',

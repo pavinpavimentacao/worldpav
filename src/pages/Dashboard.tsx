@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Layout } from '../components/Layout'
-import { DashboardCard } from '../components/DashboardCard'
-import { NextBombaCard } from '../components/NextBombaCard'
-import { StatusCard } from '../components/StatusCard'
-import { ExpenseCategoryCard } from '../components/ExpenseCategoryCard'
+import { Layout } from "../components/layout/Layout"
+import { DashboardCard } from "../components/cards/DashboardCard"
+import { StatusCard } from "../components/cards/StatusCard"
+import { ExpenseCategoryCard } from '../components/cards/ExpenseCategoryCard'
 import { Link } from 'react-router-dom'
 import { DashboardApi, DashboardStats } from '../lib/dashboard-api'
 import { GenericError } from './errors/GenericError'
@@ -50,17 +49,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-
-        {/* Próxima Bomba - Card especial */}
-        {!error && (
-          <div className="mb-6">
-            <NextBombaCard 
-              proximaBomba={stats?.proxima_bomba || null} 
-              loading={loading} 
-            />
-          </div>
-        )}
-
         {/* Cards de Métricas */}
         {error ? (
           <GenericError 
@@ -74,7 +62,7 @@ export default function Dashboard() {
             <DashboardCard
               title="Programação Hoje"
               value={stats?.programacao_hoje.length || 0}
-              subtitle="bombas programadas"
+              subtitle="serviços programados"
               color="blue"
               loading={loading}
               linkTo="/programacao"
@@ -90,7 +78,7 @@ export default function Dashboard() {
             <DashboardCard
               title="Programação Amanhã"
               value={stats?.programacao_amanha.length || 0}
-              subtitle="bombas programadas"
+              subtitle="serviços programados"
               color="blue"
               loading={loading}
               linkTo="/programacao"
@@ -324,9 +312,6 @@ export default function Dashboard() {
                       <p className="text-sm font-medium text-gray-900 truncate">{item.endereco}</p>
                       <div className="flex items-center space-x-2 text-xs text-gray-500">
                         <span>👤 {item.responsavel}</span>
-                        {item.bomba_prefix && (
-                          <span>🚛 {item.bomba_prefix}</span>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -363,9 +348,6 @@ export default function Dashboard() {
                       <p className="text-sm font-medium text-gray-900 truncate">{item.endereco}</p>
                       <div className="flex items-center space-x-2 text-xs text-gray-500">
                         <span>👤 {item.responsavel}</span>
-                        {item.bomba_prefix && (
-                          <span>🚛 {item.bomba_prefix}</span>
-                        )}
                       </div>
                     </div>
                   </div>

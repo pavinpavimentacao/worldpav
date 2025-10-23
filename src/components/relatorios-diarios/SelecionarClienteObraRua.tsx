@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Building2, Briefcase, MapPin } from 'lucide-react'
-import { Select } from '../Select'
+import { Select } from "../shared/Select"
 
 interface Cliente {
   id: string

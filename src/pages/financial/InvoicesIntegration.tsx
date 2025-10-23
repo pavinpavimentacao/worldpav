@@ -51,8 +51,6 @@ export function InvoicesIntegration() {
     try {
       setProcessing(invoice.nota_fiscal_id);
       
-      // Buscar bomba e empresa relacionadas
-      const bomba = pumps.find(p => p.prefix === invoice.bomba_prefix);
       const empresa = companies.find(c => c.name === invoice.empresa_nome);
       
       if (!bomba || !empresa) {
@@ -262,7 +260,6 @@ export function InvoicesIntegration() {
                         {invoice.empresa_nome || 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {invoice.bomba_prefix || 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

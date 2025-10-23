@@ -5,26 +5,24 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../../lib/supabase';
 import { generateInvoiceNote } from '../../lib/notes-api';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
-import { NotePreview } from '../../components/NotePreview';
-import { CompanySelector } from '../../components/CompanySelector';
-import { CurrencyInputWithValidation } from '../../components/CurrencyInputWithValidation';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
+import { NotePreview } from "../../components/shared/NotePreview";
+import { CompanySelector } from "../../components/shared/CompanySelector";
+import { CurrencyInputWithValidation } from "../../components/inputs/validation/CurrencyInputWithValidation";
 import { DatePicker } from '../../components/ui/date-picker';
-import { PhoneInputWithValidation } from '../../components/PhoneInputWithValidation';
-import { CEPInputWithValidation } from '../../components/CEPInputWithValidation';
-import { DocumentInputWithValidation } from '../../components/DocumentInputWithValidation';
-import { UFSelector } from '../../components/UFSelector';
-import { TextAreaWithCounter } from '../../components/TextAreaWithCounter';
-import { CompanyNameInputWithValidation } from '../../components/CompanyNameInputWithValidation';
-import { AddressInputWithValidation } from '../../components/AddressInputWithValidation';
-import { CityInputWithValidation } from '../../components/CityInputWithValidation';
+import { PhoneInputWithValidation } from "../../components/inputs/validation/PhoneInputWithValidation";
+import { CEPInputWithValidation } from "../../components/inputs/validation/CEPInputWithValidation";
+import { DocumentInputWithValidation } from "../../components/inputs/validation/DocumentInputWithValidation";
+import { UFSelector } from "../../components/shared/UFSelector";
+import { TextAreaWithCounter } from "../../components/shared/TextAreaWithCounter";
+import { CompanyNameInputWithValidation } from "../../components/inputs/validation/CompanyNameInputWithValidation";
+import { AddressInputWithValidation } from "../../components/inputs/validation/AddressInputWithValidation";
+import { CityInputWithValidation } from "../../components/inputs/validation/CityInputWithValidation";
 
 // Schema de validação
 const noteFormSchema = z.object({
-  company_logo: z.enum(['felixmix', 'worldrental'], {
-    required_error: 'Selecione uma empresa'
-  }),
+  company_logo: z.string().optional(),
   phone: z.string().min(1, 'Telefone é obrigatório'),
   nf_date: z.string().min(1, 'Data da nota é obrigatória'),
   nf_due_date: z.string().min(1, 'Data de vencimento é obrigatória'),
@@ -59,7 +57,7 @@ export const NewNote: React.FC = () => {
   } = useForm<NoteFormData>({
     resolver: zodResolver(noteFormSchema),
     defaultValues: {
-      company_logo: 'felixmix',
+      company_logo: 'worldpav',
       phone: '',
       nf_date: new Date().toISOString().split('T')[0],
       nf_due_date: '',

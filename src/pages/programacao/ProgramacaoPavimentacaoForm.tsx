@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Layout } from '../../components/Layout';
-import { Button } from '../../components/Button';
+import { Layout } from "../../components/layout/Layout";
+import { Button } from "../../components/shared/Button";
 import { Input } from '../../components/ui/input';
 import { DatePicker } from '../../components/ui/date-picker';
 import { SelecionarClienteObraRua } from '../../components/relatorios-diarios/SelecionarClienteObraRua';
@@ -13,7 +13,7 @@ import { MaquinariosSelector } from '../../components/relatorios-diarios/Maquina
 import { ServicosObra } from '../../components/programacao/ServicosObra';
 import { ArrowLeft, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { FaixaAsfalto, faixaAsfaltoLabels, faixaAsfaltoDescricoes } from '../../types/parceiros';
-import { Select } from '../../components/Select';
+import { Select } from "../../components/shared/Select";
 import { TIPOS_SERVICO_OPTIONS } from '../../types/programacao-pavimentacao';
 
 // Schema de validação

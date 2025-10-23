@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { Input } from '../../components/ui/input'
 import { DatePicker } from '../../components/ui/date-picker'
 import { SelecionarClienteObraRua } from '../../components/relatorios-diarios/SelecionarClienteObraRua'
@@ -15,7 +15,7 @@ import { ArrowLeft, Save, AlertCircle, CheckCircle } from 'lucide-react'
 import { createRelatorioDiario, finalizarRua, criarFaturamentoRua } from '../../lib/relatoriosDiariosApi'
 import { validarDataNaoFutura, validarEspessura } from '../../utils/relatorios-diarios-utils'
 import { FaixaAsfalto, faixaAsfaltoLabels, faixaAsfaltoDescricoes } from '../../types/parceiros'
-import { Select } from '../../components/Select'
+import { Select } from "../../components/shared/Select"
 
 // Schema de validação
 const relatorioSchema = z.object({

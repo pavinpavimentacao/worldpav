@@ -342,7 +342,7 @@ export function FinancialReports() {
             </Card>
           )}
 
-          {/* Top Bombas */}
+          {}
           {stats && stats.total_por_bomba.length > 0 && (
             <Card>
               <CardHeader>
@@ -360,7 +360,6 @@ export function FinancialReports() {
                           <span className="text-lg">🚛</span>
                         </div>
                         <div>
-                          <p className="font-medium">{bomba.bomba_prefix}</p>
                           <p className="text-sm text-gray-600">Bomba</p>
                         </div>
                       </div>

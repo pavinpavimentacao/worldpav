@@ -7,7 +7,6 @@ export interface Report {
   client_id: string | null
   client_rep_name: string | null
   work_address: string | null
-  pump_prefix: string | null
   realized_volume: number | null
   total_value: number | null
   status: ReportStatus
@@ -15,7 +14,6 @@ export interface Report {
   company_id: string
   created_at: string | null
   updated_at: string | null
-  pump_id: string | null
   driver_name: string | null
   assistant1_name: string | null
   assistant2_name: string | null
@@ -53,9 +51,6 @@ export interface CreateReportData {
   client_rep_name: string
   client_phone?: string
   work_address: string
-  pump_id: string
-  pump_prefix: string
-  pump_owner_company_id: string
   planned_volume?: number
   realized_volume: number
   team?: string
@@ -67,7 +62,6 @@ export interface ReportFilters {
   status?: ReportStatus[]
   dateFrom?: string
   dateTo?: string
-  pump_prefix?: string
   client_id?: string
   // Novos campos de busca
   searchTerm?: string
@@ -75,7 +69,6 @@ export interface ReportFilters {
   report_number?: string
   client_name?: string
   company_name?: string
-  pump_name?: string
   volume_min?: number
   volume_max?: number
   value_min?: number

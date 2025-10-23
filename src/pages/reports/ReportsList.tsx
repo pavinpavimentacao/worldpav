@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { Select } from '../../components/Select'
-import { MultiSelect } from '../../components/MultiSelect'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { Select } from "../../components/shared/Select"
+import { MultiSelect } from "../../components/shared/MultiSelect"
 import { DateRangePicker } from '../../components/ui/date-range-picker';
-import { ExportModal } from '../../components/ExportModal'
+import { ExportModal } from "../../components/exports/ExportModal"
 import { ReportWithRelations, ReportFilters, ReportStatus } from '../../types/reports'
-import { formatCurrency } from '../../utils/formatters'
+import { formatCurrency } from '../../utils/format'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { 
@@ -165,11 +165,6 @@ export default function ReportsList() {
         query = query.lte('date', filters.dateTo)
       }
 
-      if (filters.pump_prefix) {
-        console.log('🔍 [DEBUG] Aplicando filtro de bomba:', filters.pump_prefix)
-        query = query.eq('pump_prefix', filters.pump_prefix)
-      }
-
       if (filters.client_id) {
         console.log('🔍 [DEBUG] Aplicando filtro de cliente:', filters.client_id)
         query = query.eq('client_id', filters.client_id)
@@ -190,7 +185,6 @@ export default function ReportsList() {
             query = query.ilike('client_rep_name', `%${searchTerm}%`)
             break
           case 'pump':
-            query = query.ilike('pump_prefix', `%${searchTerm}%`)
             break
           case 'volume': {
             const volumeNum = parseFloat(searchTerm)
@@ -228,7 +222,6 @@ export default function ReportsList() {
       }
       
       if (filters.pump_name) {
-        query = query.ilike('pump_prefix', `%${filters.pump_name}%`)
       }
       
       if (filters.volume_min !== undefined) {
@@ -266,9 +259,6 @@ export default function ReportsList() {
       if (filters.dateTo) {
         countQuery = countQuery.lte('date', filters.dateTo)
       }
-      if (filters.pump_prefix) {
-        countQuery = countQuery.eq('pump_prefix', filters.pump_prefix)
-      }
       if (filters.client_id) {
         countQuery = countQuery.eq('client_id', filters.client_id)
       }
@@ -284,7 +274,6 @@ export default function ReportsList() {
             countQuery = countQuery.ilike('client_rep_name', `%${searchTerm}%`)
             break
           case 'pump':
-            countQuery = countQuery.ilike('pump_prefix', `%${searchTerm}%`)
             break
           case 'volume': {
             const volumeNum = parseFloat(searchTerm)
@@ -372,20 +361,17 @@ export default function ReportsList() {
         
         console.log('📊 [DATA] Clientes carregados:', clientsData)
         
-        // 3. Enriquecer com dados das bombas
-        const pumpIds = [...new Set(reportsData.map(r => r.pump_id).filter(Boolean))]
+                const pumpIds = [...new Set(reportsData.map(r => r.pump_id).filter(Boolean))]
         console.log('🔍 [DEBUG] Pump IDs únicos:', pumpIds)
         
-        // Buscar bombas internas
-        const { data: pumpsData } = await supabase
+                const { data: pumpsData } = await supabase
           .from('pumps')
           .select('*')
           .in('id', pumpIds)
         
         console.log('📊 [DATA] Bombas internas carregadas:', pumpsData)
         
-        // Buscar bombas terceiras para IDs que não foram encontrados nas bombas internas
-        const foundPumpIds = pumpsData?.map(p => p.id) || []
+                const foundPumpIds = pumpsData?.map(p => p.id) || []
         const missingPumpIds = pumpIds.filter(id => !foundPumpIds.includes(id))
         
         let bombasTerceirasData = []
@@ -413,11 +399,9 @@ export default function ReportsList() {
         
         // 5. Combinar os dados
         const enrichedReports = reportsData.map(report => {
-          // Buscar bomba interna primeiro
-          let pumpData = pumpsData?.find(p => p.id === report.pump_id)
+                    let pumpData = pumpsData?.find(p => p.id === report.pump_id)
           
-          // Se não encontrou bomba interna, buscar bomba terceira
-          if (!pumpData) {
+                    if (!pumpData) {
             const bombaTerceira = bombasTerceirasData?.find(bt => bt.id === report.pump_id)
             if (bombaTerceira) {
               pumpData = {
@@ -667,7 +651,6 @@ const handleWhatsApp = (report: ReportWithRelations) => {
     return (
       (filters.status && filters.status.length > 0) ||
       dateFilterType !== 'all' ||
-      filters.pump_prefix ||
       filters.client_id ||
       searchTerm.trim() ||
       filters.report_number ||
@@ -723,7 +706,6 @@ const handleWhatsApp = (report: ReportWithRelations) => {
       }
     },
     {
-      key: 'pump_prefix' as keyof ReportWithRelations,
       label: 'BOMBA',
       className: 'w-16 font-mono text-xs font-semibold',
       sortable: true,
@@ -934,7 +916,7 @@ const handleWhatsApp = (report: ReportWithRelations) => {
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="Ex: Felix Mix"
+                        placeholder="Ex: WorldPav"
                         value={companySearchTerm}
                         onChange={(e) => {
                           const value = e.target.value
@@ -972,7 +954,7 @@ const handleWhatsApp = (report: ReportWithRelations) => {
                     </div>
                   </div>
 
-                  {/* Prefixo da Bomba */}
+                  {}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Prefixo da Bomba
@@ -1129,9 +1111,8 @@ const handleWhatsApp = (report: ReportWithRelations) => {
               {/* Pump Filter */}
               <Select
                 label="Bomba"
-                value={filters.pump_prefix || ''}
                 onChange={(value) => {
-                  setFilters(prev => ({ ...prev, pump_prefix: value || undefined }))
+                  setFilters(prev => ({ ...prev, pump_id: value || undefined }))
                   setCurrentPage(1)
                 }}
                 options={pumps.map(pump => ({ value: pump.prefix, label: pump.prefix }))}
@@ -1170,11 +1151,6 @@ const handleWhatsApp = (report: ReportWithRelations) => {
                       {dateFilterType !== 'all' && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           Período: {getDateFilterLabel(dateFilterType)}
-                        </span>
-                      )}
-                      {filters.pump_prefix && (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          Bomba: {filters.pump_prefix}
                         </span>
                       )}
                       {filters.client_id && (

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { ConfirmDialog } from '../../components/ConfirmDialog'
-import { Loading } from '../../components/Loading'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
+import { ConfirmDialog } from "../../components/modals/ConfirmDialog"
+import { Loading } from "../../components/shared/Loading"
 import { GenericError } from '../errors/GenericError'
 import { usePagamentosReceberIntegrado } from '../../lib/pagamentos-receber-api-integrado'
 import { PagamentoReceberIntegrado, FormaPagamento } from '../../lib/pagamentos-receber-api-integrado'
-import { Select } from '../../components/Select'
+import { Select } from "../../components/shared/Select"
 import { toast } from '../../lib/toast-hooks'
 import { formatDateToBR } from '../../utils/date-utils'
 

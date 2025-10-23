@@ -1,6 +1,6 @@
 import React from 'react'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 
 export default function TestEditReport() {
   return (

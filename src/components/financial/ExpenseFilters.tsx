@@ -88,8 +88,7 @@ export function ExpenseFilters({
       onFiltersChange(newFilters);
     } else {
       onFiltersChange({
-        ...filters,
-        pump_id: pumpId
+        ...filters: pumpId
       });
     }
   };
@@ -261,7 +260,7 @@ export function ExpenseFilters({
                   </Select>
                 </div>
 
-                {/* Bomba */}
+                {}
                 <div className="space-y-2">
                   <Label>Bomba</Label>
                   <Select

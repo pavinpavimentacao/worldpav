@@ -42,3 +42,5 @@ export interface DashboardData {
   programacoes_amanha: ProgramacaoItem[]
 }
 
+
+

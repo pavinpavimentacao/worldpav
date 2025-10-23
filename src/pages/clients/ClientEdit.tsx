@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Layout } from '../../components/Layout'
-import { Button } from '../../components/Button'
-import { supabase } from '../../lib/supabase'
+import { Layout } from "../../components/layout/Layout"
+import { Button } from "../../components/shared/Button"
 import { useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '../../lib/toast-hooks'
 import { useViaCep } from '../../hooks/useViaCep'
 import { formatPhone, formatCep, validatePhone, validateCep } from '../../utils/masks'
-import { Loading } from '../../components/Loading'
+import { Loading } from "../../components/shared/Loading"
 import { GenericError } from '../errors/GenericError'
 import { formatDateToBR } from '../../utils/date-utils'
+import { getClienteById, updateCliente, type ClienteUpdateData, type Cliente } from '../../lib/clientesApi'
 
 const schema = z.object({
   rep_name: z.string({ required_error: 'Obrigatório' }).trim().min(1, 'Obrigatório'),
@@ -44,27 +44,12 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-type Client = {
-  id: string
-  rep_name?: string | null
-  company_name?: string | null
-  legal_name?: string | null
-  document?: string | null
-  email?: string | null
-  phone?: string | null
-  address?: string | null
-  city?: string | null
-  state?: string | null
-  cep?: string | null
-  notes?: string | null
-}
-
 export default function ClientEdit() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { addToast } = useToast()
   const { fetchCep, error: cepError } = useViaCep()
-  const [client, setClient] = useState<Client | null>(null)
+  const [client, setClient] = useState<Cliente | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [forceUpdate, setForceUpdate] = useState(0)
@@ -89,29 +74,27 @@ export default function ClientEdit() {
     setError(null)
 
     try {
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', id)
-        .single()
+      const clientData = await getClienteById(id)
 
-      if (clientError) throw clientError
+      if (!clientData) {
+        throw new Error('Cliente não encontrado')
+      }
 
       setClient(clientData)
 
       // Preencher formulário com dados do cliente
       reset({
-        rep_name: clientData.rep_name || '',
-        company_name: clientData.company_name || '',
-        legal_name: clientData.legal_name || '',
-        document: clientData.document || '',
+        rep_name: clientData.name || '',
+        company_name: clientData.name || '',
+        legal_name: '',  // Campo não existe na tabela
+        document: clientData.cpf_cnpj || '',
         email: clientData.email || '',
         phone: clientData.phone || '',
         address: clientData.address || '',
         city: clientData.city || '',
         state: clientData.state || '',
-        cep: clientData.cep || '',
-        notes: clientData.notes || ''
+        cep: clientData.zip_code || '',
+        notes: clientData.observations || ''
       })
     } catch (err: any) {
       console.error('Erro ao buscar cliente:', err)
@@ -212,12 +195,19 @@ export default function ClientEdit() {
     if (!id) return
 
     try {
-      const { error } = await supabase
-        .from('clients')
-        .update(values)
-        .eq('id', id)
+      const updateData: ClienteUpdateData = {
+        name: values.company_name || values.rep_name || 'Cliente sem nome',
+        cpf_cnpj: values.document,
+        email: values.email,
+        phone: values.phone,
+        address: values.address,
+        city: values.city,
+        state: values.state,
+        zip_code: values.cep,
+        observations: values.notes
+      }
 
-      if (error) throw error
+      await updateCliente(id, updateData)
 
       addToast({ message: 'Cliente atualizado com sucesso!', type: 'success' })
       navigate(`/clients/${id}`)

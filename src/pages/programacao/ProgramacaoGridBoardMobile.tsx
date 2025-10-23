@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProgramacaoAPI } from '../../lib/programacao-api';
 import { Programacao, BombaOption } from '../../types/programacao';
-import { Layout } from '../../components/Layout';
-import { Loading } from '../../components/Loading';
-import { Button } from '../../components/Button';
+import { Layout } from "../../components/layout/Layout";
+import { Loading } from "../../components/shared/Loading";
+import { Button } from "../../components/shared/Button";
 import { toast } from '../../lib/toast-hooks';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { ExportButtons } from '../../components/ExportButtons';
+import { ConfirmDialog } from "../../components/modals/ConfirmDialog";
+import { ExportButtons } from "../../components/exports/ExportButtons";
 import { getWeekBoundsBrasilia, formatDateToBR } from '../../utils/date-utils';
 import { DailyScheduleView } from '../../components/DailyScheduleView';
 import { ChevronLeft, ChevronRight, Calendar, Plus, Clock, MapPin, Users } from 'lucide-react';
@@ -286,7 +286,7 @@ export function ProgramacaoGridBoardMobile() {
                     </button>
                   </div>
 
-                  {/* Informações da Bomba */}
+                  {}
                   <div className="mb-3">
                     <div className="text-sm font-medium text-gray-900 mb-1">
                       {bomba?.prefix || 'Bomba não encontrada'}
@@ -493,11 +493,11 @@ export function ProgramacaoGridBoardMobile() {
                 </tr>
               </thead>
 
-              {/* Corpo da tabela com bombas */}
+              {}
               <tbody>
                 {bombas.map((bomba, bombaIndex) => (
                   <tr key={bomba.id} className={`${bombaIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} print-row`}>
-                    {/* Coluna da bomba */}
+                    {}
                     <td className="w-32 p-4 font-medium text-gray-900 border-r border-gray-200 sticky left-0 bg-inherit print-cell">
                       <div className="text-sm font-semibold">{bomba.prefix}</div>
                       <div className="text-xs text-gray-500">{bomba.model}</div>
