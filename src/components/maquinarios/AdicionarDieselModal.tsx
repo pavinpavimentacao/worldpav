@@ -3,6 +3,8 @@ import { X, AlertCircle, Info } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Select } from "../shared/Select"
 import { DatePicker } from '../ui/date-picker'
+import { CurrencyInput } from '../ui/currency-input'
+import { NumberInput } from '../ui/number-input-fixed'
 import { calcularValorAbastecimento } from '../../utils/diesel-calculations'
 import { supabase } from '../../lib/supabase'
 
@@ -171,16 +173,13 @@ export function AdicionarDieselModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Quantidade de Litros *
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={quantidadeLitros}
-                onChange={(e) => setQuantidadeLitros(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Ex: 100"
+              <NumberInput
+                value={Number(quantidadeLitros) || 0}
+                onChange={(value) => setQuantidadeLitros(value.toString())}
+                placeholder="0,00"
+                min={0}
+                decimals={2}
                 disabled={isSubmitting}
-                required
               />
             </div>
 
@@ -189,16 +188,11 @@ export function AdicionarDieselModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Preço por Litro (R$) *
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={precoPorLitro}
-                onChange={(e) => setPrecoPorLitro(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                placeholder="Ex: 5.50"
+              <CurrencyInput
+                value={Number(precoPorLitro) || 0}
+                onChange={(value) => setPrecoPorLitro(value.toString())}
+                placeholder="R$ 0,00"
                 disabled={isSubmitting}
-                required
               />
             </div>
           </div>

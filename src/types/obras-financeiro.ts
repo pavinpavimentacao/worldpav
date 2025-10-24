@@ -4,7 +4,7 @@
 
 export type RuaStatus = 'pendente' | 'em_andamento' | 'finalizada'
 export type DespesaCategoria = 'diesel' | 'materiais' | 'manutencao' | 'outros'
-export type NotaFiscalStatus = 'pendente' | 'pago' | 'vencido' | 'renegociado'
+export type NotaFiscalStatus = 'emitida' | 'enviada' | 'paga'
 
 export interface ObraRua {
   id: string

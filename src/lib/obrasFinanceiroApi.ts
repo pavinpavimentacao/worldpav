@@ -45,6 +45,7 @@ export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamen
 /**
  * Cria um faturamento ao finalizar uma rua
  * Calcula automaticamente a espessura e valor total
+ * Inclui serviços por viagem (mobilização/imobilização por viagem)
  */
 export async function createFaturamentoRua(input: CreateFaturamentoInput): Promise<ObraFaturamento> {
   // Calcular espessura
@@ -53,11 +54,26 @@ export async function createFaturamentoRua(input: CreateFaturamentoInput): Promi
     input.metragem_executada
   )
 
-  // Calcular valor total
-  const valor_total = calcularFaturamentoRua(
+  // Calcular valor total baseado na metragem
+  const valorBase = calcularFaturamentoRua(
     input.metragem_executada,
     input.preco_por_m2
   )
+
+  // Buscar serviços por viagem da obra (mobilização/imobilização por viagem)
+  const { data: servicosViagem, error: errorServicos } = await supabase
+    .from('obras_servicos')
+    .select('*')
+    .eq('obra_id', input.obra_id)
+    .eq('unidade', 'viagem')
+
+  let valorServicosViagem = 0
+  if (!errorServicos && servicosViagem) {
+    valorServicosViagem = servicosViagem.reduce((total, servico) => total + (servico.valor_total || 0), 0)
+  }
+
+  // Valor total = valor base + serviços por viagem
+  const valor_total = valorBase + valorServicosViagem
 
   const data_finalizacao = input.data_finalizacao || new Date().toISOString().split('T')[0]
 
@@ -97,6 +113,49 @@ export async function createFaturamentoRua(input: CreateFaturamentoInput): Promi
 }
 
 /**
+ * Calcula o faturamento total da obra incluindo serviços por obra inteira
+ * Esta função deve ser chamada no fechamento da obra
+ */
+export async function calcularFaturamentoTotalObra(obraId: string): Promise<{
+  faturamentoRuas: number
+  servicosObraInteira: number
+  total: number
+}> {
+  try {
+    // Buscar faturamentos das ruas
+    const faturamentos = await getObraFaturamentos(obraId)
+    const faturamentoRuas = faturamentos.reduce((total, fat) => total + (fat.valor_total || 0), 0)
+
+    // Buscar serviços por obra inteira (mobilização/imobilização por obra)
+    const { data: servicosObra, error: errorServicos } = await supabase
+      .from('obras_servicos')
+      .select('*')
+      .eq('obra_id', obraId)
+      .eq('unidade', 'servico')
+
+    let servicosObraInteira = 0
+    if (!errorServicos && servicosObra) {
+      servicosObraInteira = servicosObra.reduce((total, servico) => total + (servico.valor_total || 0), 0)
+    }
+
+    const total = faturamentoRuas + servicosObraInteira
+
+    return {
+      faturamentoRuas,
+      servicosObraInteira,
+      total
+    }
+  } catch (error) {
+    console.error('Erro ao calcular faturamento total da obra:', error)
+    return {
+      faturamentoRuas: 0,
+      servicosObraInteira: 0,
+      total: 0
+    }
+  }
+}
+
+/**
  * Deleta um faturamento
  */
 export async function deleteFaturamento(id: string): Promise<void> {
@@ -124,10 +183,7 @@ export async function getObraDespesas(
 ): Promise<ObraDespesa[]> {
   let query = supabase
     .from('obras_financeiro_despesas')
-    .select(`
-      *,
-      maquinario:maquinarios(id, nome)
-    `)
+    .select('*')
     .eq('obra_id', obraId)
     .order('data_despesa', { ascending: false })
 
@@ -167,10 +223,7 @@ export async function createDespesaObra(input: CreateDespesaInput): Promise<Obra
       ...input,
       sincronizado_financeiro_principal: input.sincronizado_financeiro_principal ?? true
     })
-    .select(`
-      *,
-      maquinario:maquinarios(id, nome)
-    `)
+    .select('*')
     .single()
 
   if (error) {
@@ -195,10 +248,7 @@ export async function updateDespesaObra(
     .from('obras_financeiro_despesas')
     .update(input)
     .eq('id', id)
-    .select(`
-      *,
-      maquinario:maquinarios(id, nome)
-    `)
+    .select('*')
     .single()
 
   if (error) {

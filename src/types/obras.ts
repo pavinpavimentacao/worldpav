@@ -1,5 +1,5 @@
 // Tipos para Obras
-export type ObraStatus = 'planejada' | 'em_andamento' | 'concluida' | 'cancelada'
+export type ObraStatus = 'planejamento' | 'andamento' | 'concluida' | 'cancelada'
 export type EmpresaResponsavel = 'WorldPav' | 'Pavin'
 export type RuaStatus = 'planejada' | 'liberada' | 'em_andamento' | 'pavimentada' | 'concluida'
 export type UnidadeCobranca = 'm2' | 'm3' | 'diaria' | 'servico'

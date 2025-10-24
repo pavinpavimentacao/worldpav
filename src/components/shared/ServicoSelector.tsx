@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '../ui/button'
-import { Select } from '../ui/select'
+import { FloatingSelect } from '../shared/FloatingSelect'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { CurrencyInput } from '../ui/currency-input'
 import { 
-  getServicosAtivos, 
+  getServicosAtivos,
+  getServicosAtivosSinc,
   formatPrecoServico, 
   getUnidadeServicoLabel,
   calcularValorServico,
@@ -48,8 +49,27 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
   const [valorServico, setValorServico] = useState<number>(0)
   const [observacoes, setObservacoes] = useState('')
   const [tipoMobilizacao, setTipoMobilizacao] = useState<'viagem' | 'obra_inteira'>('obra_inteira')
+  const [servicosDisponiveis, setServicosDisponiveis] = useState<Servico[]>([])
+  const [carregando, setCarregando] = useState<boolean>(true)
 
-  const servicosDisponiveis = getServicosAtivos()
+  // Carregar serviços disponíveis do banco de dados
+  useEffect(() => {
+    async function carregarServicos() {
+      setCarregando(true)
+      try {
+        const servicos = await getServicosAtivos()
+        setServicosDisponiveis(servicos)
+      } catch (error) {
+        console.error('Erro ao carregar serviços:', error)
+        // Usar serviços mockados em caso de erro
+        setServicosDisponiveis(getServicosAtivosSinc())
+      } finally {
+        setCarregando(false)
+      }
+    }
+    
+    carregarServicos()
+  }, [])
 
   const adicionarServico = (e?: React.MouseEvent) => {
     // Prevenir comportamento padrão do formulário
@@ -63,17 +83,17 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
     // Para mobilização/imobilização/serviço, não precisa validar valorServico pois usa valor fixo
     const isServicoEspecial = servicoSelecionado.tipo === 'mobilizacao' || 
                              servicoSelecionado.tipo === 'imobilizacao' || 
-                             servicoSelecionado.tipo === 'servico'
+                             servicoSelecionado.tipo === 'outros'
     if (!isServicoEspecial && valorServico <= 0) return
 
     // Para serviços especiais (mobilização, imobilização, serviço), usar valor definido pelo usuário
     let valorFinal = valorServico
-    let unidadeFinal = unidadeMedida
+    let unidadeFinal: UnidadeServico = unidadeMedida
     
     if (servicoSelecionado.tipo === 'mobilizacao' || servicoSelecionado.tipo === 'imobilizacao') {
       valorFinal = valorServico // Valor definido pelo usuário
       unidadeFinal = tipoMobilizacao === 'viagem' ? 'viagem' : 'servico' // Por viagem ou obra inteira
-    } else if (servicoSelecionado.tipo === 'servico') {
+    } else if (servicoSelecionado.tipo === 'outros') {
       valorFinal = valorServico // Valor definido pelo usuário
       unidadeFinal = 'servico' // Sempre por serviço
     }
@@ -108,10 +128,16 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
 
   const editarServico = (servico: ServicoFormulario) => {
     setServicoSelecionado(servicosDisponiveis.find(s => s.id === servico.servico_id) || null)
-    setUnidadeMedida(servico.unidade as 'm2' | 'm3')
+    if (servico.unidade === 'm2' || servico.unidade === 'm3') {
+      setUnidadeMedida(servico.unidade)
+    }
     setValorServico(servico.preco_unitario)
     setObservacoes(servico.observacoes || '')
-    setTipoMobilizacao(servico.unidade === 'viagem' ? 'viagem' : 'obra_inteira')
+    if (servico.unidade === 'viagem') {
+      setTipoMobilizacao('viagem')
+    } else {
+      setTipoMobilizacao('obra_inteira')
+    }
     setShowAdicionar(true)
     removerServico(servico.id)
   }
@@ -207,8 +233,16 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
         </div>
       )}
 
+      {/* Estado de carregamento */}
+      {carregando && (
+        <div className="card text-center py-8">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+          <p className="mt-4 text-gray-600">Carregando serviços disponíveis...</p>
+        </div>
+      )}
+
       {/* Formulário para Adicionar Serviço */}
-      {showAdicionar && (
+      {showAdicionar && !carregando && (
         <div 
           className="card p-6 border-2 border-dashed border-blue-300"
           onMouseDown={(e) => e.stopPropagation()}
@@ -222,7 +256,7 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Seleção do Serviço */}
             <div>
-              <Select
+              <FloatingSelect
                 label="Serviço *"
                 value={servicoSelecionado?.id || ''}
                 onChange={(servicoId) => {
@@ -241,12 +275,12 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
             </div>
 
             {/* Unidade de Medida - Apenas para serviços que não sejam mobilização/imobilização/serviço */}
-            {servicoSelecionado && servicoSelecionado.tipo !== 'mobilizacao' && servicoSelecionado.tipo !== 'imobilizacao' && servicoSelecionado.tipo !== 'servico' && (
+            {servicoSelecionado && servicoSelecionado.tipo !== 'mobilizacao' && servicoSelecionado.tipo !== 'imobilizacao' && servicoSelecionado.tipo !== 'outros' && (
               <div>
-                <Select
+                <FloatingSelect
                   label="Unidade de Medida *"
                   value={unidadeMedida}
-                  onChange={setUnidadeMedida}
+                  onChange={(value) => setUnidadeMedida(value as 'm2' | 'm3')}
                   options={[
                     { value: 'm2', label: 'M² (Metro Quadrado)' },
                     { value: 'm3', label: 'M³ (Metro Cúbico)' }
@@ -257,13 +291,13 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
             )}
 
             {/* Tipo de Mobilização/Imobilização/Serviço */}
-            {servicoSelecionado && (servicoSelecionado.tipo === 'mobilizacao' || servicoSelecionado.tipo === 'imobilizacao' || servicoSelecionado.tipo === 'servico') && (
+            {servicoSelecionado && (servicoSelecionado.tipo === 'mobilizacao' || servicoSelecionado.tipo === 'imobilizacao' || servicoSelecionado.tipo === 'outros') && (
               <div>
-                <Select
+                <FloatingSelect
                   label="Tipo de Cobrança *"
                   value={tipoMobilizacao}
-                  onChange={setTipoMobilizacao}
-                  options={servicoSelecionado.tipo === 'servico' ? [
+                  onChange={(value) => setTipoMobilizacao(value as 'viagem' | 'obra_inteira')}
+                  options={servicoSelecionado.tipo === 'outros' ? [
                     { value: 'obra_inteira', label: 'Por Serviço' }
                   ] : [
                     { value: 'obra_inteira', label: 'Obra Inteira' },
@@ -289,7 +323,7 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
                   Valor a ser cobrado para {tipoMobilizacao === 'viagem' ? 'cada viagem' : 'toda a obra'}
                 </p>
               )}
-              {servicoSelecionado && servicoSelecionado.tipo === 'servico' && (
+              {servicoSelecionado && servicoSelecionado.tipo === 'outros' && (
                 <p className="mt-1 text-xs text-gray-500">
                   Valor a ser cobrado por serviço
                 </p>
@@ -298,8 +332,11 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
 
             {/* Observações */}
             <div className="md:col-span-2">
-              <Textarea
-                label="Observações"
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Observações
+              </label>
+              <textarea
+                className="input min-h-[80px]"
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
                 placeholder="Observações sobre este serviço..."
@@ -309,7 +346,7 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
           </div>
 
           {/* Preview do Serviço */}
-          {servicoSelecionado && (valorServico > 0 || (servicoSelecionado.tipo === 'mobilizacao' || servicoSelecionado.tipo === 'imobilizacao' || servicoSelecionado.tipo === 'servico')) && (
+          {servicoSelecionado && (valorServico > 0 || (servicoSelecionado.tipo === 'mobilizacao' || servicoSelecionado.tipo === 'imobilizacao' || servicoSelecionado.tipo === 'outros')) && (
             <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
               <div className="flex items-center space-x-2">
                 <DollarSign className="h-4 w-4 text-green-600" />
@@ -322,7 +359,7 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
                         <p>• <strong>Tipo de Cobrança:</strong> {tipoMobilizacao === 'viagem' ? 'Por Viagem' : 'Obra Inteira'}</p>
                         <p>• <strong>Valor:</strong> R$ {valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                       </>
-                    ) : servicoSelecionado.tipo === 'servico' ? (
+                    ) : servicoSelecionado.tipo === 'outros' ? (
                       <>
                         <p>• <strong>Tipo de Cobrança:</strong> Por Serviço</p>
                         <p>• <strong>Valor:</strong> R$ {valorServico.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
@@ -368,7 +405,7 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
               }}
               disabled={
                 !servicoSelecionado || 
-                (servicoSelecionado && servicoSelecionado.tipo !== 'mobilizacao' && servicoSelecionado.tipo !== 'imobilizacao' && servicoSelecionado.tipo !== 'servico' && valorServico <= 0)
+                (servicoSelecionado && servicoSelecionado.tipo !== 'mobilizacao' && servicoSelecionado.tipo !== 'imobilizacao' && servicoSelecionado.tipo !== 'outros' && valorServico <= 0)
               }
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -379,7 +416,7 @@ export const ServicoSelector: React.FC<ServicoSelectorProps> = ({
       )}
 
       {/* Estado Vazio */}
-      {servicosObra.length === 0 && !showAdicionar && (
+      {servicosObra.length === 0 && !showAdicionar && !carregando && (
         <div className="card text-center py-8 border-2 border-dashed border-gray-300">
           <Calculator className="mx-auto h-8 w-8 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum serviço adicionado</h3>

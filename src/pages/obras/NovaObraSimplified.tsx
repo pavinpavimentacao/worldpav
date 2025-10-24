@@ -6,6 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Layout } from "../../components/layout/Layout"
 import { Button } from "../../components/shared/Button"
 import { Select } from "../../components/shared/Select"
+import { CurrencyInput } from "../../components/ui/currency-input"
 import { 
   ArrowLeft, 
   Building, 
@@ -356,15 +357,10 @@ export default function NovaObraSimplified() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Valor do Contrato (R$)
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Ex: 125000.00"
-                      value={field.value || ''}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      onBlur={field.onBlur}
+                    <CurrencyInput
+                      value={field.value || 0}
+                      onChange={field.onChange}
+                      placeholder="R$ 0,00"
                     />
                     {errors.valor_contrato && (
                       <p className="mt-1 text-sm text-red-600">{errors.valor_contrato.message}</p>

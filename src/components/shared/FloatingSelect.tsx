@@ -34,7 +34,8 @@ export const FloatingSelect: React.FC<FloatingSelectProps> = ({
   error,
   label
 }) => {
-  const selectedOption = options.find(opt => opt.value === value)
+  const safeOptions = options || []
+  const selectedOption = safeOptions.find(opt => opt.value === value)
 
   return (
     <div className={cn("w-full", className)}>
@@ -67,7 +68,7 @@ export const FloatingSelect: React.FC<FloatingSelectProps> = ({
 
             <FloatingActionPanelContent className="max-h-[300px] overflow-y-auto !bg-white !border-gray-200 !shadow-lg">
               <div className="space-y-1 p-2">
-                {options.map((option) => (
+                {safeOptions.map((option) => (
                   <FloatingActionPanelButton
                     key={option.value}
                     onClick={() => {
@@ -97,7 +98,6 @@ export const FloatingSelect: React.FC<FloatingSelectProps> = ({
     </div>
   )
 }
-
 
 
 

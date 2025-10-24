@@ -444,7 +444,7 @@ export default function RecebimentosIndex() {
                   {notasFiltradas.map((nota) => {
                     const statusInfo = formatarStatusNota(nota.status)
                     const diasVencimento = diasParaVencimento(nota.vencimento)
-                    const podeMarcarPago = nota.status === 'pendente' || nota.status === 'vencido'
+                    const podeMarcarPago = nota.status === 'emitida' || nota.status === 'enviada'
 
                     return (
                       <tr key={nota.id} className="hover:bg-gray-50">

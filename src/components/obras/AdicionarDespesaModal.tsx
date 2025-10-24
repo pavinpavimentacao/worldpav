@@ -3,6 +3,7 @@ import { X, AlertCircle, Upload, FileText, Trash2, Eye } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Select } from "../shared/Select"
 import { DatePicker } from '../ui/date-picker'
+import { CurrencyInput } from '../ui/currency-input'
 import type { DespesaCategoria } from '../../types/obras-financeiro'
 import { toast } from '../../lib/toast-hooks'
 
@@ -29,7 +30,7 @@ const categorias: Array<{ value: DespesaCategoria; label: string }> = [
 export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDespesaModalProps) {
   const [categoria, setCategoria] = useState<DespesaCategoria>('materiais')
   const [descricao, setDescricao] = useState('')
-  const [valor, setValor] = useState('')
+  const [valor, setValor] = useState(0)
   const [dataDespesa, setDataDespesa] = useState(new Date().toISOString().split('T')[0])
   const [fornecedor, setFornecedor] = useState('')
   const [sincronizado, setSincronizado] = useState(true)
@@ -51,8 +52,7 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
       return
     }
 
-    const valorNum = parseFloat(valor)
-    if (isNaN(valorNum) || valorNum <= 0) {
+    if (valor <= 0) {
       setError('Valor deve ser maior que zero')
       return
     }
@@ -78,7 +78,7 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
       await onSubmit({
         categoria,
         descricao: descricao.trim(),
-        valor: valorNum,
+        valor: valor,
         data_despesa: dataDespesa,
         fornecedor: fornecedor.trim() || undefined,
         sincronizado_financeiro_principal: sincronizado,
@@ -88,7 +88,7 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
       // Limpar formulário
       setCategoria('materiais')
       setDescricao('')
-      setValor('')
+      setValor(0)
       setDataDespesa(new Date().toISOString().split('T')[0])
       setFornecedor('')
       setSincronizado(true)
@@ -106,7 +106,7 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
     if (!isSubmitting) {
       setCategoria('materiais')
       setDescricao('')
-      setValor('')
+      setValor(0)
       setDataDespesa(new Date().toISOString().split('T')[0])
       setFornecedor('')
       setSincronizado(true)
@@ -217,16 +217,11 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Valor (R$) *
             </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
+            <CurrencyInput
               value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              placeholder="Ex: 1500.00"
+              onChange={setValor}
+              placeholder="R$ 0,00"
               disabled={isSubmitting}
-              required
             />
           </div>
 

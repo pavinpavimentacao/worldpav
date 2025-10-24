@@ -83,6 +83,11 @@ export interface ObraStats {
   valor_total_executado: number
   metragem_total: number
   metragem_executada: number
+  media_metragem_por_rua: number
+  media_toneladas_por_rua: number
+  media_espessura_por_rua: number
+  faturamento_previsto: number
+  faturamento_bruto: number
 }
 
 // =====================================================
@@ -281,6 +286,8 @@ export async function deleteObra(obraId: string): Promise<void> {
  */
 export async function getEstatisticasObras(companyId: string): Promise<ObraStats> {
   try {
+    console.log('🔍 Buscando estatísticas para companyId:', companyId)
+    
     // Buscar obras com todos os campos necessários para estatísticas
     const { data, error } = await supabase
       .from('obras')
@@ -294,9 +301,11 @@ export async function getEstatisticasObras(companyId: string): Promise<ObraStats
       .is('deleted_at', null)
 
     if (error) {
-      console.error('Erro ao buscar estatísticas:', error)
+      console.error('❌ Erro ao buscar estatísticas:', error)
       throw new Error(`Erro ao buscar estatísticas: ${error.message}`)
     }
+
+    console.log('📊 Obras encontradas para estatísticas:', data?.length || 0)
 
     const obras = data || []
     const total = obras.length
@@ -316,11 +325,64 @@ export async function getEstatisticasObras(companyId: string): Promise<ObraStats
       total + (obra.executed_value || 0), 0
     )
 
-    // TODO: Implementar cálculo de metragem quando tiver dados de ruas
-    const metragem_total = 0
-    const metragem_executada = 0
+    // Buscar dados reais de faturamentos para calcular metragem e médias
+    let metragem_total = 0
+    let metragem_executada = 0
+    let media_metragem_por_rua = 0
+    let media_toneladas_por_rua = 0
+    let media_espessura_por_rua = 0
+    let faturamento_previsto = 0
+    let faturamento_bruto = 0
 
-    return {
+    try {
+      // Buscar faturamentos com dados completos
+      const { data: faturamentos, error: fatError } = await supabase
+        .from('obras_financeiro_faturamentos')
+        .select('metragem_executada, toneladas_utilizadas, espessura_calculada, valor_total')
+        .in('obra_id', obras.map(o => o.id))
+
+      if (!fatError && faturamentos) {
+        metragem_executada = faturamentos.reduce((total, fat) => total + (fat.metragem_executada || 0), 0)
+        faturamento_bruto = faturamentos.reduce((total, fat) => total + (fat.valor_total || 0), 0)
+      }
+
+      // Buscar ruas criadas para calcular médias (não apenas concluídas)
+      const { data: ruas, error: ruasError } = await supabase
+        .from('obras_ruas')
+        .select('metragem_planejada, toneladas_planejadas, status')
+        .in('obra_id', obras.map(o => o.id))
+        .is('deleted_at', null)
+
+      if (!ruasError && ruas) {
+        metragem_total = ruas.reduce((total, rua) => total + (rua.metragem_planejada || 0), 0)
+        
+        // Calcular médias baseadas em todas as ruas criadas (não apenas concluídas)
+        if (ruas.length > 0) {
+          // Média de metragem por rua criada
+          const totalMetragemCriadas = ruas.reduce((total, rua) => total + (rua.metragem_planejada || 0), 0)
+          media_metragem_por_rua = totalMetragemCriadas / ruas.length
+          
+          // Média de toneladas por rua criada
+          const totalToneladasCriadas = ruas.reduce((total, rua) => total + (rua.toneladas_planejadas || 0), 0)
+          media_toneladas_por_rua = totalToneladasCriadas / ruas.length
+          
+          // Média de espessura por rua criada (baseada nos faturamentos)
+          if (faturamentos && faturamentos.length > 0) {
+            const totalEspessura = faturamentos.reduce((total, fat) => total + (fat.espessura_calculada || 0), 0)
+            media_espessura_por_rua = totalEspessura / faturamentos.length
+          }
+        }
+      }
+
+      // Calcular faturamento previsto (valor total dos contratos)
+      faturamento_previsto = obras.reduce((total, obra) => total + (obra.contract_value || 0), 0)
+
+    } catch (error) {
+      console.error('Erro ao buscar metragem:', error)
+      // Manter valores padrão se houver erro
+    }
+
+    const stats = {
       total,
       planejamento: statusCount.planejamento || 0,
       andamento: statusCount.andamento || 0,
@@ -329,8 +391,16 @@ export async function getEstatisticasObras(companyId: string): Promise<ObraStats
       valor_total_contratos,
       valor_total_executado,
       metragem_total,
-      metragem_executada
+      metragem_executada,
+      media_metragem_por_rua,
+      media_toneladas_por_rua,
+      media_espessura_por_rua,
+      faturamento_previsto,
+      faturamento_bruto
     }
+
+    console.log('📈 Estatísticas calculadas:', stats)
+    return stats
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error)
     throw error

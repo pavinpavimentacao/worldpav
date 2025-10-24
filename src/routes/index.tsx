@@ -52,6 +52,7 @@ import ProgramacaoPavimentacaoForm from '../pages/programacao/ProgramacaoPavimen
 import ObrasList from '../pages/obras/ObrasList'
 import ObraDetails from '../pages/obras/ObraDetails'
 import NovaObra from '../pages/obras/NovaObra'
+import EditarObra from '../pages/obras/EditarObra'
 
 // Financeiro
 import { FinancialDashboard } from '../pages/financial/FinancialDashboard'
@@ -382,6 +383,15 @@ export const router = createBrowserRouter([
     errorElement: <GenericError />
   },
   {
+    path: '/obras/:id/edit',
+    element: (
+      <RequireAuth>
+        <EditarObra />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
     path: '/obras/:id',
     element: (
       <RequireAuth>
@@ -577,7 +587,6 @@ export const router = createBrowserRouter([
     errorElement: <GenericError />
   },
 ])
-
 
 
 

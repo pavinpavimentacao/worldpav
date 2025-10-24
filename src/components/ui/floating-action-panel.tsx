@@ -107,6 +107,7 @@ export function FloatingActionPanelTrigger({
   return (
     <motion.button
       ref={triggerRef}
+      type="button"
       layoutId={`floating-panel-trigger-${uniqueId}-${mode}`}
       className={cn(
         "flex h-9 items-center rounded-md border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-900 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800",
@@ -203,6 +204,7 @@ export function FloatingActionPanelButton({
 }: FloatingActionPanelButtonProps) {
   return (
     <motion.button
+      type="button"
       className={cn(
         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-800",
         className

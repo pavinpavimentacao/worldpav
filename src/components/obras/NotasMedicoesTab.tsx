@@ -3,8 +3,8 @@ import { TrendingUp, DollarSign, FileText, FileSpreadsheet } from 'lucide-react'
 import { NotasFiscaisSubTab } from './NotasFiscaisSubTab'
 import { MedicoesSubTab } from './MedicoesSubTab'
 import { PagamentosDiretosSubTab } from './PagamentosDiretosSubTab'
-import { getFaturamentoPrevisto } from '../../lib/obrasFinanceiroApi'
-import { getFaturamentoBruto } from '../../lib/obrasNotasFiscaisApi'
+import { getFaturamentoBrutoTotal } from '../../lib/obrasNotasFiscaisApi'
+import { calcularValorTotalServicos } from '../../lib/obrasServicosApi'
 import { getObraRuas } from '../../lib/obrasRuasApi'
 
 // ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
@@ -43,8 +43,8 @@ export function NotasMedicoesTab({ obraId, precoPorM2 }: NotasMedicoesTabProps) 
         })
       } else {
         const [faturamentoPrevisto, faturamentoBruto] = await Promise.all([
-          getFaturamentoPrevisto(obraId, precoPorM2),
-          getFaturamentoBruto(obraId)
+          calcularValorTotalServicos(obraId),
+          getFaturamentoBrutoTotal(obraId)
         ])
         
         setKpis({
@@ -80,7 +80,7 @@ export function NotasMedicoesTab({ obraId, precoPorM2 }: NotasMedicoesTabProps) 
                 R$ {kpis.faturamentoPrevisto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs opacity-80">
-                Baseado nas ruas planejadas × R$ {precoPorM2.toFixed(2)}/m²
+                Baseado nos serviços × volume planejado + mobilizações
               </p>
             </>
           )}
@@ -103,7 +103,7 @@ export function NotasMedicoesTab({ obraId, precoPorM2 }: NotasMedicoesTabProps) 
                 R$ {kpis.faturamentoBruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs opacity-80">
-                Soma de todas as notas fiscais emitidas
+                Soma de notas fiscais + pagamentos diretos
               </p>
             </>
           )}

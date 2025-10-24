@@ -9,7 +9,7 @@ import type {
   UpdateNotaFiscalInput,
   NotaFiscalFilters
 } from '../types/obras-financeiro'
-import { calcularValorLiquido, verificarVencimento } from '../utils/notas-fiscais-utils'
+import { calcularValorLiquido } from '../utils/notas-fiscais-utils'
 
 /**
  * Busca todas as notas fiscais de uma obra
@@ -76,33 +76,61 @@ export async function createNotaFiscal(input: CreateNotaFiscalInput): Promise<Ob
     input.outro_desconto || 0
   )
   
-  // Verifica se já está vencido
-  const isVencido = verificarVencimento(input.vencimento)
-  const status = isVencido ? 'vencido' : 'pendente'
+  // Status padrão é 'emitida'
+  const status = 'emitida'
+  
+  console.log('🔍 Dados sendo inseridos na nota fiscal:', {
+    obra_id: input.obra_id,
+    numero_nota: input.numero_nota,
+    valor_nota: input.valor_nota,
+    vencimento: input.vencimento,
+    desconto_inss: input.desconto_inss || 0,
+    desconto_iss: input.desconto_iss || 0,
+    outro_desconto: input.outro_desconto || 0,
+    valor_liquido: valorLiquido,
+    status,
+    arquivo_nota_url: input.arquivo_nota_url,
+    observacoes: input.observacoes
+  })
+
+  console.log('🔍 Tentando inserir na tabela obras_notas_fiscais...')
+  
+  const insertData = {
+    obra_id: input.obra_id,
+    numero_nota: input.numero_nota,
+    valor_nota: input.valor_nota,
+    vencimento: input.vencimento,
+    desconto_inss: input.desconto_inss || 0,
+    desconto_iss: input.desconto_iss || 0,
+    outro_desconto: input.outro_desconto || 0,
+    valor_liquido: valorLiquido,
+    status,
+    arquivo_nota_url: input.arquivo_nota_url,
+    observacoes: input.observacoes
+  }
+  
+  console.log('📝 Dados para inserção:', insertData)
+  console.log('🔍 Verificando se obra_id é válido:', input.obra_id)
+  console.log('🔍 Verificando se numero_nota é válido:', input.numero_nota)
+  console.log('🔍 Verificando se valor_nota é válido:', input.valor_nota)
   
   const { data, error } = await supabase
     .from('obras_notas_fiscais')
-    .insert({
-      obra_id: input.obra_id,
-      numero_nota: input.numero_nota,
-      valor_nota: input.valor_nota,
-      vencimento: input.vencimento,
-      desconto_inss: input.desconto_inss || 0,
-      desconto_iss: input.desconto_iss || 0,
-      outro_desconto: input.outro_desconto || 0,
-      valor_liquido: valorLiquido,
-      status,
-      arquivo_nota_url: input.arquivo_nota_url,
-      observacoes: input.observacoes
-    })
+    .insert(insertData)
     .select()
     .single()
   
   if (error) {
-    console.error('Erro ao criar nota fiscal:', error)
-    throw new Error('Erro ao criar nota fiscal')
+    console.error('❌ Erro detalhado ao criar nota fiscal:', {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code
+    })
+    throw new Error(`Erro ao criar nota fiscal: ${error.message}`)
   }
   
+  console.log('✅ Nota fiscal criada com sucesso:', data)
   return data
 }
 
@@ -215,7 +243,7 @@ export async function verificarNotasVencidas(obraId: string): Promise<number> {
     .from('obras_notas_fiscais')
     .update({ status: 'vencido' })
     .eq('obra_id', obraId)
-    .eq('status', 'pendente')
+    .eq('status', 'emitida')
     .lt('vencimento', hoje)
     .select()
   
@@ -287,13 +315,57 @@ export async function getFaturamentoBruto(obraId: string): Promise<number> {
 }
 
 /**
+ * Calcula o faturamento bruto total (notas fiscais + pagamentos diretos)
+ */
+export async function getFaturamentoBrutoTotal(obraId: string): Promise<number> {
+  try {
+    // Buscar notas fiscais
+    const { data: notas, error: notasError } = await supabase
+      .from('obras_notas_fiscais')
+      .select('valor_nota')
+      .eq('obra_id', obraId)
+    
+    if (notasError) {
+      console.error('Erro ao buscar notas fiscais:', notasError)
+    }
+
+    // Buscar pagamentos diretos
+    const { data: pagamentos, error: pagamentosError } = await supabase
+      .from('obras_pagamentos_diretos')
+      .select('amount')
+      .eq('obra_id', obraId)
+    
+    if (pagamentosError) {
+      console.error('Erro ao buscar pagamentos diretos:', pagamentosError)
+    }
+
+    // Calcular totais
+    const totalNotas = (notas || []).reduce((total, nota) => total + (nota.valor_nota || 0), 0)
+    const totalPagamentos = (pagamentos || []).reduce((total, pagamento) => total + (pagamento.amount || 0), 0)
+    
+    const total = totalNotas + totalPagamentos
+    
+    console.log('💰 Faturamento bruto total:', {
+      totalNotas,
+      totalPagamentos,
+      total
+    })
+    
+    return total
+  } catch (error) {
+    console.error('Erro ao calcular faturamento bruto total:', error)
+    return 0
+  }
+}
+
+/**
  * Busca KPIs de recebimentos
  */
 export interface RecebimentosKPIs {
   total_a_receber: number
   total_recebido: number
   total_vencido: number
-  proximos_vencimentos: number
+  proximos_issue_dates: number
 }
 
 export async function getRecebimentosKPIs(): Promise<RecebimentosKPIs> {
@@ -302,17 +374,17 @@ export async function getRecebimentosKPIs(): Promise<RecebimentosKPIs> {
   proximosDias.setDate(proximosDias.getDate() + 7)
   const dataProximos = proximosDias.toISOString().split('T')[0]
   
-  // Total a receber (pendentes + vencidos)
+  // Total a receber (emitidas + enviadas)
   const { data: aReceber } = await supabase
     .from('obras_notas_fiscais')
     .select('valor_liquido')
-    .in('status', ['pendente', 'vencido'])
+    .in('status', ['emitida', 'enviada'])
   
-  // Total recebido (pagos)
+  // Total recebido (pagas)
   const { data: recebido } = await supabase
     .from('obras_notas_fiscais')
     .select('valor_liquido')
-    .eq('status', 'pago')
+    .eq('status', 'paga')
   
   // Total vencido
   const { data: vencido } = await supabase
@@ -324,7 +396,7 @@ export async function getRecebimentosKPIs(): Promise<RecebimentosKPIs> {
   const { data: proximos } = await supabase
     .from('obras_notas_fiscais')
     .select('valor_liquido')
-    .eq('status', 'pendente')
+    .eq('status', 'emitida')
     .gte('vencimento', hoje)
     .lte('vencimento', dataProximos)
   
@@ -332,7 +404,7 @@ export async function getRecebimentosKPIs(): Promise<RecebimentosKPIs> {
     total_a_receber: aReceber?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0,
     total_recebido: recebido?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0,
     total_vencido: vencido?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0,
-    proximos_vencimentos: proximos?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0
+    proximos_issue_dates: proximos?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0
   }
 }
 

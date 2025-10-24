@@ -117,10 +117,36 @@ export const SERVICOS_DISPONIVEIS: Servico[] = [
   }
 ]
 
+import { getServicosCatalogo } from '../lib/servicosCatalogoApi'
+
 /**
  * Retorna lista de serviços ativos
+ * Primeiro tenta buscar do banco de dados, se falhar usa os dados mockados
  */
-export function getServicosAtivos(): Servico[] {
+export async function getServicosAtivos(): Promise<Servico[]> {
+  try {
+    // Tenta buscar do banco de dados
+    const servicosDoBanco = await getServicosCatalogo()
+    if (servicosDoBanco && servicosDoBanco.length > 0) {
+      return servicosDoBanco
+    }
+    
+    // Se não encontrar no banco, usa os dados mockados
+    console.warn('Usando serviços mockados pois não foram encontrados no banco')
+    return SERVICOS_DISPONIVEIS.filter(s => s.ativo)
+  } catch (error) {
+    // Em caso de erro, usa os dados mockados
+    console.error('Erro ao buscar serviços do banco:', error)
+    console.warn('Usando serviços mockados devido a erro')
+    return SERVICOS_DISPONIVEIS.filter(s => s.ativo)
+  }
+}
+
+/**
+ * Versão síncrona para compatibilidade com código existente
+ * @deprecated Use getServicosAtivos() async quando possível
+ */
+export function getServicosAtivosSinc(): Servico[] {
   return SERVICOS_DISPONIVEIS.filter(s => s.ativo)
 }
 

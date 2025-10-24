@@ -20,7 +20,7 @@ import { formatDateToBR } from '../../utils/date-utils'
 import { AdicionarPagamentoDiretoModal } from './AdicionarPagamentoDiretoModal'
 import type { ObraPagamentoDireto, FormaPagamento } from '../../types/obras-pagamentos'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
+// Modo de produção - conectado ao banco de dados
 const USE_MOCK = false
 
 const mockPagamentosDiretos: ObraPagamentoDireto[] = [

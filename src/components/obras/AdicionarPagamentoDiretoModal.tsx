@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { X, Upload, FileText, AlertCircle, CreditCard, Smartphone, Banknote, CheckSquare, Receipt } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Input } from '../ui/input'
+import { CurrencyInput } from '../ui/currency-input'
 import { useToast } from '../../lib/toast-hooks'
 import { createPagamentoDireto } from '../../lib/obrasPagamentosDiretosApi'
 import { uploadToSupabaseStorage, validatePDF } from '../../utils/file-upload-utils'
@@ -35,7 +36,7 @@ export function AdicionarPagamentoDiretoModal({
   
   const [formData, setFormData] = useState({
     descricao: '',
-    valor: '',
+    valor: 0,
     data_pagamento: new Date().toISOString().split('T')[0], // Data atual
     forma_pagamento: 'pix' as FormaPagamento,
     observacoes: ''
@@ -113,7 +114,7 @@ export function AdicionarPagamentoDiretoModal({
       return
     }
 
-    if (!formData.valor || Number(formData.valor) <= 0) {
+    if (!formData.valor || formData.valor <= 0) {
       addToast({
         type: 'error',
         title: 'Valor inválido',
@@ -158,7 +159,7 @@ export function AdicionarPagamentoDiretoModal({
   const handleClose = () => {
     setFormData({
       descricao: '',
-      valor: '',
+      valor: 0,
       data_pagamento: new Date().toISOString().split('T')[0],
       forma_pagamento: 'pix',
       observacoes: ''
@@ -211,14 +212,11 @@ export function AdicionarPagamentoDiretoModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Valor *
               </label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
                 value={formData.valor}
-                onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, valor: value })}
                 placeholder="R$ 0,00"
-                required
+                min={0}
               />
             </div>
             

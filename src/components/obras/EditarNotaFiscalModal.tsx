@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { X, Upload, FileText, AlertCircle } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Input } from '../ui/input'
+import { CurrencyInput } from '../ui/currency-input'
 import { useToast } from '../../lib/toast-hooks'
 import { updateNotaFiscal } from '../../lib/obrasNotasFiscaisApi'
 import { uploadToSupabaseStorage, validatePDF } from '../../utils/file-upload-utils'
@@ -33,7 +34,7 @@ export function EditarNotaFiscalModal({
     desconto_inss: '',
     desconto_iss: '',
     outro_desconto: '',
-    status: 'pendente' as 'pendente' | 'pago' | 'vencido' | 'renegociado',
+    status: 'emitida' as 'emitida' | 'enviada' | 'paga',
     observacoes: ''
   })
   
@@ -44,13 +45,13 @@ export function EditarNotaFiscalModal({
   useEffect(() => {
     if (nota) {
       setFormData({
-        numero_nota: nota.numero_nota,
-        valor_nota: String(nota.valor_nota),
-        vencimento: nota.vencimento,
-        desconto_inss: String(nota.desconto_inss),
-        desconto_iss: String(nota.desconto_iss),
-        outro_desconto: String(nota.outro_desconto),
-        status: nota.status,
+        numero_nota: nota.numero_nota || '',
+        valor_nota: String(nota.valor_nota || 0),
+        vencimento: nota.vencimento || '',
+        desconto_inss: String(nota.desconto_inss || 0),
+        desconto_iss: String(nota.desconto_iss || 0),
+        outro_desconto: String(nota.outro_desconto || 0),
+        status: nota.status || 'emitida',
         observacoes: nota.observacoes || ''
       })
       setArquivoUrl(nota.arquivo_nota_url || '')
@@ -284,14 +285,10 @@ export function EditarNotaFiscalModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Valor da Nota *
               </label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.valor_nota}
-                onChange={(e) => setFormData({ ...formData, valor_nota: e.target.value })}
+              <CurrencyInput
+                value={Number(formData.valor_nota) || 0}
+                onChange={(value) => setFormData({ ...formData, valor_nota: value.toString() })}
                 placeholder="R$ 0,00"
-                required
               />
             </div>
             
@@ -316,12 +313,9 @@ export function EditarNotaFiscalModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Desconto INSS
                 </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.desconto_inss}
-                  onChange={(e) => setFormData({ ...formData, desconto_inss: e.target.value })}
+                <CurrencyInput
+                  value={Number(formData.desconto_inss) || 0}
+                  onChange={(value) => setFormData({ ...formData, desconto_inss: value.toString() })}
                   placeholder="R$ 0,00"
                 />
               </div>
@@ -330,12 +324,9 @@ export function EditarNotaFiscalModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Desconto ISS
                 </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.desconto_iss}
-                  onChange={(e) => setFormData({ ...formData, desconto_iss: e.target.value })}
+                <CurrencyInput
+                  value={Number(formData.desconto_iss) || 0}
+                  onChange={(value) => setFormData({ ...formData, desconto_iss: value.toString() })}
                   placeholder="R$ 0,00"
                 />
               </div>
@@ -344,12 +335,9 @@ export function EditarNotaFiscalModal({
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Outro Desconto
                 </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.outro_desconto}
-                  onChange={(e) => setFormData({ ...formData, outro_desconto: e.target.value })}
+                <CurrencyInput
+                  value={Number(formData.outro_desconto) || 0}
+                  onChange={(value) => setFormData({ ...formData, outro_desconto: value.toString() })}
                   placeholder="R$ 0,00"
                 />
               </div>
@@ -363,17 +351,16 @@ export function EditarNotaFiscalModal({
             </label>
             <select
               value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'pendente' | 'pago' | 'vencido' | 'renegociado' })}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'emitida' | 'enviada' | 'paga' })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               required
             >
-              <option value="pendente">Pendente</option>
-              <option value="pago">Pago</option>
-              <option value="vencido">Vencido</option>
-              <option value="renegociado">Renegociado</option>
+              <option value="emitida">Emitida</option>
+              <option value="enviada">Enviada</option>
+              <option value="paga">Paga</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              Alterar o status automaticamente marca como "Renegociado"
+              Selecione o status atual da nota fiscal
             </p>
           </div>
 

@@ -25,25 +25,20 @@ export function formatarStatusNota(status: NotaFiscalStatus): {
   bgColor: string
 } {
   const statusMap = {
-    pendente: {
-      label: 'Pendente',
+    emitida: {
+      label: 'Emitida',
       cor: 'text-yellow-800',
       bgColor: 'bg-yellow-100'
     },
-    pago: {
-      label: 'Pago',
-      cor: 'text-green-800',
-      bgColor: 'bg-green-100'
-    },
-    vencido: {
-      label: 'Vencido',
-      cor: 'text-red-800',
-      bgColor: 'bg-red-100'
-    },
-    renegociado: {
-      label: 'Renegociado',
+    enviada: {
+      label: 'Enviada',
       cor: 'text-blue-800',
       bgColor: 'bg-blue-100'
+    },
+    paga: {
+      label: 'Paga',
+      cor: 'text-green-800',
+      bgColor: 'bg-green-100'
     }
   }
 

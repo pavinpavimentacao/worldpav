@@ -10,7 +10,7 @@ import { EditarNotaFiscalModal } from './EditarNotaFiscalModal'
 import { DetalhesNotaFiscalModal } from './DetalhesNotaFiscalModal'
 import type { ObraNotaFiscal } from '../../types/obras-financeiro'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
+// Modo de produção - conectado ao banco de dados
 const USE_MOCK = false
 
 const mockNotasFiscais: ObraNotaFiscal[] = [
@@ -94,10 +94,6 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
   const [modalDetalhes, setModalDetalhes] = useState(false)
   const [notaSelecionada, setNotaSelecionada] = useState<ObraNotaFiscal | null>(null)
 
-  useEffect(() => {
-    loadNotas()
-  }, [obraId])
-
   const loadNotas = async () => {
     try {
       setLoading(true)
@@ -106,10 +102,11 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
         await new Promise(resolve => setTimeout(resolve, 500))
         setNotas(mockNotasFiscais)
       } else {
-        // Verificar notas vencidas antes de carregar
-        await verificarNotasVencidas(obraId)
+        // Verificar notas vencidas em background (não bloqueia)
+        verificarNotasVencidas(obraId).catch(console.error)
         
         const data = await getNotasFiscaisByObra(obraId)
+        console.log('🔍 Dados carregados das notas fiscais:', data)
         setNotas(data)
       }
     } catch (error) {
@@ -122,6 +119,10 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadNotas()
+  }, [obraId])
 
   const handleDelete = async (nota: ObraNotaFiscal) => {
     if (!confirm(`Tem certeza que deseja excluir a nota fiscal ${nota.numero_nota}?`)) {
@@ -164,7 +165,7 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
   }
 
   const totalDescontos = (nota: ObraNotaFiscal) => {
-    return nota.desconto_inss + nota.desconto_iss + nota.outro_desconto
+    return (nota.desconto_inss || 0) + (nota.desconto_iss || 0) + (nota.outro_desconto || 0)
   }
 
   if (loading) {
@@ -250,7 +251,7 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-900">
-                          R$ {nota.valor_nota.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {(nota.valor_nota || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -260,7 +261,7 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-semibold text-gray-900">
-                          R$ {nota.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {(nota.valor_liquido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -330,7 +331,10 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
         isOpen={modalAdicionar}
         onClose={() => setModalAdicionar(false)}
         obraId={obraId}
-        onSuccess={loadNotas}
+        onSuccess={() => {
+          // Recarregar dados após salvar
+          loadNotas()
+        }}
       />
 
       <EditarNotaFiscalModal
@@ -354,4 +358,3 @@ export function NotasFiscaisSubTab({ obraId }: NotasFiscaisSubTabProps) {
     </>
   )
 }
-

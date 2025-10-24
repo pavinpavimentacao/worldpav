@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   MapPin, 
   Calendar, 
@@ -7,6 +7,8 @@ import {
   FileText
 } from 'lucide-react'
 import { Obra } from '../../lib/obrasApi'
+import { calcularValorTotalServicos } from '../../lib/obrasServicosApi'
+import { getFaturamentoBrutoTotal } from '../../lib/obrasNotasFiscaisApi'
 
 interface ObraVisaoGeralTabProps {
   obraId: string
@@ -14,6 +16,33 @@ interface ObraVisaoGeralTabProps {
 }
 
 export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
+  const [faturamentoPrevisto, setFaturamentoPrevisto] = useState<number>(0)
+  const [valorExecutado, setValorExecutado] = useState<number>(0)
+  
+  useEffect(() => {
+    async function carregarDadosFinanceiros() {
+      try {
+        // Buscar o valor total dos serviços com base no volume previsto
+        const valorServicos = await calcularValorTotalServicos(obraId)
+        setFaturamentoPrevisto(valorServicos)
+        
+        // Se a obra está concluída, usar o valor executado salvo no banco
+        if (obra.status === 'concluida' && obra.executed_value) {
+          setValorExecutado(obra.executed_value)
+          console.log('🏁 Obra concluída - Usando valor executado salvo:', obra.executed_value)
+        } else {
+          // Se não está concluída, calcular dinamicamente
+          const faturamentoBruto = await getFaturamentoBrutoTotal(obraId)
+          setValorExecutado(faturamentoBruto)
+          console.log('🔄 Obra em andamento - Calculando valor executado:', faturamentoBruto)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados financeiros:', error)
+      }
+    }
+    
+    carregarDadosFinanceiros()
+  }, [obraId, obra.status, obra.executed_value])
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { 
@@ -79,14 +108,14 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-medium text-gray-900">Valor do Contrato</h3>
+            <h3 className="text-sm font-medium text-gray-900">Faturamento Previsto</h3>
             <DollarSign className="h-5 w-5 text-blue-600" />
           </div>
           <div className="text-2xl font-bold text-gray-900 mb-1">
-            {formatCurrency(obra.contract_value || 0)}
+            {formatCurrency(faturamentoPrevisto || 0)}
           </div>
           <div className="text-sm text-gray-500">
-            Valor contratado
+            Valor total previsto
           </div>
         </div>
 
@@ -96,10 +125,13 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
             <DollarSign className="h-5 w-5 text-green-600" />
           </div>
           <div className="text-2xl font-bold text-green-600 mb-1">
-            {formatCurrency(obra.executed_value || 0)}
+            {formatCurrency(valorExecutado)}
           </div>
           <div className="text-sm text-gray-500">
-            Executado até agora
+            {obra.status === 'concluida' 
+              ? 'Valor final executado (congelado)' 
+              : 'Notas fiscais + pagamentos diretos'
+            }
           </div>
         </div>
 
@@ -109,10 +141,10 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
             <DollarSign className="h-5 w-5 text-orange-600" />
           </div>
           <div className="text-2xl font-bold text-orange-600 mb-1">
-            {formatCurrency((obra.contract_value || 0) - (obra.executed_value || 0))}
+            {formatCurrency(faturamentoPrevisto - valorExecutado)}
           </div>
           <div className="text-sm text-gray-500">
-            Restante do contrato
+            Restante do faturamento
           </div>
         </div>
       </div>
@@ -137,7 +169,7 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
 
             <div>
               <p className="text-sm font-medium text-gray-500 mb-1">Região/Bairro</p>
-              <p className="text-sm text-gray-900">{obra.location || 'Não informado'}</p>
+              <p className="text-sm text-gray-900">{obra.location || obra.city || 'Não informado'}</p>
             </div>
 
             <div>

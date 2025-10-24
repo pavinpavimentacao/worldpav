@@ -3,10 +3,13 @@ import { Layout } from "../../components/layout/Layout"
 import { Button } from "../../components/shared/Button"
 import { Select } from "../../components/shared/Select"
 import { Link } from 'react-router-dom'
-import { Plus, Search, Filter, Eye, Edit, CheckCircle } from 'lucide-react'
-import { getObras, getEstatisticasObras, Obra, ObraStats } from '../../lib/obrasApi'
+import { Plus, Search, Filter, Eye, Edit, CheckCircle, Trash2 } from 'lucide-react'
+import { getObras, getEstatisticasObras, deleteObra, Obra, ObraStats } from '../../lib/obrasApi'
+import { getObraFaturamentos } from '../../lib/obrasFinanceiroApi'
+import { getRuasByObra } from '../../lib/obrasRuasApi'
 import { useToast } from '../../lib/toast-hooks'
 import { getOrCreateDefaultCompany } from '../../lib/company-utils'
+import { DeleteObraModal } from '../../components/obras/DeleteObraModal'
 
 // Interface local para compatibilidade com a UI existente
 interface ObraDisplay extends Obra {
@@ -27,8 +30,8 @@ interface ObraDisplay extends Obra {
 
 const getStatusBadge = (status: Obra['status']) => {
   const statusConfig = {
-    planejamento: { label: 'Planejamento', className: 'status-planejada' },
-    andamento: { label: 'Em Andamento', className: 'status-em-andamento' },
+    planejamento: { label: 'Planejamento', className: 'status-planejamento' },
+    andamento: { label: 'Em Andamento', className: 'status-andamento' },
     concluida: { label: 'Concluída', className: 'status-concluida' },
     cancelada: { label: 'Cancelada', className: 'status-cancelada' }
   }
@@ -41,8 +44,74 @@ const getEmpresaColor = (empresa: string) => {
   return empresa === 'WorldPav' ? 'empresa-worldpav' : 'empresa-pavin'
 }
 
+// Função para buscar dados reais de uma obra
+async function getObraDadosReais(obraId: string) {
+  try {
+    // Buscar faturamentos e ruas em paralelo
+    const [faturamentos, ruas] = await Promise.all([
+      getObraFaturamentos(obraId),
+      getRuasByObra(obraId)
+    ])
+
+    console.log(`🔍 Dados da obra ${obraId}:`, {
+      faturamentos: faturamentos.length,
+      ruas: ruas.length
+    })
+
+    // Calcular metragem executada (soma dos faturamentos)
+    const metragemFeita = faturamentos.reduce((total, fat) => total + (fat.metragem_executada || 0), 0)
+    
+    // Calcular metragem planejada (soma das ruas)
+    const metragemPlanejada = ruas.reduce((total, rua) => total + (rua.metragem_planejada || 0), 0)
+    
+    // Calcular toneladas aplicadas (soma dos faturamentos)
+    const toneladasAplicadas = faturamentos.reduce((total, fat) => total + (fat.toneladas_utilizadas || 0), 0)
+    
+    // Calcular toneladas planejadas (soma das ruas)
+    const toneladasPlanejadas = ruas.reduce((total, rua) => total + (rua.toneladas_planejadas || 0), 0)
+    
+    // Calcular espessura média (média dos faturamentos)
+    const espessuraMedia = faturamentos.length > 0 
+      ? faturamentos.reduce((total, fat) => total + (fat.espessura_calculada || 0), 0) / faturamentos.length
+      : 0
+    
+    // Contar ruas (ruas finalizadas vs total)
+    const ruasFeitas = ruas.filter(rua => rua.status === 'finalizada').length
+    const totalRuas = ruas.length
+    
+    // Calcular faturamento bruto (soma dos faturamentos)
+    const faturamentoBruto = faturamentos.reduce((total, fat) => total + (fat.valor_total || 0), 0)
+
+    const dados = {
+      metragemFeita,
+      metragemPlanejada,
+      toneladasAplicadas,
+      toneladasPlanejadas,
+      espessuraMedia,
+      ruasFeitas,
+      totalRuas,
+      faturamentoBruto
+    }
+
+    console.log(`📊 Dados calculados para obra ${obraId}:`, dados)
+    return dados
+  } catch (error) {
+    console.error('❌ Erro ao buscar dados reais da obra:', error)
+    return {
+      metragemFeita: 0,
+      metragemPlanejada: 0,
+      toneladasAplicadas: 0,
+      toneladasPlanejadas: 0,
+      espessuraMedia: 0,
+      ruasFeitas: 0,
+      totalRuas: 0,
+      faturamentoBruto: 0
+    }
+  }
+}
+
 // Função para converter Obra da API para ObraDisplay da UI
-const convertObraToDisplay = (obra: Obra): ObraDisplay => {
+const convertObraToDisplay = (obra: Obra, dadosReais?: any): ObraDisplay => {
   return {
     ...obra,
     nome: obra.name,
@@ -50,15 +119,15 @@ const convertObraToDisplay = (obra: Obra): ObraDisplay => {
     empresa: 'WorldPav', // Por enquanto, sempre WorldPav
     previsaoConclusao: obra.expected_end_date || '',
     valorTotal: obra.contract_value || 0,
-    // Dados técnicos - por enquanto usando valores padrão
-    metragemFeita: 0,
-    metragemPlanejada: 0,
-    toneladasAplicadas: 0,
-    toneladasPlanejadas: 0,
-    espessuraMedia: 0,
-    ruasFeitas: 0,
-    totalRuas: 0,
-    faturamentoBruto: obra.executed_value || 0
+    // Dados técnicos reais ou padrão
+    metragemFeita: dadosReais?.metragemFeita || 0,
+    metragemPlanejada: dadosReais?.metragemPlanejada || 0,
+    toneladasAplicadas: dadosReais?.toneladasAplicadas || 0,
+    toneladasPlanejadas: dadosReais?.toneladasPlanejadas || 0,
+    espessuraMedia: dadosReais?.espessuraMedia || 0,
+    ruasFeitas: dadosReais?.ruasFeitas || 0,
+    totalRuas: dadosReais?.totalRuas || 0,
+    faturamentoBruto: dadosReais?.faturamentoBruto || obra.executed_value || 0
   }
 }
 
@@ -72,6 +141,11 @@ export default function ObrasList() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [empresaFilter, setEmpresaFilter] = useState<string>('all')
   const [clienteFilter, setClienteFilter] = useState<string>('all')
+  
+  // Estados para modal de exclusão
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [obraToDelete, setObraToDelete] = useState<ObraDisplay | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Carregar company ID
   useEffect(() => {
@@ -101,6 +175,8 @@ export default function ObrasList() {
     try {
       setLoading(true)
       
+      console.log('🔍 Carregando dados para companyId:', companyId)
+      
       // Carregar obras e estatísticas em paralelo
       const [obrasResult, statsResult] = await Promise.all([
         getObras(companyId, {
@@ -112,11 +188,23 @@ export default function ObrasList() {
         getEstatisticasObras(companyId)
       ])
 
-      const obrasDisplay = obrasResult.data.map(convertObraToDisplay)
-      setObras(obrasDisplay)
+      console.log('📊 Obras encontradas:', obrasResult.data.length)
+      console.log('📈 Estatísticas:', statsResult)
+
+      // Buscar dados reais para cada obra
+      const obrasComDadosReais = await Promise.all(
+        obrasResult.data.map(async (obra) => {
+          const dadosReais = await getObraDadosReais(obra.id)
+          console.log(`🏗️ Dados reais da obra ${obra.name}:`, dadosReais)
+          return convertObraToDisplay(obra, dadosReais)
+        })
+      )
+
+      console.log('✅ Obras processadas:', obrasComDadosReais.length)
+      setObras(obrasComDadosReais)
       setStats(statsResult)
     } catch (error) {
-      console.error('Erro ao carregar obras:', error)
+      console.error('❌ Erro ao carregar obras:', error)
       addToast({ message: 'Erro ao carregar obras', type: 'error' })
     } finally {
       setLoading(false)
@@ -125,6 +213,50 @@ export default function ObrasList() {
 
   // Obter lista única de clientes
   const clientesUnicos = Array.from(new Set(obras.map(obra => obra.cliente))).sort()
+
+  // Função para abrir modal de exclusão
+  const handleOpenDeleteModal = (obra: ObraDisplay) => {
+    setObraToDelete(obra)
+    setDeleteModalOpen(true)
+  }
+
+  // Função para fechar modal de exclusão
+  const handleCloseDeleteModal = () => {
+    if (!deleting) {
+      setDeleteModalOpen(false)
+      setObraToDelete(null)
+    }
+  }
+
+  // Função para confirmar exclusão
+  const handleConfirmDelete = async () => {
+    if (!obraToDelete) return
+
+    try {
+      setDeleting(true)
+      await deleteObra(obraToDelete.id)
+      
+      addToast({
+        type: 'success',
+        message: `Obra "${obraToDelete.nome}" excluída com sucesso`
+      })
+
+      // Recarregar a lista
+      await loadData()
+      
+      // Fechar modal
+      setDeleteModalOpen(false)
+      setObraToDelete(null)
+    } catch (error) {
+      console.error('Erro ao excluir obra:', error)
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Erro ao excluir obra'
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const filteredObras = obras.filter(obra => {
     const matchesSearch = obra.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -186,7 +318,7 @@ export default function ObrasList() {
         </div>
 
         {/* Resumo Estatístico */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -238,14 +370,104 @@ export default function ObrasList() {
           <div className="bg-white p-4 rounded-lg shadow-sm border">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-purple-600 text-sm font-bold">R$</span>
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 text-sm font-bold">📊</span>
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Valor Total</p>
+                <p className="text-sm font-medium text-gray-500">Faturamento Previsto</p>
+                <p className="text-lg font-semibold text-blue-600">
+                  {loading ? '...' : formatCurrency(stats?.faturamento_previsto || 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-sm border">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 text-sm font-bold">💰</span>
+                </div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-500">Faturamento Bruto</p>
                 <p className="text-lg font-semibold text-green-600">
-                  {loading ? '...' : formatCurrency(stats?.valor_total_contratos || 0)}
+                  {loading ? '...' : formatCurrency(stats?.faturamento_bruto || 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Média por Rua */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <span className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
+              <span className="text-indigo-600 text-sm font-bold">📊</span>
+            </span>
+            Média por Rua
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Média de Metragem por Rua */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-800">Metragem Média</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {loading ? '...' : formatArea(stats?.media_metragem_por_rua || 0)}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">por rua</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 text-lg">📏</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Média de Toneladas por Rua */}
+            <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-orange-800">Toneladas Médias</p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {loading ? '...' : formatWeight(stats?.media_toneladas_por_rua || 0)}
+                  </p>
+                  <p className="text-xs text-orange-700 mt-1">por rua</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-200 rounded-full flex items-center justify-center">
+                  <span className="text-orange-600 text-lg">⚖️</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Média de Espessura por Rua */}
+            <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-green-800">Espessura Média</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {loading ? '...' : (stats?.media_espessura_por_rua || 0) > 0 ? formatThickness(stats?.media_espessura_por_rua || 0) : '-'}
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">por rua</p>
+                </div>
+                <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 text-lg">📐</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Informação adicional */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-start space-x-2">
+              <span className="text-gray-500 text-sm">ℹ️</span>
+              <div className="text-sm text-gray-700">
+                <p className="font-medium">Cálculo das Médias:</p>
+                <p className="mt-1">
+                  As médias são calculadas baseadas nas ruas criadas de todas as obras ativas, 
+                  fornecendo uma referência para planejamento de novas obras.
                 </p>
               </div>
             </div>
@@ -387,7 +609,7 @@ export default function ObrasList() {
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 font-medium text-green-600">
+                      <div className="text-sm font-medium text-green-600">
                         {formatCurrency(obra.faturamentoBruto)}
                       </div>
                     </td>
@@ -412,7 +634,7 @@ export default function ObrasList() {
                         >
                           <Edit className="h-4 w-4" />
                         </Link>
-                        {obra.status === 'em_andamento' && (
+                        {obra.status === 'andamento' && (
                           <button
                             className="text-green-600 hover:text-green-900 p-1"
                             title="Concluir obra"
@@ -420,6 +642,13 @@ export default function ObrasList() {
                             <CheckCircle className="h-4 w-4" />
                           </button>
                         )}
+                        <button
+                          onClick={() => handleOpenDeleteModal(obra)}
+                          className="text-red-600 hover:text-red-900 p-1"
+                          title="Excluir obra"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -443,6 +672,15 @@ export default function ObrasList() {
             </div>
           )}
         </div>
+
+        {/* Modal de Confirmação de Exclusão */}
+        <DeleteObraModal
+          isOpen={deleteModalOpen}
+          onClose={handleCloseDeleteModal}
+          onConfirm={handleConfirmDelete}
+          obraNome={obraToDelete?.nome || ''}
+          loading={deleting}
+        />
       </div>
     </Layout>
   )

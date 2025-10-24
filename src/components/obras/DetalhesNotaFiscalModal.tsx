@@ -20,7 +20,7 @@ export function DetalhesNotaFiscalModal({
 
   const statusInfo = formatarStatusNota(nota.status)
   const diasVencimento = diasParaVencimento(nota.vencimento)
-  const totalDescontos = nota.desconto_inss + nota.desconto_iss + nota.outro_desconto
+  const totalDescontos = (nota.desconto_inss || 0) + (nota.desconto_iss || 0) + (nota.outro_desconto || 0)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -60,7 +60,7 @@ export function DetalhesNotaFiscalModal({
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Valor Bruto da Nota:</span>
                 <span className="text-lg font-bold text-gray-900">
-                  R$ {nota.valor_nota.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(nota.valor_nota || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
               
@@ -68,20 +68,20 @@ export function DetalhesNotaFiscalModal({
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Desconto INSS:</span>
                   <span className="text-sm font-medium text-red-600">
-                    - R$ {nota.desconto_inss.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    - R$ {(nota.desconto_inss || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Desconto ISS:</span>
                   <span className="text-sm font-medium text-red-600">
-                    - R$ {nota.desconto_iss.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    - R$ {(nota.desconto_iss || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                {nota.outro_desconto > 0 && (
+                {(nota.outro_desconto || 0) > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Outro Desconto:</span>
                     <span className="text-sm font-medium text-red-600">
-                      - R$ {nota.outro_desconto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      - R$ {(nota.outro_desconto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
@@ -97,7 +97,7 @@ export function DetalhesNotaFiscalModal({
                 <div className="flex justify-between items-center">
                   <span className="text-base font-bold text-gray-900">Valor Líquido:</span>
                   <span className="text-2xl font-bold text-green-600">
-                    R$ {nota.valor_liquido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(nota.valor_liquido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -186,11 +186,27 @@ export function DetalhesNotaFiscalModal({
           <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
             <div>
               <span className="font-medium">Criado em:</span>
-              <p>{formatDateToBR(nota.created_at.split('T')[0])} às {new Date(nota.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+              <p>
+                {nota.created_at ? (
+                  <>
+                    {formatDateToBR(nota.created_at.split('T')[0])} às {new Date(nota.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </>
+                ) : (
+                  'Não disponível'
+                )}
+              </p>
             </div>
             <div>
               <span className="font-medium">Última atualização:</span>
-              <p>{formatDateToBR(nota.updated_at.split('T')[0])} às {new Date(nota.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+              <p>
+                {nota.updated_at ? (
+                  <>
+                    {formatDateToBR(nota.updated_at.split('T')[0])} às {new Date(nota.updated_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </>
+                ) : (
+                  'Não disponível'
+                )}
+              </p>
             </div>
           </div>
         </div>
@@ -205,7 +221,6 @@ export function DetalhesNotaFiscalModal({
     </div>
   )
 }
-
 
 
 

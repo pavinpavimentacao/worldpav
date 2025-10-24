@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react'
 import { Layout } from "../../components/layout/Layout"
 import { Button } from "../../components/shared/Button"
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPin, Calendar, DollarSign, Building2, TrendingUp, Edit, AlertTriangle, FileText } from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, DollarSign, Building2, TrendingUp, Edit, FileText, Settings } from 'lucide-react'
 import { ObraRuasTab } from '../../components/obras/ObraRuasTab'
 import { ObraFinanceiroTab } from '../../components/obras/ObraFinanceiroTab'
 import { NotasMedicoesTab } from '../../components/obras/NotasMedicoesTab'
 import { ObraVisaoGeralTab } from '../../components/obras/ObraVisaoGeralTab'
+import { ObraServicosTab } from '../../components/obras/ObraServicosTab'
 import { getObraById, Obra } from '../../lib/obrasApi'
+import { calcularValorTotalServicos, calcularPrecoPorM2 } from '../../lib/obrasServicosApi'
+import { getFaturamentoBrutoTotal } from '../../lib/obrasNotasFiscaisApi'
 import { useToast } from '../../lib/toast-hooks'
 
-type TabType = 'visao-geral' | 'ruas' | 'financeiro' | 'notas-medicoes'
+type TabType = 'visao-geral' | 'ruas' | 'financeiro' | 'notas-medicoes' | 'servicos'
 
 const ObraDetails = () => {
   const navigate = useNavigate()
@@ -19,36 +22,51 @@ const ObraDetails = () => {
   const [activeTab, setActiveTab] = useState<TabType>('visao-geral')
   const [obra, setObra] = useState<Obra | null>(null)
   const [loading, setLoading] = useState(true)
+  const [faturamentoPrevisto, setFaturamentoPrevisto] = useState<number>(0)
+  const [valorExecutado, setValorExecutado] = useState<number>(0)
+  const [precoPorM2Calculado, setPrecoPorM2Calculado] = useState<number>(0)
 
   // Carregar dados da obra
   useEffect(() => {
+    async function loadObra() {
+      if (!id) return
+
+      try {
+        setLoading(true)
+        const obraData = await getObraById(id)
+        
+        if (!obraData) {
+          addToast({ message: 'Obra não encontrada', type: 'error' })
+          navigate('/obras')
+          return
+        }
+
+        setObra(obraData)
+        
+        // Carregar o valor total dos serviços
+        const valorServicos = await calcularValorTotalServicos(id)
+        setFaturamentoPrevisto(valorServicos)
+        
+        // Carregar o preço por m² calculado dos serviços
+        const precoPorM2 = await calcularPrecoPorM2(id)
+        setPrecoPorM2Calculado(precoPorM2)
+        
+        // Carregar o valor executado (faturamento bruto total)
+        const faturamentoBruto = await getFaturamentoBrutoTotal(id)
+        setValorExecutado(faturamentoBruto)
+      } catch (error) {
+        console.error('Erro ao carregar obra:', error)
+        addToast({ message: 'Erro ao carregar obra', type: 'error' })
+        navigate('/obras')
+      } finally {
+        setLoading(false)
+      }
+    }
+
     if (id) {
       loadObra()
     }
-  }, [id])
-
-  async function loadObra() {
-    if (!id) return
-
-    try {
-      setLoading(true)
-      const obraData = await getObraById(id)
-      
-      if (!obraData) {
-        addToast({ message: 'Obra não encontrada', type: 'error' })
-        navigate('/obras')
-        return
-      }
-
-      setObra(obraData)
-    } catch (error) {
-      console.error('Erro ao carregar obra:', error)
-      addToast({ message: 'Erro ao carregar obra', type: 'error' })
-      navigate('/obras')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [id, addToast, navigate])
 
   if (loading || !obra) {
     return (
@@ -131,13 +149,13 @@ const ObraDetails = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 text-sm font-bold">M²</span>
+                  <DollarSign className="h-5 w-5 text-blue-600" />
                 </div>
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-500">Valor Contrato</p>
+                <p className="text-sm font-medium text-gray-500">Faturamento Previsto</p>
                 <p className="text-xl font-semibold text-gray-900">
-                  {formatCurrency(obra.contract_value || 0)}
+                  {formatCurrency(faturamentoPrevisto || 0)}
                 </p>
               </div>
             </div>
@@ -187,7 +205,7 @@ const ObraDetails = () => {
                   Executado
                 </p>
                 <p className="text-xl font-semibold text-green-600">
-                  {formatCurrency(obra.executed_value || 0)}
+                  {formatCurrency(valorExecutado)}
                 </p>
               </div>
             </div>
@@ -214,7 +232,7 @@ const ObraDetails = () => {
                 <MapPin className="h-5 w-5 text-gray-400 mt-0.5 mr-3" />
                 <div>
                   <p className="text-sm font-medium text-gray-500">Região/Bairro</p>
-                  <p className="text-sm text-gray-900">{obra.location || 'Não informado'}</p>
+                  <p className="text-sm text-gray-900">{obra.location || obra.city || 'Não informado'}</p>
                 </div>
               </div>
 
@@ -324,6 +342,17 @@ const ObraDetails = () => {
                 Ruas
               </button>
               <button
+                onClick={() => setActiveTab('servicos')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'servicos'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Settings className="h-4 w-4 mr-1 inline-block" />
+                Serviços
+              </button>
+              <button
                 onClick={() => setActiveTab('financeiro')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'financeiro'
@@ -351,14 +380,14 @@ const ObraDetails = () => {
             {activeTab === 'visao-geral' && (
               <ObraVisaoGeralTab 
                 obraId={id || ''} 
-                obra={obra as any}
+                obra={obra}
               />
             )}
 
             {activeTab === 'ruas' && (
               <ObraRuasTab 
                 obraId={id || ''} 
-                precoPorM2={25} 
+                precoPorM2={precoPorM2Calculado || 25} 
               />
             )}
 
@@ -369,7 +398,13 @@ const ObraDetails = () => {
             {activeTab === 'notas-medicoes' && (
               <NotasMedicoesTab 
                 obraId={id || ''} 
-                precoPorM2={25}
+                precoPorM2={precoPorM2Calculado || 25}
+              />
+            )}
+            
+            {activeTab === 'servicos' && (
+              <ObraServicosTab 
+                obraId={id || ''} 
               />
             )}
           </div>

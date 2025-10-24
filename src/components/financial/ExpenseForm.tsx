@@ -224,12 +224,16 @@ export function ExpenseForm({
 
                   <div className="space-y-2">
                     <Label htmlFor="custo_por_litro">Custo por Litro (R$)</Label>
-                    <Input
-                      id="custo_por_litro"
-                      type="number"
-                      step="0.01"
-                      {...register('custo_por_litro', { valueAsNumber: true })}
-                      placeholder="0.00"
+                    <Controller
+                      name="custo_por_litro"
+                      control={control}
+                      render={({ field }) => (
+                        <CurrencyInput
+                          value={field.value || 0}
+                          onChange={field.onChange}
+                          placeholder="R$ 0,00"
+                        />
+                      )}
                     />
                   </div>
                 </div>

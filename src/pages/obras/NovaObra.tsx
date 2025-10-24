@@ -6,17 +6,32 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Layout } from "../../components/layout/Layout"
 import { Button } from "../../components/shared/Button"
 import { Select } from "../../components/shared/Select"
+import { DatePicker } from '../../components/ui/date-picker'
+import { NumberInput } from '../../components/ui/number-input'
+import { CnpjInput } from '../../components/ui/cnpj-input'
 import { 
   ArrowLeft, 
   Building, 
-  Calendar
+  Calendar,
+  FileText,
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react'
+import { ServicoSelector } from "../../components/shared/ServicoSelector"
+import { ServicoObra } from '../../types/servicos'
 import { createObra, ObraInsertData } from '../../lib/obrasApi'
 import { getClientesSimples } from '../../lib/clientesApi'
 import { useToast } from '../../lib/toast-hooks'
 import { getOrCreateDefaultCompany } from '../../lib/company-utils'
+import { createServicosObra } from '../../lib/obrasServicosApi'
 
-// Schema de validação simplificado para a API
+// Tipo para serviços no formulário (sem obra_id obrigatório)
+type ServicoFormulario = Omit<ServicoObra, 'obra_id' | 'created_at'> & {
+  obra_id?: string
+  created_at?: string
+}
+
+// Schema de validação completo
 const schema = z.object({
   nome: z.string().min(1, 'O nome da obra é obrigatório'),
   descricao: z.string().optional(),
@@ -27,18 +42,24 @@ const schema = z.object({
   data_inicio_prevista: z.string().optional(),
   data_conclusao_prevista: z.string().optional(),
   valor_contrato: z.number().optional(),
+  unidade_cobranca: z.string().optional(),
+  volume_total_previsto: z.number().optional(),
+  volume_planejamento: z.number().optional(),
+  total_ruas: z.number().optional(),
+  previsao_dias: z.number().optional(),
+  tem_cnpj_separado: z.boolean().optional(),
+  cnpj_obra: z.string().optional(),
+  razao_social_obra: z.string().optional(),
   observacoes: z.string().optional()
 })
 
 type FormValues = z.infer<typeof schema>
 
-// Estados do Brasil
-const estadosBrasil = [
-  { value: 'SP', label: 'São Paulo' },
-  { value: 'RJ', label: 'Rio de Janeiro' },
-  { value: 'MG', label: 'Minas Gerais' },
-  { value: 'PR', label: 'Paraná' },
-  { value: 'RS', label: 'Rio Grande do Sul' }
+// Unidades de cobrança disponíveis
+const unidadesCobranca = [
+  { value: 'm2', label: 'Metro Quadrado (M²)' },
+  { value: 'm3', label: 'Metro Cúbico (M³)' },
+  { value: 'diaria', label: 'Por Diária' }
 ]
 
 export default function NovaObra() {
@@ -49,53 +70,72 @@ export default function NovaObra() {
 
   // Estados
   const [clientes, setClientes] = useState<Array<{ id: string; name: string }>>([])
-  const [loading, setLoading] = useState(false)
   const [companyId, setCompanyId] = useState<string>('')
+  
+  // Estados para serviços e volume
+  const [servicosObra, setServicosObra] = useState<ServicoObra[]>([])
 
   const {
     handleSubmit,
     control,
+    watch,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
+    mode: 'onChange',
     defaultValues: {
+      nome: '',
+      descricao: '',
       cliente_id: clientIdFromUrl || '',
-      estado: 'SP'
+      cidade: '',
+      estado: 'SP',
+      location: '',
+      data_inicio_prevista: '',
+      data_conclusao_prevista: '',
+      valor_contrato: 0,
+      unidade_cobranca: 'm2',
+      volume_total_previsto: 0,
+      volume_planejamento: 0,
+      total_ruas: 0,
+      previsao_dias: 0,
+      tem_cnpj_separado: false,
+      cnpj_obra: '',
+      razao_social_obra: '',
+      observacoes: ''
     }
   })
 
   // Carregar company ID
   useEffect(() => {
+    async function loadCompanyId() {
+      try {
+        const id = await getOrCreateDefaultCompany()
+        setCompanyId(id)
+      } catch (err) {
+        console.error('Erro ao carregar company ID:', err)
+        addToast({ message: 'Erro ao carregar empresa', type: 'error' })
+      }
+    }
     loadCompanyId()
-  }, [])
+  }, [addToast])
 
   // Carregar clientes quando companyId mudar
   useEffect(() => {
     if (companyId) {
+      const loadClientes = async () => {
+        try {
+          const clientesData = await getClientesSimples(companyId)
+          setClientes(clientesData)
+        } catch (error) {
+          console.error('Erro ao carregar clientes:', error)
+          addToast({ message: 'Erro ao carregar clientes', type: 'error' })
+        }
+      }
       loadClientes()
     }
-  }, [companyId])
+  }, [companyId, addToast])
 
-  async function loadCompanyId() {
-    try {
-      const id = await getOrCreateDefaultCompany()
-      setCompanyId(id)
-    } catch (err) {
-      console.error('Erro ao carregar company ID:', err)
-      addToast({ message: 'Erro ao carregar empresa', type: 'error' })
-    }
-  }
-
-  async function loadClientes() {
-    try {
-      const clientesData = await getClientesSimples(companyId)
-      setClientes(clientesData)
-    } catch (error) {
-      console.error('Erro ao carregar clientes:', error)
-      addToast({ message: 'Erro ao carregar clientes', type: 'error' })
-    }
-  }
-
+  // Função para submeter o formulário
   const onSubmit = async (data: FormValues) => {
     if (!companyId) {
       addToast({ message: 'Empresa não identificada', type: 'error' })
@@ -103,7 +143,6 @@ export default function NovaObra() {
     }
 
     try {
-      setLoading(true)
 
       const obraData: ObraInsertData = {
         company_id: companyId,
@@ -117,10 +156,39 @@ export default function NovaObra() {
         location: data.location || null,
         city: data.cidade,
         state: data.estado,
-        observations: data.observacoes || null
+        observations: data.observacoes || null,
+        // Campos de planejamento
+        unidade_cobranca: data.unidade_cobranca || null,
+        volume_planejamento: data.volume_planejamento || null,
+        total_ruas: data.total_ruas || null,
+        previsao_dias: data.previsao_dias || null,
+        tem_cnpj_separado: data.tem_cnpj_separado || null,
+        cnpj_obra: data.cnpj_obra || null,
+        razao_social_obra: data.razao_social_obra || null
       }
 
       const obra = await createObra(obraData)
+      
+      // Salvar serviços da obra se houver
+      if (servicosObra.length > 0) {
+        try {
+          const servicosParaSalvar = servicosObra.map(servico => ({
+            obra_id: obra.id,
+            servico_id: servico.servico_id,
+            servico_nome: servico.servico_nome,
+            quantidade: servico.quantidade,
+            preco_unitario: servico.preco_unitario,
+            valor_total: servico.valor_total,
+            unidade: servico.unidade,
+            observacoes: servico.observacoes
+          }))
+          
+          await createServicosObra(obra.id, servicosParaSalvar)
+        } catch (error) {
+          console.error('Erro ao salvar serviços da obra:', error)
+          addToast({ message: 'Obra criada, mas houve erro ao salvar serviços', type: 'warning' })
+        }
+      }
       
       addToast({ message: 'Obra criada com sucesso!', type: 'success' })
       navigate(`/obras/${obra.id}`)
@@ -128,9 +196,34 @@ export default function NovaObra() {
       console.error('Erro ao criar obra:', error)
       addToast({ message: 'Erro ao criar obra', type: 'error' })
     } finally {
-      setLoading(false)
+      // Loading handled by isSubmitting
     }
   }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL' 
+    }).format(value)
+  }
+
+  // Função para gerenciar mudanças nos serviços
+  const onServicosChange = (novosServicos: ServicoFormulario[]) => {
+    setServicosObra(novosServicos as ServicoObra[])
+  }
+
+  // Função para obter label da unidade
+  const getUnidadeLabel = (unidade: 'm2' | 'm3' | 'diaria') => {
+    if (unidade === 'm2') return 'M²'
+    if (unidade === 'm3') return 'M³'
+    if (unidade === 'diaria') return 'Diária'
+    return 'M²'
+  }
+
+  // Observar mudanças na unidade de cobrança e volume
+  const unidadeCobranca = (watch('unidade_cobranca') as 'm2' | 'm3' | 'diaria') || 'm2'
+  const volumePrevisto = watch('volume_planejamento') || 0
+  const temCnpjSeparado = watch('tem_cnpj_separado') || false
 
   return (
     <Layout>
@@ -153,9 +246,14 @@ export default function NovaObra() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" onKeyDown={(e) => {
+          // Prevenir submit do formulário quando Enter é pressionado em campos que não são o botão de submit
+          if (e.key === 'Enter' && e.target !== e.currentTarget.querySelector('button[type="submit"]')) {
+            e.preventDefault()
+          }
+        }}>
           {/* Seção: Informações Básicas */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="card">
             <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
               <Building className="h-5 w-5 mr-2 text-blue-600" />
               Informações Básicas
@@ -173,7 +271,7 @@ export default function NovaObra() {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="input"
                       placeholder="Ex: Pavimentação Região Centro - Osasco"
                       value={field.value || ''}
                       onChange={field.onChange}
@@ -210,6 +308,30 @@ export default function NovaObra() {
                 )}
               />
 
+              {/* Descrição */}
+              <Controller
+                name="descricao"
+                control={control}
+                render={({ field }) => (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Descrição
+                    </label>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      placeholder="Descrição da obra (opcional)"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                    />
+                    {errors.descricao && (
+                      <p className="mt-1 text-sm text-red-600">{errors.descricao.message}</p>
+                    )}
+                  </div>
+                )}
+              />
+
               {/* Cidade */}
               <Controller
                 name="cidade"
@@ -221,7 +343,7 @@ export default function NovaObra() {
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="input"
                       placeholder="Ex: Osasco"
                       value={field.value || ''}
                       onChange={field.onChange}
@@ -241,81 +363,217 @@ export default function NovaObra() {
                 render={({ field }) => (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Estado *
+                      Estado
                     </label>
-                    <Select
-                      value={field.value || ''}
-                      onChange={field.onChange}
-                      options={[
-                        { value: '', label: 'Selecione o estado' },
-                        ...estadosBrasil
-                      ]}
-                    />
-                    {errors.estado && (
-                      <p className="mt-1 text-sm text-red-600">{errors.estado.message}</p>
-                    )}
-                  </div>
-                )}
-              />
-
-              {/* Região/Bairro */}
-              <Controller
-                name="location"
-                control={control}
-                render={({ field }) => (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Região/Bairro
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Ex: Centro, Jardim das Flores, Região Sul"
-                      value={field.value || ''}
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                    />
-                    {errors.location && (
-                      <p className="mt-1 text-sm text-red-600">{errors.location.message}</p>
-                    )}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="input bg-gray-50 text-gray-700 cursor-not-allowed"
+                        value="São Paulo"
+                        readOnly
+                        disabled
+                      />
+                      <input
+                        type="hidden"
+                        value="SP"
+                        onChange={field.onChange}
+                      />
+                    </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      💡 Informe a região/bairro da obra, pois ela engloba várias ruas
+                      Atualmente atendemos apenas São Paulo
                     </p>
                   </div>
                 )}
               />
 
-              {/* Descrição */}
+            </div>
+          </div>
+
+          {/* Seção: Unidade de Cobrança */}
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-green-600" />
+              Unidade de Cobrança
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-6">
+              {/* Unidade de Cobrança */}
               <Controller
-                name="descricao"
+                name="unidade_cobranca"
                 control={control}
                 render={({ field }) => (
+                  <div>
+                    <Select
+                      label="Unidade de Cobrança *"
+                      value={field.value || ''}
+                      onChange={field.onChange}
+                      placeholder="Selecione a unidade"
+                      options={[
+                        { value: '', label: 'Selecione a unidade' },
+                        ...unidadesCobranca
+                      ]}
+                      error={errors.unidade_cobranca?.message}
+                    />
+                  </div>
+                )}
+              />
+
+              {/* Previsão de Dias - aparece apenas quando unidade for "diaria" */}
+              {unidadeCobranca === 'diaria' && (
+                <Controller
+                  name="previsao_dias"
+                  control={control}
+                  render={({ field }) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Previsão de Dias *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="input"
+                        placeholder="Ex: 30"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        onBlur={field.onBlur}
+                      />
+                      {errors.previsao_dias && (
+                        <p className="mt-1 text-sm text-red-600">{errors.previsao_dias.message}</p>
+                      )}
+                    </div>
+                  )}
+                />
+              )}
+
+            </div>
+
+            {/* Informações sobre a unidade selecionada */}
+            {unidadeCobranca && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium">Cobrança por {getUnidadeLabel(unidadeCobranca)}</p>
+                    <p className="mt-1">
+                      {unidadeCobranca === 'm2' && 'Metro quadrado - Para cálculo de previsão de metragem de superfícies'}
+                      {unidadeCobranca === 'm3' && 'Metro cúbico - Para cálculo de previsão de volume de massa asfáltica'}
+                      {unidadeCobranca === 'diaria' && 'Por diária - Para serviços de longa duração com previsão de dias'}
+                    </p>
+                    <p className="mt-2 text-xs">
+                      <strong>Nota:</strong> O valor total da obra será calculado pela soma de todos os serviços adicionados.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Seção: CNPJ Separado */}
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-purple-600" />
+              CNPJ da Obra
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Checkbox para CNPJ separado */}
+              <Controller
+                name="tem_cnpj_separado"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="tem_cnpj_separado"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      checked={field.value}
+                      onChange={field.onChange}
+                    />
+                    <label htmlFor="tem_cnpj_separado" className="ml-2 block text-sm text-gray-900">
+                      <span className="font-medium">Esta obra tem um CNPJ separado?</span>
+                      <span className="text-gray-500 ml-1">(Geralmente para consórcios entre empresas)</span>
+                    </label>
+                  </div>
+                )}
+              />
+
+              {/* Campos de CNPJ separado (aparecem apenas se checkbox marcado) */}
+              {temCnpjSeparado && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
                   <div className="md:col-span-2">
+                    <div className="flex items-center mb-2">
+                      <CheckCircle className="h-4 w-4 text-purple-600 mr-2" />
+                      <span className="text-sm font-medium text-purple-900">
+                        CNPJ Específico da Obra
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CNPJ */}
+                  <Controller
+                    name="cnpj_obra"
+                    control={control}
+                    render={({ field }) => (
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Descrição
+                          CNPJ da Obra *
                         </label>
-                    <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      rows={3}
-                      placeholder="Descrição da obra (opcional)"
+                        <CnpjInput
                           value={field.value || ''}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
+                          placeholder="Ex: 98.765.432/0001-10"
                         />
-                    {errors.descricao && (
-                      <p className="mt-1 text-sm text-red-600">{errors.descricao.message}</p>
+                        {errors.cnpj_obra && (
+                          <p className="mt-1 text-sm text-red-600">{errors.cnpj_obra.message}</p>
                         )}
                       </div>
                     )}
                   />
+
+                  {/* Razão Social */}
+                  <Controller
+                    name="razao_social_obra"
+                    control={control}
+                    render={({ field }) => (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Razão Social da Obra *
+                        </label>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Ex: Consórcio ABC/DEF Pavimentação Ltda"
+                          value={field.value || ''}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                        />
+                        {errors.razao_social_obra && (
+                          <p className="mt-1 text-sm text-red-600">{errors.razao_social_obra.message}</p>
+                        )}
+                      </div>
+                    )}
+                  />
+
+                  <div className="md:col-span-2">
+                    <div className="flex items-start space-x-2 p-3 bg-blue-50 rounded-lg">
+                      <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-medium">Informação Importante:</p>
+                        <p>Este CNPJ será usado para faturamento e documentação específica desta obra, independente do CNPJ do cliente principal.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Seção: Datas e Valores */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
+          {/* Seção: Planejamento */}
+          <div className="card">
             <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-green-600" />
-              Datas e Valores
+              Planejamento da Obra
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -325,19 +583,14 @@ export default function NovaObra() {
                 control={control}
                 render={({ field }) => (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Data de Início Prevista
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    <DatePicker
+                      label="Data de Início Prevista *"
                       value={field.value || ''}
                       onChange={field.onChange}
-                      onBlur={field.onBlur}
+                      required
+                      placeholder="Selecione a data"
+                      error={errors.data_inicio_prevista?.message}
                     />
-                    {errors.data_inicio_prevista && (
-                      <p className="mt-1 text-sm text-red-600">{errors.data_inicio_prevista.message}</p>
-                    )}
                   </div>
                 )}
               />
@@ -348,68 +601,96 @@ export default function NovaObra() {
                 control={control}
                 render={({ field }) => (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Data de Conclusão Prevista
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    <DatePicker
+                      label="Data de Conclusão Prevista *"
                       value={field.value || ''}
                       onChange={field.onChange}
-                      onBlur={field.onBlur}
+                      required
+                      placeholder="Selecione a data"
+                      error={errors.data_conclusao_prevista?.message}
                     />
-                    {errors.data_conclusao_prevista && (
-                      <p className="mt-1 text-sm text-red-600">{errors.data_conclusao_prevista.message}</p>
-                    )}
                   </div>
                 )}
               />
 
-              {/* Valor do Contrato */}
+              {/* Total de Ruas */}
               <Controller
-                name="valor_contrato"
+                name="total_ruas"
                 control={control}
                 render={({ field }) => (
-                  <div className="md:col-span-2">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Valor do Contrato (R$)
+                      Total de Ruas *
                     </label>
                     <input
                       type="number"
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Ex: 125000.00"
+                      min="1"
+                      className="input"
+                      placeholder="Ex: 10"
                       value={field.value || ''}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       onBlur={field.onBlur}
                     />
-                    {errors.valor_contrato && (
-                      <p className="mt-1 text-sm text-red-600">{errors.valor_contrato.message}</p>
+                    {errors.total_ruas && (
+                      <p className="mt-1 text-sm text-red-600">{errors.total_ruas.message}</p>
                     )}
                   </div>
                 )}
               />
 
-              {/* Observações */}
+              {/* Metragem Média por Rua */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Metragem Média por Rua
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="input bg-gray-50 cursor-not-allowed"
+                    value={(() => {
+                      const volumeTotal = watch('volume_planejamento') || 0
+                      const totalRuas = watch('total_ruas') || 0
+                      if (totalRuas > 0) {
+                        const media = volumeTotal / totalRuas
+                        return media.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })
+                      }
+                      return '0,00'
+                    })()}
+                    readOnly
+                    placeholder="Calculado automaticamente"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                    <span className="text-gray-500 text-sm">m²</span>
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Calculado automaticamente: Volume Total Previsto (m³) ÷ Total de Ruas
+                </p>
+              </div>
+
+              {/* Volume Total Previsto */}
               <Controller
-                name="observacoes"
+                name="volume_planejamento"
                 control={control}
                 render={({ field }) => (
-                  <div className="md:col-span-2">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Observações
+                      Volume Total Previsto (m³) *
                     </label>
-                    <textarea
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      rows={3}
-                      placeholder="Observações adicionais (opcional)"
-                      value={field.value || ''}
+                    <NumberInput
+                      value={field.value || 0}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
+                      placeholder="Ex: 10.000,00"
+                      decimals={2}
+                      min={0}
+                      step={0.01}
                     />
-                    {errors.observacoes && (
-                      <p className="mt-1 text-sm text-red-600">{errors.observacoes.message}</p>
+                    {errors.volume_planejamento && (
+                      <p className="mt-1 text-sm text-red-600">{errors.volume_planejamento.message}</p>
                     )}
                   </div>
                 )}
@@ -417,25 +698,307 @@ export default function NovaObra() {
             </div>
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex justify-end space-x-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate('/obras')}
-            >
+          {/* Seção: Valores */}
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-yellow-600" />
+              Valores da Obra
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-6">
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>Informação:</strong> O valor total da obra será calculado automaticamente pela soma de todos os serviços adicionados.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Serviços */}
+          <div className="card p-6">
+            <ServicoSelector
+              servicosObra={servicosObra as ServicoFormulario[]}
+              unidadeCobrancaObra={unidadeCobranca}
+              onServicosChange={onServicosChange}
+              errors={undefined}
+            />
+          </div>
+
+          {/* Seção: Observações */}
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-gray-600" />
+              Observações
+            </h3>
+            
+            <Controller
+              name="observacoes"
+              control={control}
+              render={({ field }) => (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Observações
+                  </label>
+                  <textarea
+                    className="input min-h-[100px] resize-none"
+                    placeholder="Adicione observações sobre a obra..."
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                </div>
+              )}
+            />
+          </div>
+
+          {/* Resumo e Botões */}
+          <div className="card bg-gray-50">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumo da Obra</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
+              <div>
+                <p className="text-gray-500">Nome</p>
+                <p className="font-medium text-gray-900">
+                  {watch('nome') || 'Não informado'}
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-500">Região</p>
+                <p className="font-medium text-gray-900">
+                  {watch('cidade') && watch('estado') 
+                    ? `${watch('cidade')}/${watch('estado')}`
+                    : 'Não informado'
+                  }
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-500">Volume</p>
+                <p className="font-medium text-gray-900">
+                  {watch('volume_planejamento')?.toFixed(1) || 0} m³
+                </p>
+              </div>
+              {(() => {
+                const servicosM2M3 = servicosObra.filter(s => s.unidade === 'm2' || s.unidade === 'm3')
+                const servicosMobilizacao = servicosObra.filter(s => s.unidade === 'servico' || s.unidade === 'viagem')
+                
+                // Calcular valor total por M²/M³
+                const valorPorM2M3 = servicosM2M3.reduce((total, servico) => total + servico.preco_unitario, 0)
+                
+                // Multiplicar pelo volume previsto
+                const previsaoFaturamentoM2M3 = valorPorM2M3 * volumePrevisto
+                
+                // Valor das mobilizações (fixo)
+                const totalMobilizacao = servicosMobilizacao.reduce((total, servico) => total + servico.valor_total, 0)
+                
+                // Total previsto da obra
+                const totalPrevistoObra = previsaoFaturamentoM2M3 + totalMobilizacao
+                
+                return (
+                  <>
+                    {previsaoFaturamentoM2M3 > 0 && (
+                      <div>
+                        <p className="text-gray-500">Previsão M²/M³</p>
+                        <p className="font-medium text-green-600">
+                          {formatCurrency(previsaoFaturamentoM2M3)}
+                        </p>
+                      </div>
+                    )}
+                    {totalMobilizacao > 0 && (
+                      <div>
+                        <p className="text-gray-500">Mobilização</p>
+                        <p className="font-medium text-orange-600">
+                          {formatCurrency(totalMobilizacao)}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-gray-500">Previsão Total</p>
+                      <p className="font-medium text-blue-600">
+                        {formatCurrency(totalPrevistoObra)}
+                      </p>
+                    </div>
+                  </>
+                )
+              })()}
+              {temCnpjSeparado && (
+                <>
+                  <div>
+                    <p className="text-gray-500">CNPJ da Obra</p>
+                    <p className="font-medium text-purple-900">
+                      {watch('cnpj_obra') || 'Não informado'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Razão Social da Obra</p>
+                    <p className="font-medium text-purple-900">
+                      {watch('razao_social_obra') || 'Não informado'}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Resumo da Obra */}
+            <div className="card p-6 bg-gray-50 border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                Resumo da Obra
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Informações Básicas */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900 border-b pb-2">Informações Básicas</h4>
+                  <div>
+                    <p className="text-sm text-gray-600">Nome da Obra</p>
+                    <p className="font-medium text-gray-900">{watch('nome') || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Cliente</p>
+                    <p className="font-medium text-gray-900">
+                      {(clientes || []).find(c => c.id === watch('cliente_id'))?.name || 'Não selecionado'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Região</p>
+                    <p className="font-medium text-gray-900">
+                      {watch('cidade') && watch('estado') 
+                        ? `${watch('cidade')}/${watch('estado')}`
+                        : 'Não informado'
+                      }
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Unidade de Cobrança</p>
+                    <p className="font-medium text-gray-900">
+                      {getUnidadeLabel((watch('unidade_cobranca') as 'm2' | 'm3' | 'diaria') || 'm2')}
+                    </p>
+                  </div>
+                  {unidadeCobranca === 'diaria' && (
+                    <div>
+                      <p className="text-sm text-gray-600">Previsão de Dias</p>
+                      <p className="font-medium text-gray-900">
+                        {watch('previsao_dias') || 0} dias
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Serviços */}
+                <div className="space-y-3">
+                  <h4 className="font-medium text-gray-900 border-b pb-2">Serviços e Valores</h4>
+                  <div>
+                    <p className="text-sm text-gray-600">Volume Previsto</p>
+                    <p className="font-medium text-gray-900">
+                      {volumePrevisto} {getUnidadeLabel(unidadeCobranca)}
+                    </p>
+                  </div>
+                  
+                  {/* Serviços */}
+                  {servicosObra.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">Serviços Adicionados</p>
+                      <div className="space-y-2">
+                        {servicosObra.map((servico) => (
+                          <div key={servico.id} className="flex justify-between items-center text-sm bg-white p-2 rounded border">
+                            <div>
+                              <span className="font-medium">{servico.servico_nome}</span>
+                              <span className="text-gray-500 ml-2">({servico.unidade.toUpperCase()})</span>
+                            </div>
+                            <span className="font-medium text-green-600">
+                              R$ {servico.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        ))}
+                        {/* Cálculo de Previsão de Faturamento */}
+                        {(() => {
+                          const servicosM2M3 = servicosObra.filter(s => s.unidade === 'm2' || s.unidade === 'm3')
+                          const servicosMobilizacao = servicosObra.filter(s => s.unidade === 'servico' || s.unidade === 'viagem')
+                          
+                          // Calcular valor total por M²/M³
+                          const valorPorM2M3 = servicosM2M3.reduce((total, servico) => total + servico.preco_unitario, 0)
+                          
+                          // Multiplicar pelo volume previsto
+                          const previsaoFaturamentoM2M3 = valorPorM2M3 * volumePrevisto
+                          
+                          // Valor das mobilizações (fixo)
+                          const totalMobilizacao = servicosMobilizacao.reduce((total, servico) => total + servico.valor_total, 0)
+                          
+                          // Total previsto da obra
+                          const totalPrevistoObra = previsaoFaturamentoM2M3 + totalMobilizacao
+                          
+                          return (
+                            <>
+                              {/* Volume e Valor por Unidade */}
+                              <div className="bg-gray-50 p-3 rounded border border-gray-200 mb-3">
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-gray-600">Volume Previsto:</span>
+                                  <span className="font-medium">{volumePrevisto} {getUnidadeLabel(unidadeCobranca)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm mt-1">
+                                  <span className="text-gray-600">Valor por {getUnidadeLabel(unidadeCobranca)}:</span>
+                                  <span className="font-medium">
+                                    R$ {valorPorM2M3.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Previsão de Faturamento por M²/M³ */}
+                              {previsaoFaturamentoM2M3 > 0 && (
+                                <div className="flex justify-between items-center text-sm font-semibold bg-green-50 p-2 rounded border border-green-200">
+                                  <span>Previsão Faturamento M²/M³</span>
+                                  <span className="text-green-600">
+                                    R$ {previsaoFaturamentoM2M3.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Valor Mobilização/Imobilização */}
+                              {totalMobilizacao > 0 && (
+                                <div className="flex justify-between items-center text-sm font-semibold bg-orange-50 p-2 rounded border border-orange-200">
+                                  <span>Mobilização/Imobilização</span>
+                                  <span className="text-orange-600">
+                                    R$ {totalMobilizacao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Total Previsto da Obra */}
+                              <div className="flex justify-between items-center text-lg font-bold bg-blue-50 p-3 rounded border border-blue-200">
+                                <span>Previsão Total da Obra</span>
+                                <span className="text-blue-600">
+                                  R$ {totalPrevistoObra.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+
+                              {/* Nota sobre Previsão */}
+                              <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                                <p className="text-xs text-yellow-800">
+                                  <strong>⚠️ Previsão:</strong> Este é o valor previsto de faturamento caso tudo ocorra conforme planejado.
+                                  Valores finais podem variar conforme volume real executado.
+                                </p>
+                              </div>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                 Cancelar
               </Button>
-            <Button
-              type="submit"
-              disabled={loading || isSubmitting}
-            >
-              {loading ? 'Criando...' : 'Criar Obra'}
+              <Button type="submit" variant="primary" disabled={isSubmitting}>
+                {isSubmitting ? 'Salvando...' : 'Salvar Obra'}
               </Button>
+            </div>
           </div>
         </form>
       </div>
     </Layout>
   )
 }
-

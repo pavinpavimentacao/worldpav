@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { Plus, DollarSign, Calendar, User, Edit2, Trash2, Check, X, TrendingUp, AlertCircle } from 'lucide-react';
 import { Button } from "../shared/Button";
 import { Input } from '../ui/input';
+import { CurrencyInput } from '../ui/currency-input';
 import { toast } from '../../lib/toast-hooks';
 import { mockColaboradores } from '../../mocks/colaboradores-mock';
 import {
@@ -447,32 +448,28 @@ export const DiariasTab: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Valor Unitário (R$) <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={valorUnitario}
-                    onChange={(e) => setValorUnitario(e.target.value)}
-                    required
+                  <CurrencyInput
+                    value={Number(valorUnitario) || 0}
+                    onChange={(value) => setValorUnitario(value.toString())}
+                    placeholder="R$ 0,00"
                     disabled={isSubmitting}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Adicional (R$)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={adicional}
-                    onChange={(e) => setAdicional(e.target.value)}
+                  <CurrencyInput
+                    value={Number(adicional) || 0}
+                    onChange={(value) => setAdicional(value.toString())}
+                    placeholder="R$ 0,00"
                     disabled={isSubmitting}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Desconto (R$)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={desconto}
-                    onChange={(e) => setDesconto(e.target.value)}
+                  <CurrencyInput
+                    value={Number(desconto) || 0}
+                    onChange={(value) => setDesconto(value.toString())}
+                    placeholder="R$ 0,00"
                     disabled={isSubmitting}
                   />
                 </div>

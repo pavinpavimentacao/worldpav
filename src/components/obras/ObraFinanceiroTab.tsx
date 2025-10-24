@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, X, Download, Calendar, Tag, Building, User, Eye } from 'lucide-react'
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, X, Download, Calendar, Tag, Building, User, Eye, CheckCircle, FileText } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Select } from "../shared/Select"
 import { AdicionarDespesaModal } from './AdicionarDespesaModal'
@@ -14,7 +14,7 @@ import {
   deleteDespesaObra
 } from '../../lib/obrasFinanceiroApi'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
+// Modo de produção - conectado ao banco de dados
 const USE_MOCK = false
 
 const mockFaturamentos: ObraFaturamento[] = [

@@ -9,7 +9,7 @@ import { AdicionarMedicaoModal } from './AdicionarMedicaoModal'
 import { DetalhesMedicaoModal } from './DetalhesMedicaoModal'
 import type { ObraMedicao, ObraNotaFiscal } from '../../types/obras-financeiro'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
+// Modo de produção - conectado ao banco de dados
 const USE_MOCK = false
 
 const mockMedicoes: ObraMedicao[] = [
