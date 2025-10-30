@@ -12,7 +12,11 @@ export interface ProgramacaoPavimentacao {
   cliente_id: string;
   cliente_nome?: string;
   obra: string; // Nome da obra
+  obra_id?: string; // ID da obra no banco
+  obra_nome?: string; // Nome da obra
   rua: string; // Nome da rua
+  rua_id?: string; // ID da rua no banco
+  rua_nome?: string; // Nome da rua
   
   // Equipe e Maquinários
   prefixo_equipe: string; // Ex: "Equipe A", "Equipe 01"
@@ -48,6 +52,8 @@ export interface ProgramacaoPavimentacaoFormData {
   cliente_id: string;
   obra: string;
   rua: string;
+  obra_id: string; // ID da obra no banco de dados
+  rua_id?: string; // ID da rua no banco de dados
   prefixo_equipe: string;
   maquinarios: string[];
   metragem_prevista: number;

@@ -6,9 +6,10 @@ import {
   NichoParceiro
 } from '../types/parceiros'
 import { CarregamentoRR2C, ConsumoRR2C } from '../types/carregamento-rr2c'
+import { supabase } from './supabase'
 
 // Flag para usar mockups
-const USE_MOCK = true
+const USE_MOCK = false
 
 // ========== MOCKUPS ==========
 
@@ -430,7 +431,34 @@ export async function getEquipesParceiros(): Promise<ParceiroEquipe[]> {
     return mockEquipes.filter(e => empreiteirosIds.includes(e.parceiro_id) && e.ativo)
   }
   
-  throw new Error('Implementação real pendente')
+  try {
+    // Implementação real - Buscar equipes do banco de dados
+    const { data: parceiros, error: parceirosError } = await supabase
+      .from('parceiros')
+      .select('id')
+      .eq('nicho', 'empreiteiro')
+      .eq('ativo', true);
+    
+    if (parceirosError) throw parceirosError;
+    
+    const parceirosIds = parceiros?.map(p => p.id) || [];
+    
+    // Se não há parceiros, retorna array vazio
+    if (parceirosIds.length === 0) return [];
+    
+    const { data: equipes, error: equipesError } = await supabase
+      .from('parceiros_equipes')
+      .select('*')
+      .in('parceiro_id', parceirosIds)
+      .eq('ativo', true);
+      
+    if (equipesError) throw equipesError;
+    
+    return equipes || [];
+  } catch (error) {
+    console.error('Erro ao buscar equipes de parceiros:', error);
+    return []; // Em caso de erro, retorna array vazio
+  }
 }
 
 /**

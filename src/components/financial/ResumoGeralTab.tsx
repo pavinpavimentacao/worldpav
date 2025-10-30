@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { TrendingUp, TrendingDown, Building2 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { getObrasComResumoFinanceiro, getSerieReceitasDespesas, getDespesasPorDiaECategoria } from '../../lib/financialConsolidadoApi'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+// ⚙️ DADOS REAIS
+const USE_MOCK = false
 
 interface ObraResumo {
   id: string
@@ -99,11 +100,29 @@ export function ResumoGeralTab({ mesAno }: ResumoGeralTabProps) {
           { nome: 'Outros', valor: 320, cor: CORES_PIZZA[4] },
         ])
       } else {
-        // TODO: Implementar chamada real da API
-        // const data = await getObrasComResumoFinanceiro(mesAno)
-        // setObras(data)
-        // setDadosLinha(gerarDadosLinha(data))
-        // setDadosPizza(gerarDadosPizza(data))
+        // Obras e cards
+        const obrasResumo = await getObrasComResumoFinanceiro(mesAno)
+        setObras(obrasResumo as any)
+
+        // Gráfico linha Receitas x Despesas
+        const serie = await getSerieReceitasDespesas(mesAno)
+        setDadosLinha(
+          (serie || []).map(item => ({
+            dia: item.data.split('-')[2],
+            receitas: item.receitas,
+            despesas: item.despesas,
+          }))
+        )
+
+        // Gráfico pizza por categoria de despesas
+        const { porCategoria } = await getDespesasPorDiaECategoria(mesAno)
+        setDadosPizza(
+          (porCategoria || []).map((c, idx) => ({
+            nome: c.categoria,
+            valor: c.valor,
+            cor: CORES_PIZZA[idx % CORES_PIZZA.length],
+          }))
+        )
       }
     } catch (error) {
       console.error('Erro ao carregar resumo de obras:', error)

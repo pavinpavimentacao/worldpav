@@ -24,6 +24,7 @@ import { supabase } from '../../lib/supabase'
 import { toast } from '../../lib/toast-hooks'
 import { getOrCreateDefaultCompany, WORLDPAV_COMPANY_ID, PAVIN_COMPANY_ID } from '../../lib/company-utils'
 import { TIPO_EQUIPE_OPTIONS, TIPO_CONTRATO_OPTIONS, getFuncoesOptions, TipoEquipe } from '../../types/colaboradores'
+import { getEquipes } from '../../lib/equipesApi'
 
 // Schema de validação
 const schema = z.object({
@@ -54,6 +55,25 @@ const empresas = [
 const NovoColaborador: React.FC = () => {
   const navigate = useNavigate()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingEquipes, setLoadingEquipes] = useState(true)
+  
+  // Carregar equipes ao montar o componente
+  React.useEffect(() => {
+    const loadEquipes = async () => {
+      try {
+        const companyId = await getOrCreateDefaultCompany()
+        const equipesData = await getEquipes(companyId)
+        setEquipes(equipesData)
+      } catch (error) {
+        console.error('Erro ao carregar equipes:', error)
+      } finally {
+        setLoadingEquipes(false)
+      }
+    }
+    
+    loadEquipes()
+  }, [])
   
   const {
     register,
@@ -67,7 +87,7 @@ const NovoColaborador: React.FC = () => {
     defaultValues: {
       nome: '',
       funcao: 'Ajudante', // Default para Ajudante
-      tipoEquipe: 'equipe_a', // Default para Equipe A
+      tipoEquipe: '', // Será preenchido com ID da equipe
       tipoContrato: 'fixo', // Default para Fixo
       telefone: '',
       email: '',
@@ -138,22 +158,6 @@ const NovoColaborador: React.FC = () => {
       console.log('🏢 Verificando empresas...');
       await getOrCreateDefaultCompany();
       
-      // Mapear tipo de equipe do frontend para o banco de dados
-      const mapearTipoEquipe = (tipoEquipe: string): string => {
-        const mapeamento: { [key: string]: string } = {
-          'equipe_a': 'pavimentacao',
-          'equipe_b': 'maquinas', 
-          'escritorio': 'apoio'
-        };
-        const resultado = mapeamento[tipoEquipe] || 'pavimentacao';
-        console.log('🔄 Mapeamento tipo_equipe:', { 
-          original: tipoEquipe, 
-          mapeado: resultado,
-          mapeamento: mapeamento
-        });
-        return resultado;
-      };
-
       // Limpar formatação antes de salvar
       const cleanData = {
         name: data.nome,
@@ -162,7 +166,8 @@ const NovoColaborador: React.FC = () => {
         phone: unformatPhone(data.telefone),
         email: data.email.toLowerCase().trim(),
         position: data.funcao, // Usar função selecionada
-        tipo_equipe: mapearTipoEquipe(data.tipoEquipe), // Mapear para valores do banco
+        equipe_id: data.tipoEquipe, // ✅ Agora é o ID da equipe
+        tipo_equipe: 'pavimentacao', // Mantém para compatibilidade (pode ser qualquer valor válido)
         tipo_contrato: data.tipoContrato as any, // Usar tipo de contrato selecionado
         salario_fixo: data.salario,
         status: data.status === 'ativo' ? 'ativo' : 'inativo',
@@ -172,10 +177,8 @@ const NovoColaborador: React.FC = () => {
       };
       
       console.log('📊 Dados do colaborador para salvar:', cleanData)
-      console.log('🔍 Tipo de equipe selecionado (frontend):', data.tipoEquipe)
-      console.log('🔍 Tipo de equipe mapeado (banco):', cleanData.tipo_equipe)
+      console.log('🔍 Equipe selecionada (ID):', data.tipoEquipe)
       console.log('🔍 Tipo de contrato selecionado:', data.tipoContrato)
-      console.log('🔍 Verificação final - tipo_equipe no cleanData:', cleanData.tipo_equipe)
       
       // Salvar no Supabase - tentar diferentes abordagens para contornar RLS
       let colaborador = null;
@@ -360,7 +363,7 @@ const NovoColaborador: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo de Equipe *
+                  Equipe *
                 </label>
                 <Controller
                   name="tipoEquipe"
@@ -369,9 +372,16 @@ const NovoColaborador: React.FC = () => {
                     <Select
                       value={field.value}
                       onChange={field.onChange}
-                      options={TIPO_EQUIPE_OPTIONS}
-                      placeholder="Selecione o tipo de equipe"
+                      options={[
+                        { value: '', label: 'Selecione a equipe' },
+                        ...equipes.map(eq => ({
+                          value: eq.id,
+                          label: eq.name
+                        }))
+                      ]}
+                      placeholder="Selecione a equipe"
                       className={errors.tipoEquipe ? 'border-red-500' : ''}
+                      disabled={loadingEquipes || equipes.length === 0}
                     />
                   )}
                 />

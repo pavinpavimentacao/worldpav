@@ -9,6 +9,18 @@ import { WorkScheduling } from '../../components/shared/WorkScheduling'
 import { formatDateToBR } from '../../utils/date-utils'
 import { useToast } from '../../lib/toast-hooks'
 import { getClienteById, type Cliente } from '../../lib/clientesApi'
+import { getObras, type Obra } from '../../lib/obrasApi'
+import { supabase } from '../../lib/supabase'
+import { ProgramacaoDetalhesModal } from '../../components/programacao/ProgramacaoDetalhesModal'
+import { ProgramacaoPavimentacaoAPI, type ProgramacaoPavimentacaoWithDetails } from '../../lib/programacao-pavimentacao-api'
+import { ContratosAPI, type ContratoWithDetails } from '../../lib/contratos-api'
+import { DocumentacaoAPI, type DocumentacaoWithDetails } from '../../lib/documentacao-api'
+import { NovoContratoModal } from '../../components/contratos/NovoContratoModal'
+import { NovaDocumentacaoModal } from '../../components/documentacao/NovaDocumentacaoModal'
+import { DetalhesContratoModal } from '../../components/contratos/DetalhesContratoModal'
+import { EditarContratoModal } from '../../components/contratos/EditarContratoModal'
+import { DetalhesDocumentacaoModal } from '../../components/documentacao/DetalhesDocumentacaoModal'
+import { EditarDocumentacaoModal } from '../../components/documentacao/EditarDocumentacaoModal'
 
 type Report = {
   id: string
@@ -18,32 +30,7 @@ type Report = {
   total_value: number | null
   status: 'PENDENTE' | 'CONFIRMADO' | 'PAGO' | 'NOTA_EMITIDA'
   work_id?: string | null
-}
-
-type Work = {
-  id: string
-  name: string
-  description?: string | null
-  status: 'planejada' | 'em_andamento' | 'concluida' | 'cancelada'
-  start_date?: string | null
-  end_date?: string | null
-  estimated_value?: number | null
-  realized_value?: number | null
-  progress: number
-  responsible_company: 'WorldPav' | 'Pavin'
-  created_at: string
-}
-
-type Contract = {
-  id: string
-  name: string
-  type: 'contrato' | 'proposta' | 'termo' | 'aditivo'
-  status: 'ativo' | 'vencido' | 'cancelado'
-  start_date: string
-  end_date?: string | null
-  value?: number | null
-  file_path?: string | null
-  created_at: string
+  client_id?: string | null
 }
 
 function currency(v: number | null | undefined) {
@@ -61,14 +48,191 @@ export default function ClientDetails() {
   const [error, setError] = useState<string | null>(null)
   const [client, setClient] = useState<Cliente | null>(null)
   const [reports, setReports] = useState<Report[]>([])
-  const [works, setWorks] = useState<Work[]>([])
-  const [contracts, setContracts] = useState<Contract[]>([])
+  const [works, setWorks] = useState<Obra[]>([])
+  const [contracts, setContracts] = useState<ContratoWithDetails[]>([])
+  const [documentacao, setDocumentacao] = useState<DocumentacaoWithDetails[]>([])
   const [activeTab, setActiveTab] = useState<'overview' | 'works' | 'reports' | 'contracts' | 'scheduling' | 'documentation'>('overview')
+  
+  // Estados para programações
+  const [programacoes, setProgramacoes] = useState<ProgramacaoPavimentacaoWithDetails[]>([])
+  const [programacaoSelecionada, setProgramacaoSelecionada] = useState<ProgramacaoPavimentacaoWithDetails | null>(null)
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false)
+  
+  // Estados para modais
+  const [showNovoContratoModal, setShowNovoContratoModal] = useState(false)
+  const [showNovaDocumentacaoModal, setShowNovaDocumentacaoModal] = useState(false)
+  
+  // Estados para detalhes e edição de contratos
+  const [contratoSelecionado, setContratoSelecionado] = useState<ContratoWithDetails | null>(null)
+  const [showDetalhesContratoModal, setShowDetalhesContratoModal] = useState(false)
+  const [showEditarContratoModal, setShowEditarContratoModal] = useState(false)
+  
+  // Estados para detalhes e edição de documentação
+  const [documentacaoSelecionada, setDocumentacaoSelecionada] = useState<DocumentacaoWithDetails | null>(null)
+  const [showDetalhesDocumentacaoModal, setShowDetalhesDocumentacaoModal] = useState(false)
+  const [showEditarDocumentacaoModal, setShowEditarDocumentacaoModal] = useState(false)
+
 
   const canSeeRevenue = useMemo(() => {
     const role = (user?.user_metadata as any)?.role
     return role === 'admin' || role === 'financeiro'
   }, [user])
+
+  // Função para buscar obras do cliente
+  async function fetchWorks(clientId: string, companyId: string): Promise<Obra[]> {
+    try {
+      const { data } = await getObras(companyId, { client_id: clientId })
+      return data || []
+    } catch (error) {
+      console.error('Erro ao buscar obras do cliente:', error)
+      return []
+    }
+  }
+
+  // Função para buscar relatórios do cliente
+  async function fetchReports(clientId: string): Promise<Report[]> {
+    try {
+      // TODO: Implementar busca real de relatórios quando a estrutura estiver definida
+      // Por enquanto, retornamos array vazio já que a tabela reports não tem client_id
+      console.log('Busca de relatórios por cliente ainda não implementada')
+      return []
+    } catch (error) {
+      console.error('Erro ao buscar relatórios:', error)
+      return []
+    }
+  }
+
+  // Função para buscar contratos do cliente
+  async function fetchContracts(clientId: string): Promise<ContratoWithDetails[]> {
+    try {
+      const contratos = await ContratosAPI.getByClientId(clientId)
+      return contratos
+    } catch (error) {
+      console.error('Erro ao buscar contratos:', error)
+      return []
+    }
+  }
+
+  // Função para buscar documentação do cliente
+  async function fetchDocumentacao(clientId: string): Promise<DocumentacaoWithDetails[]> {
+    try {
+      const docs = await DocumentacaoAPI.getByClientId(clientId)
+      return docs
+    } catch (error) {
+      console.error('Erro ao buscar documentação:', error)
+      return []
+    }
+  }
+
+  // Função para buscar programações do cliente
+  async function fetchProgramacoes(clientId: string) {
+    try {
+      const progs = await ProgramacaoPavimentacaoAPI.getByClientId(clientId)
+      setProgramacoes(progs)
+      return progs
+    } catch (error) {
+      console.error('Erro ao buscar programações:', error)
+      return []
+    }
+  }
+  
+  // Função para abrir modal de detalhes
+  const abrirDetalhes = (programacao: ProgramacaoPavimentacaoWithDetails) => {
+    setProgramacaoSelecionada(programacao)
+    setShowDetalhesModal(true)
+  }
+  
+  // Função para fechar modal
+  const fecharDetalhes = () => {
+    setShowDetalhesModal(false)
+    setProgramacaoSelecionada(null)
+  }
+
+  // Funções para contratos
+  const abrirDetalhesContrato = (contrato: ContratoWithDetails) => {
+    setContratoSelecionado(contrato)
+    setShowDetalhesContratoModal(true)
+  }
+
+  const fecharDetalhesContrato = () => {
+    setShowDetalhesContratoModal(false)
+    setContratoSelecionado(null)
+  }
+
+  const abrirEditarContrato = (contrato: ContratoWithDetails) => {
+    setContratoSelecionado(contrato)
+    setShowEditarContratoModal(true)
+    setShowDetalhesContratoModal(false)
+  }
+
+  const fecharEditarContrato = () => {
+    setShowEditarContratoModal(false)
+    setContratoSelecionado(null)
+  }
+
+  const handleDeletarContrato = async () => {
+    if (!contratoSelecionado || !client) return
+    
+    if (!confirm(`Tem certeza que deseja excluir o contrato "${contratoSelecionado.name}"?`)) {
+      return
+    }
+
+    try {
+      await ContratosAPI.delete(contratoSelecionado.id)
+      alert('Contrato excluído com sucesso!')
+      
+      // Recarregar contratos
+      const newContracts = await fetchContracts(client.id)
+      setContracts(newContracts)
+      
+      fecharDetalhesContrato()
+    } catch (error: any) {
+      alert(error.message || 'Erro ao excluir contrato.')
+    }
+  }
+
+  // Funções para documentação
+  const abrirDetalhesDocumentacao = (doc: DocumentacaoWithDetails) => {
+    setDocumentacaoSelecionada(doc)
+    setShowDetalhesDocumentacaoModal(true)
+  }
+
+  const fecharDetalhesDocumentacao = () => {
+    setShowDetalhesDocumentacaoModal(false)
+    setDocumentacaoSelecionada(null)
+  }
+
+  const abrirEditarDocumentacao = (doc: DocumentacaoWithDetails) => {
+    setDocumentacaoSelecionada(doc)
+    setShowEditarDocumentacaoModal(true)
+    setShowDetalhesDocumentacaoModal(false)
+  }
+
+  const fecharEditarDocumentacao = () => {
+    setShowEditarDocumentacaoModal(false)
+    setDocumentacaoSelecionada(null)
+  }
+
+  const handleDeletarDocumentacao = async () => {
+    if (!documentacaoSelecionada || !client) return
+    
+    if (!confirm(`Tem certeza que deseja excluir a documentação "${documentacaoSelecionada.name}"?`)) {
+      return
+    }
+
+    try {
+      await DocumentacaoAPI.delete(documentacaoSelecionada.id)
+      alert('Documentação excluída com sucesso!')
+      
+      // Recarregar documentação
+      const newDocs = await fetchDocumentacao(client.id)
+      setDocumentacao(newDocs)
+      
+      fecharDetalhesDocumentacao()
+    } catch (error: any) {
+      alert(error.message || 'Erro ao excluir documentação.')
+    }
+  }
 
   async function fetchAll() {
     if (!id) return
@@ -85,95 +249,20 @@ export default function ClientDetails() {
       
       setClient(clientData)
 
-      // Mock data para relatórios (TODO: Implementar busca real de relatórios)
-      const mockReports: Report[] = [
-        {
-          id: '1',
-          report_number: 'REL-001',
-          date: '2024-01-15',
-          realized_volume: 150,
-          total_value: 15000,
-          status: 'PAGO',
-          work_id: 'work-1'
-        },
-        {
-          id: '2',
-          report_number: 'REL-002',
-          date: '2024-01-20',
-          realized_volume: 200,
-          total_value: 20000,
-          status: 'CONFIRMADO',
-          work_id: 'work-1'
-        },
-        {
-          id: '3',
-          report_number: 'REL-003',
-          date: '2024-02-01',
-          realized_volume: 100,
-          total_value: 10000,
-          status: 'PENDENTE',
-          work_id: 'work-2'
-        }
-      ]
-      setReports(mockReports)
+      // Buscar dados reais em paralelo
+      const [worksData, reportsData, contractsData, documentacaoData, programacoesData] = await Promise.all([
+        fetchWorks(id, clientData.company_id),
+        fetchReports(id),
+        fetchContracts(id),
+        fetchDocumentacao(id),
+        fetchProgramacoes(id)
+      ])
 
-      // Mock data para obras (será substituído por dados reais do banco)
-      const mockWorks: Work[] = [
-        {
-          id: '1',
-          name: 'Pavimentação Residencial - Condomínio ABC',
-          description: 'Pavimentação asfáltica de 2.500m² em condomínio residencial',
-          status: 'em_andamento',
-          start_date: '2024-01-15',
-          end_date: '2024-02-15',
-          estimated_value: 125000,
-          realized_value: 75000,
-          progress: 60,
-          responsible_company: 'WorldPav',
-          created_at: '2024-01-10T10:00:00Z'
-        },
-        {
-          id: '2',
-          name: 'Recapeamento - Rua das Flores',
-          description: 'Recapeamento de 1.200m² em via pública',
-          status: 'concluida',
-          start_date: '2023-12-01',
-          end_date: '2023-12-20',
-          estimated_value: 85000,
-          realized_value: 82000,
-          progress: 100,
-          responsible_company: 'Pavin',
-          created_at: '2023-11-25T10:00:00Z'
-        }
-      ]
-      setWorks(mockWorks)
-
-      // Mock data para contratos (será substituído por dados reais do banco)
-      const mockContracts: Contract[] = [
-        {
-          id: '1',
-          name: 'Contrato de Prestação de Serviços - 2024',
-          type: 'contrato',
-          status: 'ativo',
-          start_date: '2024-01-01',
-          end_date: '2024-12-31',
-          value: 500000,
-          file_path: '/contracts/contrato-2024.pdf',
-          created_at: '2023-12-15T10:00:00Z'
-        },
-        {
-          id: '2',
-          name: 'Proposta Técnica - Condomínio ABC',
-          type: 'proposta',
-          status: 'ativo',
-          start_date: '2024-01-10',
-          end_date: '2024-02-15',
-          value: 125000,
-          file_path: '/contracts/proposta-condominio-abc.pdf',
-          created_at: '2024-01-05T10:00:00Z'
-        }
-      ]
-      setContracts(mockContracts)
+      setWorks(worksData)
+      setReports(reportsData)
+      setContracts(contractsData)
+      setDocumentacao(documentacaoData)
+      setProgramacoes(programacoesData)
 
       setLoading(false)
     } catch (err: any) {
@@ -193,7 +282,7 @@ export default function ClientDetails() {
   }, [reports])
 
   const totalObras = useMemo(() => {
-    return works.reduce((acc, w) => acc + (Number(w.realized_value) || 0), 0)
+    return works.reduce((acc, w) => acc + (Number(w.contract_value) || 0), 0)
   }, [works])
 
   const reportsByWork = useMemo(() => {
@@ -211,7 +300,7 @@ export default function ClientDetails() {
   function whatsappLink() {
     const digits = (client?.phone || '').replace(/\D/g, '')
     if (!digits) return null
-    const text = `Olá ${client?.rep_name || ''}! Aqui é da WorldPav. Estamos revisando seus relatórios. Qualquer dúvida, estamos à disposição.`
+    const text = `Olá ${client?.representante || ''}! Aqui é da WorldPav. Estamos revisando seus relatórios. Qualquer dúvida, estamos à disposição.`
     return `https://wa.me/55${digits}?text=${encodeURIComponent(text)}`
   }
 
@@ -246,21 +335,21 @@ export default function ClientDetails() {
 
   function getWorkStatusBadge(status: string) {
     const variants = {
-      'planejada': 'secondary',
-      'em_andamento': 'warning',
+      'planejamento': 'default',
+      'andamento': 'warning',
       'concluida': 'success',
       'cancelada': 'danger'
     } as const
-    return variants[status as keyof typeof variants] || 'secondary'
+    return variants[status as keyof typeof variants] || 'default'
   }
 
   function getContractStatusBadge(status: string) {
     const variants = {
       'ativo': 'success',
       'vencido': 'danger',
-      'cancelado': 'secondary'
+      'cancelado': 'default'
     } as const
-    return variants[status as keyof typeof variants] || 'secondary'
+    return variants[status as keyof typeof variants] || 'default'
   }
 
   if (error) {
@@ -285,15 +374,8 @@ export default function ClientDetails() {
         <div className="md:flex md:items-center md:justify-between">
           <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-              {client ? `${client.rep_name || 'Cliente'} - ${client.company_name || 'Sem empresa'}` : 'Detalhes do Cliente'}
+              {client ? `${client.representante || client.name || 'Cliente'}${client.empresa ? ` - ${client.empresa}` : ''}` : 'Detalhes do Cliente'}
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              {client && (
-                <>
-                  {getClientTypeLabel(client.client_type)} • {getWorkAreaLabel(client.work_area)} • {client.responsible_company}
-                </>
-              )}
-            </p>
           </div>
           <div className="mt-4 flex md:ml-4 md:mt-0 space-x-3">
             {whatsappLink() && (
@@ -345,15 +427,13 @@ export default function ClientDetails() {
                 <div className="animate-pulse h-24 bg-gray-100 rounded" />
               ) : client ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                  <div><span className="text-gray-500">Representante:</span> <span className="ml-2 font-medium">{client.rep_name || '-'}</span></div>
-                  <div><span className="text-gray-500">Empresa:</span> <span className="ml-2 font-medium">{client.company_name || '-'}</span></div>
+                  <div><span className="text-gray-500">Representante:</span> <span className="ml-2 font-medium">{client.representante || '-'}</span></div>
+                  <div><span className="text-gray-500">Empresa:</span> <span className="ml-2 font-medium">{client.empresa_responsavel?.name || '-'}</span></div>
                   <div><span className="text-gray-500">Nome:</span> <span className="ml-2 font-medium">{client.name || '-'}</span></div>
+                  <div><span className="text-gray-500">Razão Social:</span> <span className="ml-2 font-medium">{client.empresa || '-'}</span></div>
                   <div><span className="text-gray-500">CPF/CNPJ:</span> <span className="ml-2 font-medium">{client.cpf_cnpj || '-'}</span></div>
                   <div><span className="text-gray-500">Email:</span> <span className="ml-2 font-medium">{client.email || '-'}</span></div>
                   <div><span className="text-gray-500">Telefone:</span> <span className="ml-2 font-medium">{client.phone || '-'}</span></div>
-                  <div><span className="text-gray-500">Contato Técnico:</span> <span className="ml-2 font-medium">{client.technical_contact || '-'}</span></div>
-                  <div><span className="text-gray-500">Contato Financeiro:</span> <span className="ml-2 font-medium">{client.financial_contact || '-'}</span></div>
-                  <div><span className="text-gray-500">Prazo Pagamento:</span> <span className="ml-2 font-medium">{client.payment_terms ? `${client.payment_terms} dias` : '-'}</span></div>
                   <div><span className="text-gray-500">Endereço:</span> <span className="ml-2 font-medium">{client.address || '-'}</span></div>
                   <div><span className="text-gray-500">Cidade/UF:</span> <span className="ml-2 font-medium">{client.city || '-'} / {client.state || '-'}</span></div>
                   <div><span className="text-gray-500">CEP:</span> <span className="ml-2 font-medium">{client.zip_code || '-'}</span></div>
@@ -363,31 +443,8 @@ export default function ClientDetails() {
               )}
             </div>
 
-            {/* Categorização */}
-            <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Categorização</h3>
-              {client && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                  <div><span className="text-gray-500">Tipo de Cliente:</span> <span className="ml-2 font-medium">{getClientTypeLabel(client.client_type)}</span></div>
-                  <div><span className="text-gray-500">Área de Atuação:</span> <span className="ml-2 font-medium">{getWorkAreaLabel(client.work_area)}</span></div>
-                  <div><span className="text-gray-500">Tipo de Obra:</span> <span className="ml-2 font-medium">{getWorkTypeLabel(client.work_type)}</span></div>
-                  <div><span className="text-gray-500">Empresa Responsável:</span> <span className="ml-2 font-medium">{client.responsible_company || '-'}</span></div>
-                  <div><span className="text-gray-500">Volume Estimado:</span> <span className="ml-2 font-medium">{client.estimated_volume || '-'}</span></div>
-                </div>
-              )}
-            </div>
 
-            {/* Preferências de Equipamentos */}
-            {client?.equipment_preferences && client.equipment_preferences.length > 0 && (
-              <div className="card">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Preferências de Equipamentos</h3>
-                <div className="flex flex-wrap gap-2">
-                  {client.equipment_preferences.map((equipment, index) => (
-                    <Badge key={index} variant="secondary" size="sm">{equipment}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
 
             {/* Métricas */}
@@ -416,7 +473,7 @@ export default function ClientDetails() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900">Obras do Cliente</h3>
-              <Button onClick={() => navigate(`/works/new?client_id=${id}`)}>
+              <Button onClick={() => navigate(`/obras/new?client_id=${id}`)}>
                 + Nova Obra
               </Button>
             </div>
@@ -426,7 +483,7 @@ export default function ClientDetails() {
             ) : works.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                 <p className="text-gray-500">Nenhuma obra encontrada para este cliente.</p>
-                <Button className="mt-4" onClick={() => navigate(`/works/new?client_id=${id}`)}>
+                <Button className="mt-4" onClick={() => navigate(`/obras/new?client_id=${id}`)}>
                   Criar primeira obra
                 </Button>
               </div>
@@ -447,7 +504,7 @@ export default function ClientDetails() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="text-gray-500">Empresa:</span>
-                        <span className="ml-2 font-medium">{work.responsible_company}</span>
+                        <span className="ml-2 font-medium">{work.company_id || '-'}</span>
                       </div>
                       <div>
                         <span className="text-gray-500">Início:</span>
@@ -455,26 +512,20 @@ export default function ClientDetails() {
                       </div>
                       <div>
                         <span className="text-gray-500">Valor Estimado:</span>
-                        <span className="ml-2 font-medium">{currency(work.estimated_value)}</span>
+                        <span className="ml-2 font-medium">{currency(work.contract_value)}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Valor Realizado:</span>
-                        <span className="ml-2 font-medium">{currency(work.realized_value)}</span>
+                        <span className="text-gray-500">Localização:</span>
+                        <span className="ml-2 font-medium">{work.location || '-'}</span>
                       </div>
                     </div>
                     
-                    <div className="mt-4">
-                      <div className="flex justify-between text-sm text-gray-600 mb-1">
-                        <span>Progresso</span>
-                        <span>{work.progress}%</span>
+                    {work.description && (
+                      <div className="mt-4">
+                        <span className="text-gray-500">Descrição:</span>
+                        <p className="text-sm text-gray-700 mt-1">{work.description}</p>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{ width: `${work.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -502,7 +553,7 @@ export default function ClientDetails() {
                         <h4 className="text-lg font-semibold text-gray-900">
                           {work ? work.name : 'Relatórios sem obra específica'}
                         </h4>
-                        <Badge variant="secondary" size="sm">
+                        <Badge variant="default" size="sm">
                           {workReports.length} relatório(s)
                         </Badge>
                       </div>
@@ -513,7 +564,6 @@ export default function ClientDetails() {
                             <tr className="border-b border-gray-200">
                               <th className="text-left py-2">Nº</th>
                               <th className="text-left py-2">Data</th>
-                              <th className="text-left py-2">Bomba</th>
                               <th className="text-left py-2">Volume</th>
                               <th className="text-left py-2">Total</th>
                               <th className="text-left py-2">Status</th>
@@ -557,7 +607,7 @@ export default function ClientDetails() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900">Contratos e Documentos</h3>
-              <Button onClick={() => navigate(`/contracts/new?client_id=${id}`)}>
+              <Button onClick={() => setShowNovoContratoModal(true)}>
                 + Novo Contrato
               </Button>
             </div>
@@ -566,9 +616,13 @@ export default function ClientDetails() {
               <div className="animate-pulse h-24 bg-gray-100 rounded" />
             ) : contracts.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <p className="text-gray-500">Nenhum contrato encontrado para este cliente.</p>
-                <Button className="mt-4" onClick={() => navigate(`/contracts/new?client_id=${id}`)}>
-                  Criar primeiro contrato
+                <div className="text-gray-400 text-4xl mb-4">📄</div>
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Nenhum contrato cadastrado</h4>
+                <p className="text-gray-600 mb-4">
+                  Este cliente ainda não possui contratos cadastrados.
+                </p>
+                <Button onClick={() => setShowNovoContratoModal(true)}>
+                  Adicionar Primeiro Contrato
                 </Button>
               </div>
             ) : (
@@ -582,8 +636,11 @@ export default function ClientDetails() {
                           {contract.type.charAt(0).toUpperCase() + contract.type.slice(1)} • 
                           Criado em {format(new Date(contract.created_at), 'dd/MM/yyyy')}
                         </p>
+                        {contract.obra_nome && (
+                          <p className="text-sm text-gray-500 mt-1">Obra: {contract.obra_nome}</p>
+                        )}
                       </div>
-                      <Badge variant={getContractStatusBadge(contract.status)} size="sm">
+                      <Badge variant={getContractStatusBadge(contract.status)}>
                         {contract.status.toUpperCase()}
                       </Badge>
                     </div>
@@ -605,13 +662,34 @@ export default function ClientDetails() {
                       </div>
                     </div>
                     
-                    {contract.file_path && (
-                      <div className="mt-4">
-                        <Button variant="outline" size="sm">
-                          📄 Visualizar Documento
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="outline" size="sm" onClick={() => abrirDetalhesContrato(contract)}>
+                        👁️ Ver Detalhes
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => abrirEditarContrato(contract)}>
+                        ✏️ Editar
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={async () => {
+                          if (!confirm(`Tem certeza que deseja excluir o contrato "${contract.name}"?`)) return
+                          try {
+                            await ContratosAPI.delete(contract.id)
+                            alert('Contrato excluído com sucesso!')
+                            if (client) {
+                              const newContracts = await fetchContracts(client.id)
+                              setContracts(newContracts)
+                            }
+                          } catch (error: any) {
+                            alert(error.message || 'Erro ao excluir contrato.')
+                          }
+                        }}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                      >
+                        🗑️ Excluir
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -621,56 +699,258 @@ export default function ClientDetails() {
 
         {activeTab === 'documentation' && (
           <div className="space-y-6">
-            <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">Documentação e NRS</h3>
-              
-              {client?.documentation_requirements ? (
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Documentação e NRS que a empresa geralmente pede:</h4>
-                    <div className="text-sm text-gray-700 whitespace-pre-line">
-                      {client.documentation_requirements}
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900">Documentação e NRS</h3>
+              <Button onClick={() => setShowNovaDocumentacaoModal(true)}>
+                + Nova Documentação
+              </Button>
+            </div>
+            
+            {loading ? (
+              <div className="animate-pulse h-24 bg-gray-100 rounded" />
+            ) : documentacao.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                <div className="text-gray-400 text-4xl mb-4">📋</div>
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Nenhuma documentação cadastrada</h4>
+                <p className="text-gray-600 mb-4">
+                  Este cliente ainda não possui documentação cadastrada.
+                </p>
+                <Button onClick={() => setShowNovaDocumentacaoModal(true)}>
+                  Adicionar Primeira Documentação
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {documentacao.map((doc) => (
+                  <div key={doc.id} className="bg-white rounded-lg border border-gray-200 p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900">{doc.name}</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Tipo: {doc.type.charAt(0).toUpperCase() + doc.type.slice(1)}
+                          {doc.category && ` • ${doc.category}`}
+                        </p>
+                        {doc.obra_nome && (
+                          <p className="text-sm text-gray-500 mt-1">Obra: {doc.obra_nome}</p>
+                        )}
+                      </div>
+                      <Badge variant={doc.status === 'vencido' ? 'danger' : doc.status === 'proximo_vencimento' ? 'warning' : 'success'}>
+                        {doc.status.toUpperCase().replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Válido de:</span>
+                        <span className="ml-2 font-medium">
+                          {doc.valid_from ? format(new Date(doc.valid_from), 'dd/MM/yyyy') : '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Válido até:</span>
+                        <span className="ml-2 font-medium">
+                          {doc.valid_until ? format(new Date(doc.valid_until), 'dd/MM/yyyy') : 'Indefinido'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Criado em:</span>
+                        <span className="ml-2 font-medium">{format(new Date(doc.created_at), 'dd/MM/yyyy')}</span>
+                      </div>
+                    </div>
+                    
+                    {doc.observations && (
+                      <div className="mt-4">
+                        <span className="text-gray-500">Observações:</span>
+                        <p className="text-sm text-gray-700 mt-1">{doc.observations}</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="outline" size="sm" onClick={() => abrirDetalhesDocumentacao(doc)}>
+                        👁️ Ver Detalhes
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => abrirEditarDocumentacao(doc)}>
+                        ✏️ Editar
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={async () => {
+                          if (!confirm(`Tem certeza que deseja excluir a documentação "${doc.name}"?`)) return
+                          try {
+                            await DocumentacaoAPI.delete(doc.id)
+                            alert('Documentação excluída com sucesso!')
+                            if (client) {
+                              const newDocs = await fetchDocumentacao(client.id)
+                              setDocumentacao(newDocs)
+                            }
+                          } catch (error: any) {
+                            alert(error.message || 'Erro ao excluir documentação.')
+                          }
+                        }}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                      >
+                        🗑️ Excluir
+                      </Button>
                     </div>
                   </div>
-                  
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">💡 Dica:</h4>
-                    <p className="text-sm text-blue-800">
-                      Esta lista pode ser atualizada a qualquer momento. Mantenha-a sempre atualizada com as 
-                      documentações e NRS que cada cliente costuma solicitar para agilizar o processo de 
-                      preparação dos serviços.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="text-gray-400 text-4xl mb-4">📋</div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Nenhuma documentação cadastrada</h4>
-                  <p className="text-gray-600 mb-4">
-                    Este cliente ainda não possui documentações e NRS cadastradas.
-                  </p>
-                  <Button variant="outline" onClick={() => navigate(`/clients/${id}/edit`)}>
-                    ✏️ Editar Cliente
-                  </Button>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'scheduling' && (
           <div className="space-y-6">
-            <WorkScheduling 
-              clientId={client?.company_name || undefined}
-              onWorkSelect={(work) => {
-                console.log('Obra selecionada:', work)
-                // Aqui você pode implementar a lógica para selecionar uma obra
-                // Por exemplo, navegar para a página de detalhes da obra
-              }}
-            />
+            {/* Programações do cliente */}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Programações de Pavimentação</h3>
+              <div className="text-sm text-gray-500">
+                {programacoes.length} programação(ões) encontrada(s)
+              </div>
+            </div>
+            
+            {loading ? (
+              <div className="animate-pulse h-24 bg-gray-100 rounded" />
+            ) : programacoes.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                <p className="text-gray-500">Nenhuma programação encontrada para este cliente.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {programacoes.map((prog) => (
+                  <div key={prog.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900">{prog.obra}</h4>
+                        <p className="text-sm text-gray-600 mt-1">{prog.rua}</p>
+                        <p className="text-sm text-gray-500 mt-1">📅 {formatDateToBR(prog.data)}</p>
+                      </div>
+                      <Badge 
+                        variant={prog.status === 'confirmada' ? 'success' : 'default'}
+                      >
+                        {prog.status === 'confirmada' ? 'CONFIRMADA' : 'PROGRAMADA'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
+                      <div>
+                        <span className="text-gray-500">Horário:</span>
+                        <span className="ml-2 font-medium">{prog.horario_inicio || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Metragem:</span>
+                        <span className="ml-2 font-medium">{prog.metragem_prevista} m²</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Toneladas:</span>
+                        <span className="ml-2 font-medium">{prog.quantidade_toneladas} ton</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Equipe:</span>
+                        <span className="ml-2 font-medium">{prog.prefixo_equipe}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => abrirDetalhes(prog)}
+                      >
+                        👁️ Ver Detalhes
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Modal de Detalhes */}
+            {showDetalhesModal && programacaoSelecionada && (
+              <ProgramacaoDetalhesModal 
+                programacao={programacaoSelecionada}
+                onClose={fecharDetalhes}
+              />
+            )}
           </div>
         )}
+
+
       </div>
+
+      {/* Modais */}
+      {showNovoContratoModal && client && (
+        <NovoContratoModal
+          isOpen={showNovoContratoModal}
+          onClose={() => setShowNovoContratoModal(false)}
+          clientId={client.id}
+          onSuccess={async () => {
+            // Recarregar contratos
+            const newContracts = await fetchContracts(client.id)
+            setContracts(newContracts)
+          }}
+        />
+      )}
+
+      {showNovaDocumentacaoModal && client && (
+        <NovaDocumentacaoModal
+          isOpen={showNovaDocumentacaoModal}
+          onClose={() => setShowNovaDocumentacaoModal(false)}
+          clientId={client.id}
+          onSuccess={async () => {
+            // Recarregar documentação
+            const newDocs = await fetchDocumentacao(client.id)
+            setDocumentacao(newDocs)
+          }}
+        />
+      )}
+
+      {/* Modais de Detalhes e Edição - Contratos */}
+      {showDetalhesContratoModal && contratoSelecionado && (
+        <DetalhesContratoModal
+          contrato={contratoSelecionado}
+          onClose={fecharDetalhesContrato}
+          onEdit={() => abrirEditarContrato(contratoSelecionado)}
+          onDelete={handleDeletarContrato}
+        />
+      )}
+
+      {showEditarContratoModal && contratoSelecionado && (
+        <EditarContratoModal
+          isOpen={showEditarContratoModal}
+          onClose={fecharEditarContrato}
+          contrato={contratoSelecionado}
+          onSuccess={async () => {
+            if (!client) return
+            const newContracts = await fetchContracts(client.id)
+            setContracts(newContracts)
+          }}
+        />
+      )}
+
+      {/* Modais de Detalhes e Edição - Documentação */}
+      {showDetalhesDocumentacaoModal && documentacaoSelecionada && (
+        <DetalhesDocumentacaoModal
+          documentacao={documentacaoSelecionada}
+          onClose={fecharDetalhesDocumentacao}
+          onEdit={() => abrirEditarDocumentacao(documentacaoSelecionada)}
+          onDelete={handleDeletarDocumentacao}
+        />
+      )}
+
+      {showEditarDocumentacaoModal && documentacaoSelecionada && (
+        <EditarDocumentacaoModal
+          isOpen={showEditarDocumentacaoModal}
+          onClose={fecharEditarDocumentacao}
+          documentacao={documentacaoSelecionada}
+          onSuccess={async () => {
+            if (!client) return
+            const newDocs = await fetchDocumentacao(client.id)
+            setDocumentacao(newDocs)
+          }}
+        />
+      )}
     </Layout>
   )
 }

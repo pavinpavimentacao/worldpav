@@ -33,6 +33,7 @@ export interface ProximaProgramacao {
   obra_nome?: string
   tempo_restante: string
   minutos_restantes: number
+  espessura_media_solicitada?: number
 }
 
 export interface DashboardData {

@@ -47,6 +47,12 @@ self.addEventListener('activate', function(event) {
 self.addEventListener('fetch', function(event) {
   const url = event.request.url;
   
+  // Em desenvolvimento localhost, não interceptar requisições do Vite
+  if (url.includes('localhost:5173')) {
+    // Permitir que o Vite dev server gerencie todas as requisições
+    return;
+  }
+  
   // Ignorar requisições que não devem ser cacheadas:
   // - Não são GET
   // - APIs externas (Supabase)

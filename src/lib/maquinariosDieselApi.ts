@@ -28,18 +28,19 @@ export async function getMaquinarioDiesel(
     .from('maquinarios_diesel')
     .select(`
       *,
-      maquinario:maquinarios(id, nome),
-      obra:obras(id, nome)
+      maquinario:maquinarios(id, name),
+      obra:obras(id, name),
+      rua:obras_ruas!rua_id(id, name)
     `)
     .eq('maquinario_id', maquinarioId)
-    .order('data_abastecimento', { ascending: false })
+    .order('date', { ascending: false })
 
   if (filters?.data_inicio) {
-    query = query.gte('data_abastecimento', filters.data_inicio)
+    query = query.gte('date', filters.data_inicio)
   }
 
   if (filters?.data_fim) {
-    query = query.lte('data_abastecimento', filters.data_fim)
+    query = query.lte('date', filters.data_fim)
   }
 
   if (filters?.obra_id) {
@@ -63,20 +64,20 @@ export async function getMaquinarioDiesel(
 export async function createAbastecimentoDiesel(
   input: CreateDieselInput
 ): Promise<MaquinarioDiesel> {
-  const valor_total = calcularValorAbastecimento(
-    input.quantidade_litros,
-    input.preco_por_litro
+  const total_amount = calcularValorAbastecimento(
+    input.liters,
+    input.price_per_liter
   )
 
   const abastecimentoData: any = {
     maquinario_id: input.maquinario_id,
     obra_id: input.obra_id || null,
-    quantidade_litros: input.quantidade_litros,
-    preco_por_litro: input.preco_por_litro,
-    valor_total,
-    data_abastecimento: input.data_abastecimento,
-    posto: input.posto,
-    km_hodometro: input.km_hodometro || null,
+    liters: input.liters,
+    price_per_liter: input.price_per_liter,
+    total_amount,
+    date: input.date,
+    gas_station: input.gas_station,
+    odometer: input.odometer || null,
     observacoes: input.observacoes || null
   }
 
@@ -88,11 +89,11 @@ export async function createAbastecimentoDiesel(
       const despesa = await createDespesaObra({
         obra_id: input.obra_id,
         categoria: 'diesel',
-        descricao: `Abastecimento - ${input.posto}`,
-        valor: valor_total,
-        data_despesa: input.data_abastecimento,
+        descricao: `Abastecimento - ${input.gas_station}`,
+        valor: total_amount,
+        data_despesa: input.date,
         maquinario_id: input.maquinario_id,
-        fornecedor: input.posto,
+        fornecedor: input.gas_station,
         sincronizado_financeiro_principal: true
       })
       despesaId = despesa.id
@@ -108,8 +109,9 @@ export async function createAbastecimentoDiesel(
     .insert(abastecimentoData)
     .select(`
       *,
-      maquinario:maquinarios(id, nome),
-      obra:obras(id, nome)
+      maquinario:maquinarios(id, name),
+      obra:obras(id, name),
+      rua:obras_ruas!rua_id(id, name)
     `)
     .single()
 
@@ -130,18 +132,18 @@ export async function updateAbastecimentoDiesel(
 ): Promise<MaquinarioDiesel> {
   const updateData: any = { ...input }
 
-  // Recalcular valor_total se quantidade ou preço mudaram
-  if (input.quantidade_litros !== undefined || input.preco_por_litro !== undefined) {
+  // Recalcular total_amount se quantidade ou preço mudaram
+  if (input.liters !== undefined || input.price_per_liter !== undefined) {
     const { data: current } = await supabase
       .from('maquinarios_diesel')
-      .select('quantidade_litros, preco_por_litro')
+      .select('liters, price_per_liter')
       .eq('id', id)
       .single()
 
     if (current) {
-      const novaQuantidade = input.quantidade_litros ?? current.quantidade_litros
-      const novoPreco = input.preco_por_litro ?? current.preco_por_litro
-      updateData.valor_total = calcularValorAbastecimento(novaQuantidade, novoPreco)
+      const novaQuantidade = input.liters ?? current.liters
+      const novoPreco = input.price_per_liter ?? current.price_per_liter
+      updateData.total_amount = calcularValorAbastecimento(novaQuantidade, novoPreco)
     }
   }
 
@@ -151,8 +153,9 @@ export async function updateAbastecimentoDiesel(
     .eq('id', id)
     .select(`
       *,
-      maquinario:maquinarios(id, nome),
-      obra:obras(id, nome)
+      maquinario:maquinarios(id, name),
+      obra:obras(id, name),
+      rua:obras_ruas!rua_id(id, name)
     `)
     .single()
 
@@ -220,11 +223,12 @@ export async function getDieselTodasObras(): Promise<MaquinarioDiesel[]> {
     .from('maquinarios_diesel')
     .select(`
       *,
-      maquinario:maquinarios(id, nome),
-      obra:obras(id, nome)
+      maquinario:maquinarios(id, name),
+      obra:obras(id, name),
+      rua:obras_ruas!rua_id(id, name)
     `)
     .not('obra_id', 'is', null)
-    .order('data_abastecimento', { ascending: false })
+    .order('date', { ascending: false })
 
   if (error) {
     console.error('Erro ao buscar diesel de todas as obras:', error)
@@ -242,8 +246,9 @@ export async function getDieselById(id: string): Promise<MaquinarioDiesel | null
     .from('maquinarios_diesel')
     .select(`
       *,
-      maquinario:maquinarios(id, nome),
-      obra:obras(id, nome)
+      maquinario:maquinarios(id, name),
+      obra:obras(id, name),
+      rua:obras_ruas!rua_id(id, name)
     `)
     .eq('id', id)
     .single()
@@ -279,8 +284,8 @@ export async function getDieselMensal(
     const abastecimentosMes = agrupados[mes] || []
     return {
       mes,
-      litros: abastecimentosMes.reduce((sum, a) => sum + a.quantidade_litros, 0),
-      valor: abastecimentosMes.reduce((sum, a) => sum + a.valor_total, 0)
+      litros: abastecimentosMes.reduce((sum, a) => sum + a.liters, 0),
+      valor: abastecimentosMes.reduce((sum, a) => sum + a.total_amount, 0)
     }
   })
 }

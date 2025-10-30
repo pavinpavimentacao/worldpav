@@ -29,8 +29,8 @@ import { MarcarComoPagoModal } from '../../components/recebimentos/MarcarComoPag
 import { DetalhesNotaFiscalModal } from '../../components/obras/DetalhesNotaFiscalModal'
 import type { ObraNotaFiscal, NotaFiscalStatus } from '../../types/obras-financeiro'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+// ⚙️ MODO MOCK - Conectado ao banco de dados real
+const USE_MOCK = false
 
 const mockNotasRecebimentos: Array<ObraNotaFiscal & { obra_nome?: string }> = [
   {
@@ -61,7 +61,7 @@ const mockNotasRecebimentos: Array<ObraNotaFiscal & { obra_nome?: string }> = [
     desconto_iss: 770.00,
     outro_desconto: 200.00,
     valor_liquido: 36375.00,
-    status: 'pago',
+    status: 'paga',
     data_pagamento: '2025-01-25',
     arquivo_nota_url: 'https://exemplo.com/notas/nf-2025-002.pdf',
     observacoes: 'Pagamento antecipado - desconto negociado',

@@ -128,7 +128,7 @@ export function verificarLicencasObrigatorias(
   faltantes: TipoLicenca[];
   vencidas: LicencaMaquinario[];
 } {
-  const isEspargidor = tipoMaquinario.toLowerCase().includes('espargidor');
+  const isEspargidor = tipoMaquinario?.toLowerCase().includes('espargidor') || false;
   const licencasObrigatorias = isEspargidor 
     ? LICENCAS_OBRIGATORIAS_ESPARGIDOR 
     : LICENCAS_OBRIGATORIAS_VEICULOS;

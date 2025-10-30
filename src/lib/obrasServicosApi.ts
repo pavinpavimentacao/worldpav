@@ -166,3 +166,107 @@ export async function createServicosObra(obraId: string, servicos: ServicoObraIn
 
   return data || []
 }
+
+/**
+ * Calcula o valor executado baseado no preço por m² × metragem executada das ruas
+ */
+export async function calcularValorExecutadoPorMetragem(obraId: string): Promise<number> {
+  try {
+    console.log('🔍 [calcularValorExecutadoPorMetragem] Buscando metragem executada para obra:', obraId)
+    
+    // Buscar TODOS os relatórios diários da obra para calcular a metragem executada
+    const { data: relatorios, error: relatoriosError } = await supabase
+      .from('relatorios_diarios')
+      .select('metragem_feita')
+      .eq('obra_id', obraId)
+
+    if (relatoriosError) {
+      console.error('❌ Erro ao buscar relatórios diários:', relatoriosError)
+      // Fallback: buscar ruas (método antigo)
+      return calcularValorExecutadoPorRuas(obraId)
+    }
+
+    // Calcular metragem total executada
+    const metragemTotalExecutada = (relatorios || []).reduce((total, relatorio) => {
+      return total + (parseFloat(relatorio.metragem_feita) || 0)
+    }, 0)
+
+    console.log('📊 [calcularValorExecutadoPorMetragem] Relatórios encontrados:', relatorios?.length || 0)
+    console.log('📊 [calcularValorExecutadoPorMetragem] Metragem total executada:', metragemTotalExecutada)
+
+    // Buscar preço médio por m² das ruas da obra
+    const { data: ruas, error: ruasError } = await supabase
+      .from('obras_ruas')
+      .select('preco_por_m2, metragem_executada')
+      .eq('obra_id', obraId)
+      .is('deleted_at', null)
+      .not('preco_por_m2', 'is', null)
+
+    if (ruasError) {
+      console.error('❌ Erro ao buscar ruas:', ruasError)
+      return 0
+    }
+
+    if (!ruas || ruas.length === 0) {
+      console.log('⚠️ Nenhuma rua encontrada com preço por m²')
+      return 0
+    }
+
+    // Calcular preço médio por m²
+    const precos = ruas
+      .map(rua => parseFloat(rua.preco_por_m2) || 0)
+      .filter(preco => preco > 0)
+    
+    const precoMedio = precos.length > 0 
+      ? precos.reduce((total, preco) => total + preco, 0) / precos.length 
+      : 0
+
+    // Calcular valor executado = metragem total × preço médio por m²
+    const valorExecutado = metragemTotalExecutada * precoMedio
+
+    console.log('💰 [calcularValorExecutadoPorMetragem] Cálculo:', {
+      obraId,
+      totalRelatorios: relatorios?.length || 0,
+      metragemTotalExecutada,
+      precoMedio,
+      valorExecutado
+    })
+
+    return valorExecutado
+  } catch (error) {
+    console.error('❌ Erro ao calcular valor executado por metragem:', error)
+    // Fallback: buscar ruas
+    return calcularValorExecutadoPorRuas(obraId)
+  }
+}
+
+// Função auxiliar para fallback (método antigo)
+async function calcularValorExecutadoPorRuas(obraId: string): Promise<number> {
+  try {
+    const { data: ruas, error } = await supabase
+      .from('obras_ruas')
+      .select('metragem_executada, preco_por_m2')
+      .eq('obra_id', obraId)
+      .is('deleted_at', null)
+
+    if (error) {
+      console.error('Erro ao buscar ruas para cálculo do valor executado:', error)
+      return 0
+    }
+
+    if (!ruas || ruas.length === 0) {
+      return 0
+    }
+
+    const valorExecutado = ruas.reduce((total, rua) => {
+      const metragem = rua.metragem_executada || 0
+      const precoPorM2 = rua.preco_por_m2 || 0
+      return total + (metragem * precoPorM2)
+    }, 0)
+
+    return valorExecutado
+  } catch (error) {
+    console.error('Erro ao calcular valor executado por ruas:', error)
+    return 0
+  }
+}

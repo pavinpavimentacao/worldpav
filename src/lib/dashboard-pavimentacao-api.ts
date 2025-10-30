@@ -2,8 +2,36 @@ import { supabase } from './supabase'
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns'
 import type { DashboardKPIs, ProgramacaoItem, ProximaProgramacao, DashboardData } from '../types/dashboard-pavimentacao'
 
-// 🎭 MODO MOCK ATIVADO
-const USE_MOCK = true
+// 🎭 MODO MOCK DESATIVADO - USANDO BANCO DE DADOS REAL
+const USE_MOCK = false
+
+// Timezone do projeto
+const TIMEZONE = 'America/Sao_Paulo'
+
+/**
+ * Converte uma data para o timezone de São Paulo
+ */
+function toSaoPauloTime(date: Date): Date {
+  // São Paulo está UTC-3 (ou UTC-2 no horário de verão)
+  // Para simplificar, vamos usar UTC-3 (offset de -180 minutos)
+  const offset = -180 // minutos
+  return new Date(date.getTime() + (offset * 60 * 1000))
+}
+
+/**
+ * Converte uma data/hora local de São Paulo para UTC
+ */
+function fromSaoPauloTime(dateStr: string, timeStr: string): Date {
+  // Criar data no timezone de São Paulo
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [hour, minute] = timeStr.split(':').map(Number)
+  
+  // Criar data local (assumindo que é São Paulo)
+  const localDate = new Date(year, month - 1, day, hour, minute, 0)
+  
+  // Converter para UTC (adicionar 3 horas)
+  return new Date(localDate.getTime() + (3 * 60 * 60 * 1000))
+}
 
 /**
  * API para Dashboard de Pavimentação
@@ -245,8 +273,13 @@ export class DashboardPavimentacaoApi {
    * Buscar todos os KPIs do dashboard
    */
   static async getKPIs(): Promise<DashboardKPIs> {
-    const today = format(new Date(), 'yyyy-MM-dd')
-    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
+    // Usar timezone de São Paulo
+    const agora = new Date()
+    const hojeSaoPaulo = toSaoPauloTime(agora)
+    const amanhaSaoPaulo = toSaoPauloTime(addDays(agora, 1))
+    
+    const today = format(hojeSaoPaulo, 'yyyy-MM-dd')
+    const tomorrow = format(amanhaSaoPaulo, 'yyyy-MM-dd')
     const mesInicio = format(startOfMonth(new Date()), 'yyyy-MM-dd')
     const mesFim = format(endOfMonth(new Date()), 'yyyy-MM-dd')
 
@@ -289,8 +322,8 @@ export class DashboardPavimentacaoApi {
       const { count, error } = await supabase
         .from('programacao_pavimentacao')
         .select('*', { count: 'exact', head: true })
-        .eq('data', data)
-        .in('status', ['confirmada', 'em_andamento'])
+        .eq('date', data)
+        .eq('status', 'programado')
 
       if (error) throw error
       return count || 0
@@ -304,7 +337,9 @@ export class DashboardPavimentacaoApi {
    * Buscar programações de hoje
    */
   static async getProgramacaoHoje(): Promise<ProgramacaoItem[]> {
-    const today = format(new Date(), 'yyyy-MM-dd')
+    const agora = new Date()
+    const hojeSaoPaulo = toSaoPauloTime(agora)
+    const today = format(hojeSaoPaulo, 'yyyy-MM-dd')
     return this.getProgramacoesDia(today)
   }
 
@@ -312,7 +347,9 @@ export class DashboardPavimentacaoApi {
    * Buscar programações de amanhã
    */
   static async getProgramacaoAmanha(): Promise<ProgramacaoItem[]> {
-    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
+    const agora = new Date()
+    const amanhaSaoPaulo = toSaoPauloTime(addDays(agora, 1))
+    const tomorrow = format(amanhaSaoPaulo, 'yyyy-MM-dd')
     return this.getProgramacoesDia(tomorrow)
   }
 
@@ -325,20 +362,16 @@ export class DashboardPavimentacaoApi {
         .from('programacao_pavimentacao')
         .select(`
           id,
-          data,
-          horario,
-          endereco,
-          numero,
-          bairro,
-          cidade,
-          metragem_planejada,
+          date,
+          horario_inicio,
+          metragem_prevista,
           status,
-          cliente_id,
-          obra_id
+          obra_id,
+          rua_id
         `)
-        .eq('data', data)
-        .in('status', ['confirmada', 'em_andamento'])
-        .order('horario', { ascending: true })
+        .eq('date', data)
+        .eq('status', 'programado')
+        .order('horario_inicio', { ascending: true })
         .limit(10)
 
       if (error) throw error
@@ -349,39 +382,53 @@ export class DashboardPavimentacaoApi {
           let cliente_nome = 'Cliente não informado'
           let obra_nome = 'Obra não informada'
 
-          // Buscar cliente
-          if (prog.cliente_id) {
-            const { data: cliente } = await supabase
-              .from('clients')
-              .select('name')
-              .eq('id', prog.cliente_id)
-              .single()
-            
-            if (cliente) cliente_nome = cliente.name
-          }
-
-          // Buscar obra
+          // Buscar obra e cliente
           if (prog.obra_id) {
             const { data: obra } = await supabase
               .from('obras')
-              .select('nome')
+              .select('name, client_id')
               .eq('id', prog.obra_id)
               .single()
             
-            if (obra) obra_nome = obra.nome
+            if (obra) {
+              obra_nome = obra.name
+              
+              // Buscar cliente
+              if (obra.client_id) {
+                const { data: cliente } = await supabase
+                  .from('clients')
+                  .select('name')
+                  .eq('id', obra.client_id)
+                  .single()
+                
+                if (cliente) cliente_nome = cliente.name
+              }
+            }
+          }
+
+          // Buscar rua
+          let rua_nome = 'Rua não informada'
+          if (prog.rua_id) {
+            const { data: rua } = await supabase
+              .from('obras_ruas')
+              .select('name')
+              .eq('id', prog.rua_id)
+              .single()
+            
+            if (rua) rua_nome = rua.name
           }
 
           return {
             id: prog.id,
-            data: prog.data,
-            horario: prog.horario,
-            endereco: prog.endereco,
-            numero: prog.numero,
-            bairro: prog.bairro,
-            cidade: prog.cidade,
+            data: prog.date,
+            horario: prog.horario_inicio,
+            endereco: rua_nome,
+            numero: '',
+            bairro: '',
+            cidade: '',
             cliente_nome,
             obra_nome,
-            metragem_planejada: prog.metragem_planejada,
+            metragem_planejada: prog.metragem_prevista,
             status: prog.status
           }
         })
@@ -399,29 +446,28 @@ export class DashboardPavimentacaoApi {
    */
   static async getProximaProgramacao(): Promise<ProximaProgramacao | null> {
     try {
-      const hoje = new Date()
-      const hojeStr = format(hoje, 'yyyy-MM-dd')
-      const horaAtual = hoje.getHours() * 60 + hoje.getMinutes()
+      // Usar timezone de São Paulo
+      const agora = new Date()
+      const hojeSaoPaulo = toSaoPauloTime(agora)
+      const hojeStr = format(hojeSaoPaulo, 'yyyy-MM-dd')
+      const horaAtual = hojeSaoPaulo.getHours() * 60 + hojeSaoPaulo.getMinutes()
 
       // Buscar programações de hoje e amanhã
       const { data: programacoes, error } = await supabase
         .from('programacao_pavimentacao')
         .select(`
           id,
-          data,
-          horario,
-          endereco,
-          numero,
-          bairro,
-          cidade,
-          cliente_id,
-          obra_id
+          date,
+          horario_inicio,
+          obra_id,
+          rua_id,
+          espessura_media_solicitada
         `)
-        .gte('data', hojeStr)
-        .lte('data', format(addDays(hoje, 1), 'yyyy-MM-dd'))
-        .in('status', ['confirmada', 'em_andamento'])
-        .order('data', { ascending: true })
-        .order('horario', { ascending: true })
+        .gte('date', hojeStr)
+        .lte('date', format(addDays(agora, 1), 'yyyy-MM-dd'))
+        .eq('status', 'programado')
+        .order('date', { ascending: true })
+        .order('horario_inicio', { ascending: true })
 
       if (error) throw error
       if (!programacoes || programacoes.length === 0) return null
@@ -429,11 +475,13 @@ export class DashboardPavimentacaoApi {
       // Filtrar programações futuras
       let proximaProg = null
       for (const prog of programacoes) {
-        const [hora, minuto] = prog.horario.split(':').map(Number)
+        if (!prog.horario_inicio) continue
+        
+        const [hora, minuto] = prog.horario_inicio.split(':').map(Number)
         const horaProgramacao = hora * 60 + minuto
 
         // Se for hoje, verificar se é futura
-        if (prog.data === hojeStr && horaProgramacao <= horaAtual) {
+        if (prog.date === hojeStr && horaProgramacao <= horaAtual) {
           continue
         }
 
@@ -443,16 +491,27 @@ export class DashboardPavimentacaoApi {
 
       if (!proximaProg) return null
 
-      // Calcular tempo restante
-      const [hora, minuto] = proximaProg.horario.split(':').map(Number)
-      const dataProgramacao = new Date(proximaProg.data)
-      dataProgramacao.setHours(hora, minuto, 0, 0)
+      // Calcular tempo restante usando timezone de São Paulo
+      const dataProgramacaoUTC = fromSaoPauloTime(proximaProg.date, proximaProg.horario_inicio)
       
-      const diffMs = dataProgramacao.getTime() - hoje.getTime()
+      const diffMs = dataProgramacaoUTC.getTime() - agora.getTime()
       const diffMinutos = Math.floor(diffMs / (1000 * 60))
       
       let tempoRestante = ''
-      if (diffMinutos < 60) {
+      if (diffMinutos < 0) {
+        // Programação já passou
+        const minutosAtraso = Math.abs(diffMinutos)
+        if (minutosAtraso < 60) {
+          tempoRestante = `Atrasado ${minutosAtraso}min`
+        } else if (minutosAtraso < 1440) {
+          const horas = Math.floor(minutosAtraso / 60)
+          const mins = minutosAtraso % 60
+          tempoRestante = `Atrasado ${horas}h ${mins}min`
+        } else {
+          const dias = Math.floor(minutosAtraso / 1440)
+          tempoRestante = `Atrasado ${dias} dia${dias > 1 ? 's' : ''}`
+        }
+      } else if (diffMinutos < 60) {
         tempoRestante = `${diffMinutos}min`
       } else if (diffMinutos < 1440) { // menos de 24h
         const horas = Math.floor(diffMinutos / 60)
@@ -463,46 +522,57 @@ export class DashboardPavimentacaoApi {
         tempoRestante = dias === 1 ? '1 dia' : `${dias} dias`
       }
 
-      // Buscar detalhes
-      let cliente_nome = ''
-      let obra_nome = ''
-
-      if (proximaProg.cliente_id) {
-        const { data: cliente } = await supabase
-          .from('clients')
-          .select('name')
-          .eq('id', proximaProg.cliente_id)
-          .single()
-        
-        if (cliente) cliente_nome = cliente.name
-      }
+      // Buscar detalhes do cliente e obra
+      let cliente_nome = 'Cliente não especificado'
+      let obra_nome = 'Obra não especificada'
+      let rua_nome = 'Rua não especificada'
 
       if (proximaProg.obra_id) {
         const { data: obra } = await supabase
           .from('obras')
-          .select('nome')
+          .select('name, client_id')
           .eq('id', proximaProg.obra_id)
           .single()
         
-        if (obra) obra_nome = obra.nome
+        if (obra) {
+          obra_nome = obra.name
+          
+          // Buscar cliente
+          if (obra.client_id) {
+            const { data: cliente } = await supabase
+              .from('clients')
+              .select('name')
+              .eq('id', obra.client_id)
+              .single()
+            
+            if (cliente) cliente_nome = cliente.name
+          }
+        }
       }
 
-      const endereco_completo = [
-        proximaProg.endereco,
-        proximaProg.numero,
-        proximaProg.bairro,
-        proximaProg.cidade
-      ].filter(Boolean).join(', ')
+      // Buscar rua
+      if (proximaProg.rua_id) {
+        const { data: rua } = await supabase
+          .from('obras_ruas')
+          .select('name')
+          .eq('id', proximaProg.rua_id)
+          .single()
+        
+        if (rua) rua_nome = rua.name
+      }
+
+      const endereco_completo = rua_nome
 
       return {
         id: proximaProg.id,
-        data: proximaProg.data,
-        horario: proximaProg.horario,
+        data: proximaProg.date,
+        horario: proximaProg.horario_inicio,
         endereco_completo,
         cliente_nome,
         obra_nome,
         tempo_restante: tempoRestante,
-        minutos_restantes: diffMinutos
+        minutos_restantes: diffMinutos,
+        espessura_media_solicitada: proximaProg.espessura_media_solicitada
       }
     } catch (error) {
       console.error('Erro ao buscar próxima programação:', error)

@@ -11,6 +11,14 @@ export interface ObraRua {
   length?: number | null
   width?: number | null
   area?: number | null
+  metragem_planejada?: number | null
+  metragem_executada?: number | null
+  toneladas_utilizadas?: number | null
+  espessura_calculada?: number | null
+  preco_por_m2?: number | null
+  valor_total?: number | null
+  data_finalizacao?: string | null
+  relatorio_diario_id?: string | null
   status: 'planejada' | 'em_execucao' | 'concluida'
   start_date?: string | null
   end_date?: string | null
@@ -25,6 +33,14 @@ export interface ObraRuaInsertData {
   length?: number | null
   width?: number | null
   area?: number | null
+  metragem_planejada?: number | null
+  metragem_executada?: number | null
+  toneladas_utilizadas?: number | null
+  espessura_calculada?: number | null
+  preco_por_m2?: number | null
+  valor_total?: number | null
+  data_finalizacao?: string | null
+  relatorio_diario_id?: string | null
   status?: 'planejada' | 'em_execucao' | 'concluida'
   start_date?: string | null
   end_date?: string | null
@@ -36,6 +52,14 @@ export interface ObraRuaUpdateData {
   length?: number | null
   width?: number | null
   area?: number | null
+  metragem_planejada?: number | null
+  metragem_executada?: number | null
+  toneladas_utilizadas?: number | null
+  espessura_calculada?: number | null
+  preco_por_m2?: number | null
+  valor_total?: number | null
+  data_finalizacao?: string | null
+  relatorio_diario_id?: string | null
   status?: 'planejada' | 'em_execucao' | 'concluida'
   start_date?: string | null
   end_date?: string | null
@@ -149,17 +173,42 @@ export async function updateRua(ruaId: string, ruaData: ObraRuaUpdateData): Prom
  */
 export async function deleteRua(ruaId: string): Promise<void> {
   try {
+    console.log('🗑️ [deleteRua] Excluindo rua:', ruaId)
+    
+    // Primeiro, excluir faturamentos relacionados (soft delete também)
+    const { data: faturamentos } = await supabase
+      .from('obras_financeiro_faturamentos')
+      .select('id')
+      .eq('rua_id', ruaId)
+      .is('deleted_at', null)
+
+    if (faturamentos && faturamentos.length > 0) {
+      console.log(`🗑️ [deleteRua] Excluindo ${faturamentos.length} faturamento(s) relacionados`)
+      
+      for (const fat of faturamentos) {
+        await supabase
+          .from('obras_financeiro_faturamentos')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', fat.id)
+      }
+      
+      console.log('✅ [deleteRua] Faturamentos excluídos com sucesso')
+    }
+
+    // Excluir a rua (soft delete)
     const { error } = await supabase
       .from('obras_ruas')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', ruaId)
 
     if (error) {
-      console.error('Erro ao excluir rua:', error)
+      console.error('❌ Erro ao excluir rua:', error)
       throw new Error(`Erro ao excluir rua: ${error.message}`)
     }
+
+    console.log('✅ [deleteRua] Rua excluída com sucesso')
   } catch (error) {
-    console.error('Erro ao excluir rua:', error)
+    console.error('❌ Erro ao excluir rua:', error)
     throw error
   }
 }

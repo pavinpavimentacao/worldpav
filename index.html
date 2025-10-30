@@ -29,24 +29,25 @@
     <!-- Service Worker Registration -->
     <script>
       // Registrar Service Worker apenas em produção
-      if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registrado com sucesso:', registration.scope);
-            })
-            .catch((registrationError) => {
-              console.log('Falha no registro do SW:', registrationError);
-            });
-        });
-      } else if (window.location.hostname === 'localhost') {
-        // Em desenvolvimento, desregistrar qualquer SW existente
-        if ('serviceWorker' in navigator) {
+      if ('serviceWorker' in navigator) {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          // Em desenvolvimento, desregistrar qualquer SW existente
           navigator.serviceWorker.getRegistrations().then((registrations) => {
             registrations.forEach((registration) => {
               registration.unregister();
               console.log('SW desregistrado em desenvolvimento');
             });
+          });
+        } else if (window.location.protocol === 'https:') {
+          // Em produção HTTPS, registrar o SW
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then((registration) => {
+                console.log('SW registrado com sucesso:', registration.scope);
+              })
+              .catch((registrationError) => {
+                console.log('Falha no registro do SW:', registrationError);
+              });
           });
         }
       }

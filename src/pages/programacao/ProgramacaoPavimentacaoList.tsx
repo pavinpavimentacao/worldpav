@@ -1,17 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Layout } from "../../components/layout/Layout";
 import { Button } from "../../components/shared/Button";
 import { Input } from '../../components/ui/input';
 import { ExportProgramacaoPDF } from '../../components/programacao/ExportProgramacaoPDF';
-import { Plus, Search, Calendar, MapPin, Users, Truck, FileText, Building2, Settings, CheckCircle, Edit, Clock } from 'lucide-react';
+import { Plus, Search, Calendar, MapPin, Users, Truck, FileText, Building2, Settings, CheckCircle, Edit, Clock, Loader2, Eye, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { mockProgramacoesPavimentacao } from '../../mocks/programacao-pavimentacao-mock';
 import { formatDateBR } from '../../utils/date-format';
 import type { ProgramacaoPavimentacao } from '../../types/programacao-pavimentacao';
 import { ConfirmarObraModal, DadosConfirmacaoObra } from '../../components/programacao/ConfirmarObraModal';
 import { createRelatorioDiario, finalizarRua, criarFaturamentoRua } from '../../lib/relatoriosDiariosApi';
+import { getEquipeByPrefixo } from '../../lib/equipesApi';
 import { toast } from '../../lib/toast-hooks';
-import { adicionarRelatorioDiario } from '../../mocks/relatorios-diarios-mock';
+import { ProgramacaoPavimentacaoAPI } from '../../lib/programacao-pavimentacao-api';
 
 const ProgramacaoPavimentacaoList: React.FC = () => {
   const navigate = useNavigate();
@@ -22,8 +22,41 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
   const [showConfirmarModal, setShowConfirmarModal] = useState(false);
   const [programacaoSelecionada, setProgramacaoSelecionada] = useState<ProgramacaoPavimentacao | null>(null);
 
-  // Dados mockados (com estado mutável)
-  const [programacoes, setProgramacoes] = useState(mockProgramacoesPavimentacao);
+  // Estados para modal de detalhes
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [programacaoDetalhes, setProgramacaoDetalhes] = useState<ProgramacaoPavimentacao | null>(null);
+
+  // Estados para modal de exclusão
+  const [showExcluirModal, setShowExcluirModal] = useState(false);
+  const [programacaoExcluir, setProgramacaoExcluir] = useState<ProgramacaoPavimentacao | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+
+  // Estados para dados reais
+  const [programacoes, setProgramacoes] = useState<ProgramacaoPavimentacao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Carregar programações do banco de dados
+  useEffect(() => {
+    const carregarProgramacoes = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Buscar programações sem filtro de company_id por enquanto
+        const programacoesData = await ProgramacaoPavimentacaoAPI.getAll();
+        setProgramacoes(programacoesData);
+      } catch (err) {
+        console.error('Erro ao carregar programações:', err);
+        setError(err instanceof Error ? err.message : 'Erro desconhecido');
+        toast.error('Erro ao carregar programações');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarProgramacoes();
+  }, []);
 
   // Filtrar programações
   const programacoesFiltradas = useMemo(() => {
@@ -77,12 +110,47 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
     setShowConfirmarModal(true);
   };
 
+  const handleAbrirDetalhes = (programacao: ProgramacaoPavimentacao) => {
+    setProgramacaoDetalhes(programacao);
+    setShowDetalhesModal(true);
+  };
+
+  const handleAbrirExclusao = (programacao: ProgramacaoPavimentacao) => {
+    setProgramacaoExcluir(programacao);
+    setShowExcluirModal(true);
+  };
+
+  const handleExcluirProgramacao = async () => {
+    if (!programacaoExcluir) return;
+
+    try {
+      setExcluindo(true);
+      
+      // Chamar API para excluir programação
+      await ProgramacaoPavimentacaoAPI.delete(programacaoExcluir.id);
+      
+      // Atualizar lista local removendo a programação excluída
+      setProgramacoes(prev => prev.filter(p => p.id !== programacaoExcluir.id));
+      
+      toast.success('Programação excluída com sucesso!');
+      
+      // Fechar modal
+      setShowExcluirModal(false);
+      setProgramacaoExcluir(null);
+      
+    } catch (error) {
+      console.error('Erro ao excluir programação:', error);
+      toast.error('Erro ao excluir programação. Tente novamente.');
+    } finally {
+      setExcluindo(false);
+    }
+  };
+
   const handleConfirmarObra = async (dados: DadosConfirmacaoObra) => {
     if (!programacaoSelecionada) return;
 
     try {
-      // MODO MOCK: Criar relatório diário efetivamente
-      console.log('=== CONFIRMAÇÃO DE OBRA (MODO MOCK) ===');
+      console.log('=== CONFIRMAÇÃO DE OBRA ===');
       console.log('Programação:', programacaoSelecionada);
       console.log('Dados da execução:', dados);
       
@@ -90,68 +158,35 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
       const espessura = (dados.toneladas_aplicadas / dados.metragem_feita) * 4.17;
       console.log('Espessura calculada:', espessura.toFixed(2), 'cm');
 
-      // Simular processo
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // 1. CRIAR RELATÓRIO DIÁRIO (salvar no mock)
-      const relatorio = adicionarRelatorioDiario({
-        cliente_id: programacaoSelecionada.cliente_id,
-        cliente_nome: programacaoSelecionada.cliente_nome || 'Cliente',
-        obra_id: `obra-${programacaoSelecionada.id}`,
-        obra_nome: programacaoSelecionada.obra,
-        rua_id: `rua-${programacaoSelecionada.id}`,
-        rua_nome: programacaoSelecionada.rua,
-        equipe_id: `equipe-${programacaoSelecionada.prefixo_equipe}`,
-        equipe_nome: programacaoSelecionada.prefixo_equipe,
-        equipe_is_terceira: false,
-        data_inicio: programacaoSelecionada.data,
-        data_fim: dados.data_fim,
-        horario_inicio: programacaoSelecionada.horario_inicio || '07:00',
-        horario_fim: dados.horario_fim,
-        metragem_feita: dados.metragem_feita,
-        toneladas_aplicadas: dados.toneladas_aplicadas,
-        observacoes: dados.observacoes,
-        maquinarios: programacaoSelecionada.maquinarios_nomes?.map((nome, index) => ({
-          id: programacaoSelecionada.maquinarios[index],
-          nome: nome,
-          is_terceiro: false,
-          parceiro_id: undefined,
-          parceiro_nome: undefined,
-        })) || [],
-      });
-      
-      console.log('✅ Relatório criado e salvo:', relatorio.numero);
-      console.log('✅ ID do relatório:', relatorio.id);
-      console.log('✅ Rua finalizada:', programacaoSelecionada.rua);
-      console.log('✅ Faturamento gerado: R$', (dados.metragem_feita * 25).toLocaleString('pt-BR'));
-      
-      if (dados.fotos_obra && dados.fotos_obra.length > 0) {
-        console.log(`✅ ${dados.fotos_obra.length} foto(s) salva(s)`);
+      // Verificar se temos os IDs necessários
+      if (!programacaoSelecionada.obra_id || !programacaoSelecionada.rua_id) {
+        throw new Error('IDs de obra e/ou rua não encontrados na programação. Por favor, tente novamente.');
       }
 
-      // 2. Atualizar status da programação para "confirmada"
-      setProgramacoes(programacoes.map(p => 
-        p.id === programacaoSelecionada.id 
-          ? {
-              ...p,
-              status: 'confirmada' as const,
-              confirmada: true,
-              data_confirmacao: dados.data_fim,
-              relatorio_diario_id: relatorio.id,
-              updated_at: new Date().toISOString()
-            }
-          : p
-      ));
-      
-      toast.success(`Rua finalizada! Relatório ${relatorio.numero} criado e salvo com sucesso.`);
-      
-      // TODO: Quando integrado com banco de dados real, descomentar:
-      /*
+      // ✅ BUSCAR ID DA EQUIPE PELO PREFIXO
+      let equipeId: string | undefined;
+      if (programacaoSelecionada.prefixo_equipe) {
+        try {
+          const companyId = '39cf8b61-6737-4aa5-af3f-51fba9f12345'; // TODO: pegar do contexto
+          const equipe = await getEquipeByPrefixo(programacaoSelecionada.prefixo_equipe, companyId);
+          if (equipe) {
+            equipeId = equipe.id;
+            console.log('✅ Equipe encontrada:', equipe.name, 'ID:', equipeId);
+          } else {
+            console.warn('⚠️ Equipe não encontrada para o prefixo:', programacaoSelecionada.prefixo_equipe);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao buscar equipe:', error);
+          // Não impedir a confirmação, apenas continuar sem equipe_id
+        }
+      }
+
+      // 1. CRIAR RELATÓRIO DIÁRIO
       const relatorio = await createRelatorioDiario({
         cliente_id: programacaoSelecionada.cliente_id,
-        obra_id: '[ID da obra]', // Buscar do banco
-        rua_id: '[ID da rua]',     // Buscar do banco
-        equipe_id: '[ID da equipe]', // Buscar do banco
+        obra_id: programacaoSelecionada.obra_id, // ✅ ID real da obra
+        rua_id: programacaoSelecionada.rua_id, // ✅ ID real da rua
+        equipe_id: equipeId, // ✅ ID real da equipe encontrada pelo prefixo
         equipe_is_terceira: false,
         data_inicio: programacaoSelecionada.data,
         data_fim: dados.data_fim,
@@ -166,23 +201,36 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
         }))
       });
 
-      await finalizarRua('[rua_id]', relatorio.id, dados.data_fim, dados.metragem_feita, dados.toneladas_aplicadas);
-      await criarFaturamentoRua('[obra_id]', '[rua_id]', dados.metragem_feita, 25);
+      console.log('✅ Relatório criado:', relatorio.id);
+
+      // 2. FINALIZAR RUA E CRIAR FATURAMENTO
+      await finalizarRua(programacaoSelecionada.rua_id, relatorio.id, dados.data_fim, dados.metragem_feita, dados.toneladas_aplicadas);
+      await criarFaturamentoRua(programacaoSelecionada.obra_id, programacaoSelecionada.rua_id, dados.metragem_feita, 25);
       
-      // Atualizar status no banco
-      await updateProgramacaoStatus(programacaoSelecionada.id, 'confirmada', relatorio.id);
+      // 3. ATUALIZAR STATUS DA PROGRAMAÇÃO NO BANCO
+      const programacaoAtualizada = await ProgramacaoPavimentacaoAPI.confirmar(
+        programacaoSelecionada.id, 
+        relatorio.id
+      );
+
+      // 4. ATUALIZAR ESTADO LOCAL
+      setProgramacoes(programacoes.map(p => 
+        p.id === programacaoSelecionada.id 
+          ? programacaoAtualizada
+          : p
+      ));
       
-      navigate(`/relatorios-diarios/${relatorio.id}`);
-      */
+      toast.success(`Rua finalizada! Relatório ${relatorio.id} criado e salvo com sucesso.`);
       
-      // Por enquanto, apenas mostrar mensagem de sucesso
+      // 5. NAVEGAR PARA O RELATÓRIO
       setTimeout(() => {
-        navigate('/relatorios-diarios');
+        navigate(`/relatorios-diarios/${relatorio.id}`);
       }, 2000);
 
     } catch (error: any) {
       console.error('Erro ao confirmar obra:', error);
-      throw new Error(error.message || 'Erro ao confirmar obra');
+      toast.error(error.message || 'Erro ao confirmar obra');
+      throw error;
     }
   };
 
@@ -326,8 +374,40 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
           </div>
         </div>
 
+        {/* Estado de Loading */}
+        {loading && (
+          <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-12 text-center">
+            <Loader2 className="h-16 w-16 text-blue-600 mx-auto mb-4 animate-spin" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Carregando programações...
+            </h3>
+            <p className="text-sm text-gray-500">
+              Aguarde enquanto buscamos os dados do banco
+            </p>
+          </div>
+        )}
+
+        {/* Estado de Erro */}
+        {error && !loading && (
+          <div className="bg-white rounded-xl shadow-lg border-2 border-red-200 p-12 text-center">
+            <FileText className="h-16 w-16 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-red-900 mb-2">
+              Erro ao carregar programações
+            </h3>
+            <p className="text-sm text-red-600 mb-6">
+              {error}
+            </p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Tentar Novamente
+            </Button>
+          </div>
+        )}
+
         {/* Quadro Branco - Programações */}
-        {programacoesAgrupadas.length === 0 ? (
+        {!loading && !error && programacoesAgrupadas.length === 0 ? (
           <div className="bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-300 p-12 text-center">
             <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -345,7 +425,7 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
               </Button>
             )}
           </div>
-        ) : (
+        ) : !loading && !error ? (
           <div className="space-y-6">
             {programacoesAgrupadas.map(([data, progs]) => (
               <div key={data}>
@@ -514,7 +594,18 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
                       )}
 
                       {/* Botões de Ação */}
-                      <div className="flex gap-3 pt-4 border-t-2 border-gray-200">
+                      <div className="flex gap-2 pt-4 border-t-2 border-gray-200">
+                        {/* Botão Ver Detalhes - sempre visível */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAbrirDetalhes(prog)}
+                          className="flex-1 bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Detalhes
+                        </Button>
+
                         {prog.confirmada ? (
                           // Se já confirmada, mostrar botão para ver relatório
                           <>
@@ -535,6 +626,15 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
                             >
                               <FileText className="h-4 w-4 mr-2" />
                               Ver Relatório
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAbrirExclusao(prog)}
+                              className="flex-1 bg-red-50 hover:bg-red-100 border-red-300 text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
                             </Button>
                           </>
                         ) : (
@@ -557,6 +657,15 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Confirmar Obra
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAbrirExclusao(prog)}
+                              className="flex-1 bg-red-50 hover:bg-red-100 border-red-300 text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
+                            </Button>
                           </>
                         )}
                       </div>
@@ -565,6 +674,292 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {/* Modal de Detalhes da Programação */}
+        {showDetalhesModal && programacaoDetalhes && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Eye className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">Detalhes da Programação</h2>
+                      <p className="text-gray-600">Visualização completa dos dados da programação</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowDetalhesModal(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <span className="text-2xl">&times;</span>
+                  </button>
+                </div>
+
+                {/* Conteúdo do Modal */}
+                <div className="space-y-6">
+                  {/* Informações Básicas */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-blue-600" />
+                        Informações da Obra
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm text-gray-500">Cliente</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.cliente_nome}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Obra</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.obra}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Rua</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.rua}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-green-600" />
+                        Data e Equipe
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm text-gray-500">Data da Programação</p>
+                          <p className="font-semibold text-gray-900">{formatDateBR(programacaoDetalhes.data)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Horário de Início</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.horario_inicio || 'Não especificado'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Equipe</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.prefixo_equipe}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Detalhes Técnicos */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Settings className="h-5 w-5 text-purple-600" />
+                        Especificações Técnicas
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm text-gray-500">Metragem Prevista</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.metragem_prevista} m²</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Quantidade de Toneladas</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.quantidade_toneladas} ton</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Faixa a Realizar</p>
+                          <p className="font-semibold text-gray-900">{programacaoDetalhes.faixa_realizar}</p>
+                        </div>
+                        {programacaoDetalhes.espessura_media_solicitada && (
+                          <div>
+                            <p className="text-sm text-gray-500">Espessura Média Solicitada</p>
+                            <p className="font-semibold text-gray-900">{programacaoDetalhes.espessura_media_solicitada} cm</p>
+                          </div>
+                        )}
+                        {programacaoDetalhes.espessura && (
+                          <div>
+                            <p className="text-sm text-gray-500">Espessura</p>
+                            <p className="font-semibold text-gray-900">{programacaoDetalhes.espessura} cm</p>
+                          </div>
+                        )}
+                        {programacaoDetalhes.tipo_servico && (
+                          <div>
+                            <p className="text-sm text-gray-500">Tipo de Serviço</p>
+                            <p className="font-semibold text-gray-900">{programacaoDetalhes.tipo_servico}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Truck className="h-5 w-5 text-orange-600" />
+                        Maquinários Alocados
+                      </h3>
+                      <div className="space-y-2">
+                        {programacaoDetalhes.maquinarios_nomes && programacaoDetalhes.maquinarios_nomes.length > 0 ? (
+                          programacaoDetalhes.maquinarios_nomes.map((maq, idx) => (
+                            <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded border">
+                              <Truck className="h-4 w-4 text-gray-600" />
+                              <span className="text-sm font-medium text-gray-900">{maq}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500 italic">Nenhum maquinário alocado</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status e Observações */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-indigo-600" />
+                        Status da Programação
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm text-gray-500">Status Atual</p>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
+                            programacaoDetalhes.confirmada 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {programacaoDetalhes.confirmada ? 'Confirmada' : 'Pendente'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Data de Criação</p>
+                          <p className="font-semibold text-gray-900">
+                            {programacaoDetalhes.created_at ? new Date(programacaoDetalhes.created_at).toLocaleString('pt-BR') : 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Última Atualização</p>
+                          <p className="font-semibold text-gray-900">
+                            {programacaoDetalhes.updated_at ? new Date(programacaoDetalhes.updated_at).toLocaleString('pt-BR') : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-amber-600" />
+                        Observações
+                      </h3>
+                      <div>
+                        {programacaoDetalhes.observacoes ? (
+                          <p className="text-gray-900 bg-white p-3 rounded border text-sm">
+                            {programacaoDetalhes.observacoes}
+                          </p>
+                        ) : (
+                          <p className="text-gray-500 italic">Nenhuma observação registrada</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botões do Modal */}
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t-2 border-gray-200">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDetalhesModal(false)}
+                  >
+                    Fechar
+                  </Button>
+                  {!programacaoDetalhes.confirmada && (
+                    <Button
+                      onClick={() => {
+                        setShowDetalhesModal(false);
+                        navigate(`/programacao-pavimentacao/${programacaoDetalhes.id}/edit`);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Programação
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmação de Exclusão */}
+        {showExcluirModal && programacaoExcluir && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Trash2 className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Confirmar Exclusão</h2>
+                    <p className="text-gray-600">Esta ação não pode ser desfeita</p>
+                  </div>
+                </div>
+
+                {/* Conteúdo do Modal */}
+                <div className="mb-6">
+                  <p className="text-gray-700 mb-4">
+                    Tem certeza que deseja excluir a programação de <strong>{formatDateBR(programacaoExcluir.data)}</strong>?
+                  </p>
+                  
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Cliente:</span>
+                      <span className="text-sm font-medium text-gray-900">{programacaoExcluir.cliente_nome}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Obra:</span>
+                      <span className="text-sm font-medium text-gray-900">{programacaoExcluir.obra}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Rua:</span>
+                      <span className="text-sm font-medium text-gray-900">{programacaoExcluir.rua}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-500">Equipe:</span>
+                      <span className="text-sm font-medium text-gray-900">{programacaoExcluir.prefixo_equipe}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botões do Modal */}
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowExcluirModal(false);
+                      setProgramacaoExcluir(null);
+                    }}
+                    disabled={excluindo}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleExcluirProgramacao}
+                    disabled={excluindo}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {excluindo ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Excluindo...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Sim, Excluir
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

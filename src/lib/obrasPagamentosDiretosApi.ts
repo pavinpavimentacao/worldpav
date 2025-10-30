@@ -9,7 +9,36 @@ import type {
 } from '../types/obras-pagamentos'
 
 // ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+const USE_MOCK = false
+
+// Função auxiliar para mapear dados do banco (inglês) para TypeScript (português)
+function mapDatabaseToTypeScript(data: any): ObraPagamentoDireto {
+  return {
+    id: data.id,
+    obra_id: data.obra_id,
+    descricao: data.description || data.descricao,
+    valor: data.amount || data.valor,
+    data_pagamento: data.payment_date || data.data_pagamento,
+    forma_pagamento: data.payment_method || data.forma_pagamento,
+    comprovante_url: data.document_url || data.comprovante_url,
+    observacoes: data.observations || data.observacoes,
+    created_at: data.created_at,
+    updated_at: data.updated_at || data.created_at
+  }
+}
+
+// Função auxiliar para mapear dados TypeScript (português) para banco (inglês)
+function mapTypeScriptToDatabase(input: any): any {
+  return {
+    obra_id: input.obra_id,
+    description: input.descricao,
+    amount: input.valor,
+    payment_date: input.data_pagamento,
+    payment_method: input.forma_pagamento,
+    document_url: input.comprovante_url,
+    observations: input.observacoes
+  }
+}
 
 // Mock data para desenvolvimento
 const mockPagamentosDiretos: ObraPagamentoDireto[] = [
@@ -65,9 +94,12 @@ export async function createPagamentoDireto(input: CreatePagamentoDiretoInput): 
     return novoPagamento
   }
 
+  // Mapear de português para inglês antes de inserir
+  const dbInput = mapTypeScriptToDatabase(input)
+  
   const { data, error } = await supabase
     .from('obras_pagamentos_diretos')
-    .insert(input)
+    .insert(dbInput)
     .select()
     .single()
 
@@ -75,7 +107,8 @@ export async function createPagamentoDireto(input: CreatePagamentoDiretoInput): 
     throw new Error(`Erro ao criar pagamento direto: ${error.message}`)
   }
 
-  return data
+  // Mapear de volta para português
+  return mapDatabaseToTypeScript(data)
 }
 
 export async function getPagamentosDiretosByObra(obraId: string): Promise<ObraPagamentoDireto[]> {
@@ -88,13 +121,14 @@ export async function getPagamentosDiretosByObra(obraId: string): Promise<ObraPa
     .from('obras_pagamentos_diretos')
     .select('*')
     .eq('obra_id', obraId)
-    .order('data_pagamento', { ascending: false })
+    .order('payment_date', { ascending: false })
 
   if (error) {
     throw new Error(`Erro ao buscar pagamentos diretos: ${error.message}`)
   }
 
-  return data || []
+  // Mapear todos os resultados de inglês para português
+  return (data || []).map(mapDatabaseToTypeScript)
 }
 
 export async function getAllPagamentosDiretos(filters?: PagamentoDiretoFilters): Promise<ObraPagamentoDireto[]> {
@@ -132,34 +166,31 @@ export async function getAllPagamentosDiretos(filters?: PagamentoDiretoFilters):
 
   let query = supabase
     .from('obras_pagamentos_diretos')
-    .select(`
-      *,
-      obra:obras(nome, cliente_nome)
-    `)
-    .order('data_pagamento', { ascending: false })
+    .select('*')
+    .order('payment_date', { ascending: false })
 
   if (filters?.obra_id) {
     query = query.eq('obra_id', filters.obra_id)
   }
 
   if (filters?.forma_pagamento) {
-    query = query.eq('forma_pagamento', filters.forma_pagamento)
+    query = query.eq('payment_method', filters.forma_pagamento)
   }
 
   if (filters?.data_inicio) {
-    query = query.gte('data_pagamento', filters.data_inicio)
+    query = query.gte('payment_date', filters.data_inicio)
   }
 
   if (filters?.data_fim) {
-    query = query.lte('data_pagamento', filters.data_fim)
+    query = query.lte('payment_date', filters.data_fim)
   }
 
   if (filters?.valor_min) {
-    query = query.gte('valor', filters.valor_min)
+    query = query.gte('amount', filters.valor_min)
   }
 
   if (filters?.valor_max) {
-    query = query.lte('valor', filters.valor_max)
+    query = query.lte('amount', filters.valor_max)
   }
 
   const { data, error } = await query
@@ -168,7 +199,34 @@ export async function getAllPagamentosDiretos(filters?: PagamentoDiretoFilters):
     throw new Error(`Erro ao buscar pagamentos diretos: ${error.message}`)
   }
 
-  return data || []
+  // Mapear todos os resultados de inglês para português
+  const pagamentosMapeados = (data || []).map(mapDatabaseToTypeScript)
+  
+  // Buscar nomes das obras para cada pagamento
+  const pagamentosComObra = await Promise.all(
+    pagamentosMapeados.map(async (pagamento) => {
+      try {
+        const { data: obra } = await supabase
+          .from('obras')
+          .select('name')
+          .eq('id', pagamento.obra_id)
+          .single()
+        
+        return {
+          ...pagamento,
+          obra_nome: obra?.name || 'Obra não encontrada'
+        }
+      } catch (e) {
+        console.error(`Erro ao buscar obra ${pagamento.obra_id}:`, e)
+        return {
+          ...pagamento,
+          obra_nome: 'Obra não encontrada'
+        }
+      }
+    })
+  )
+  
+  return pagamentosComObra
 }
 
 export async function updatePagamentoDireto(id: string, input: UpdatePagamentoDiretoInput): Promise<ObraPagamentoDireto> {
@@ -189,9 +247,12 @@ export async function updatePagamentoDireto(id: string, input: UpdatePagamentoDi
     return mockPagamentosDiretos[index]
   }
 
+  // Mapear de português para inglês antes de atualizar
+  const dbInput = mapTypeScriptToDatabase(input)
+  
   const { data, error } = await supabase
     .from('obras_pagamentos_diretos')
-    .update(input)
+    .update(dbInput)
     .eq('id', id)
     .select()
     .single()
@@ -200,7 +261,8 @@ export async function updatePagamentoDireto(id: string, input: UpdatePagamentoDi
     throw new Error(`Erro ao atualizar pagamento direto: ${error.message}`)
   }
 
-  return data
+  // Mapear de volta para português
+  return mapDatabaseToTypeScript(data)
 }
 
 export async function deletePagamentoDireto(id: string): Promise<void> {
@@ -261,7 +323,7 @@ export async function getResumoFinanceiroObra(obraId: string): Promise<ResumoFin
   // Buscar pagamentos diretos da obra
   const { data: pagamentosDiretos, error: errorPagamentos } = await supabase
     .from('obras_pagamentos_diretos')
-    .select('valor')
+    .select('amount')
     .eq('obra_id', obraId)
 
   if (errorPagamentos) {
@@ -274,8 +336,8 @@ export async function getResumoFinanceiroObra(obraId: string): Promise<ResumoFin
   const totalPendente = notasFiscais?.filter(nota => nota.status === 'pendente').reduce((sum, nota) => sum + nota.valor_nota, 0) || 0
   const totalVencido = notasFiscais?.filter(nota => nota.status === 'vencido').reduce((sum, nota) => sum + nota.valor_nota, 0) || 0
 
-  // Calcular totais dos pagamentos diretos
-  const totalPagamentosDiretos = pagamentosDiretos?.reduce((sum, pag) => sum + pag.valor, 0) || 0
+  // Calcular totais dos pagamentos diretos (usar 'amount' do banco)
+  const totalPagamentosDiretos = pagamentosDiretos?.reduce((sum, pag) => sum + (pag.amount || 0), 0) || 0
 
   return {
     obra_id: obraId,

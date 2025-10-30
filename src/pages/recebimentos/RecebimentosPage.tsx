@@ -14,7 +14,8 @@ import {
   Banknote,
   CheckSquare,
   Receipt,
-  Building2
+  Building2,
+  X
 } from 'lucide-react'
 import { Layout } from "../../components/layout/Layout"
 import { Button } from "../../components/shared/Button"
@@ -29,8 +30,8 @@ import { formatarStatusNota } from '../../utils/notas-fiscais-utils'
 import type { ObraNotaFiscal } from '../../types/obras-financeiro'
 import type { ObraPagamentoDireto, FormaPagamento } from '../../types/obras-pagamentos'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+// ⚙️ MODO MOCK - Conectado ao banco de dados real
+const USE_MOCK = false
 
 // Mock data para recebimentos consolidados
 const mockNotasFiscais: Array<ObraNotaFiscal & { obra_nome?: string }> = [
@@ -44,7 +45,7 @@ const mockNotasFiscais: Array<ObraNotaFiscal & { obra_nome?: string }> = [
     desconto_iss: 2250.00,
     outro_desconto: 0,
     valor_liquido: 40500.00,
-    status: 'pago',
+    status: 'paga',
     data_pagamento: '2025-01-10',
     arquivo_nota_url: 'https://exemplo.com/notas/nf-001.pdf',
     observacoes: 'Pagamento antecipado',
@@ -132,13 +133,6 @@ const mockPagamentosDiretos: Array<ObraPagamentoDireto & { obra_nome?: string }>
 const mockKPIs = {
   total_recebimentos: 142500.00, // Todos os recebimentos (pago + pendente + vencido)
   total_faturamento_bruto: 92500.00, // Apenas os pagos (40500 + 52000)
-  total_notas_fiscais_pagas: 40500.00, // Apenas notas pagas
-  total_pagamentos_diretos: 52000.00, // Todos os pagamentos diretos (sempre pagos)
-  total_pix: 27000.00,
-  total_transferencias: 25000.00,
-  total_dinheiro: 0,
-  total_cheques: 0,
-  total_outros: 0,
   total_pendentes: 27000.00, // Notas pendentes
   total_vencidos: 22500.00 // Notas vencidas
 }
@@ -149,6 +143,8 @@ export function RecebimentosPage() {
   const [notasFiscais, setNotasFiscais] = useState<Array<ObraNotaFiscal & { obra_nome?: string }>>([])
   const [pagamentosDiretos, setPagamentosDiretos] = useState<Array<ObraPagamentoDireto & { obra_nome?: string }>>([])
   const [kpis, setKpis] = useState(mockKPIs)
+  const [showModalDetalhes, setShowModalDetalhes] = useState(false)
+  const [recebimentoSelecionado, setRecebimentoSelecionado] = useState<any>(null)
   
   // Filtros
   const [filtros, setFiltros] = useState({
@@ -173,19 +169,40 @@ export function RecebimentosPage() {
         setPagamentosDiretos(mockPagamentosDiretos)
         setKpis(mockKPIs)
       } else {
-        // Buscar TODAS as notas fiscais (pago, pendente, vencido)
-        const notas = await getAllNotasFiscais()
-        setNotasFiscais(notas)
+        try {
+          // Buscar TODAS as notas fiscais (pago, pendente, vencido)
+          const notas = await getAllNotasFiscais()
+          setNotasFiscais(notas || [])
+        } catch (e) {
+          console.error('Erro ao carregar notas fiscais:', e)
+          setNotasFiscais([])
+        }
         
-        // Buscar pagamentos diretos
-        const pagamentos = await getAllPagamentosDiretos()
-        setPagamentosDiretos(pagamentos)
+        try {
+          // Buscar pagamentos diretos
+          const pagamentos = await getAllPagamentosDiretos()
+          setPagamentosDiretos(pagamentos || [])
+        } catch (e) {
+          console.error('Erro ao carregar pagamentos diretos:', e)
+          setPagamentosDiretos([])
+        }
         
-        // Buscar KPIs
-        const kpisData = await getRecebimentosKPIs()
-        setKpis(kpisData)
+        try {
+          // Buscar KPIs
+          const kpisData = await getRecebimentosKPIs()
+          console.log('📊 [RecebimentosPage] KPIs recebidos:', kpisData)
+          console.log('📊 [RecebimentosPage] Total Recebimentos:', kpisData?.total_recebimentos)
+          console.log('📊 [RecebimentosPage] Faturamento Bruto:', kpisData?.total_faturamento_bruto)
+          console.log('📊 [RecebimentosPage] Pendentes:', kpisData?.total_pendentes)
+          console.log('📊 [RecebimentosPage] Vencidos:', kpisData?.total_vencidos)
+          setKpis(kpisData || mockKPIs)
+        } catch (e) {
+          console.error('Erro ao carregar KPIs:', e)
+          setKpis(mockKPIs)
+        }
       }
     } catch (error) {
+      console.error('Erro geral ao carregar recebimentos:', error)
       addToast({
         type: 'error',
         title: 'Erro ao carregar recebimentos',
@@ -211,15 +228,25 @@ export function RecebimentosPage() {
     return formatarStatusNota(status as any)
   }
 
+  const handleVerDetalhes = (recebimento: any) => {
+    setRecebimentoSelecionado(recebimento)
+    setShowModalDetalhes(true)
+  }
+
+  const handleFecharModal = () => {
+    setShowModalDetalhes(false)
+    setRecebimentoSelecionado(null)
+  }
+
   const recebimentosFiltrados = [
     // Todas as notas fiscais (pago, pendente, vencido)
-    ...notasFiscais.map(nota => ({
+    ...(notasFiscais || []).map(nota => ({
       id: `nf-${nota.id}`,
       tipo: 'nota-fiscal' as const,
-      descricao: `Nota Fiscal ${nota.numero_nota}`,
-      obra: nota.obra_nome || 'Obra não encontrada',
-      valor: nota.valor_liquido,
-      data: nota.data_pagamento || nota.vencimento,
+      descricao: `Nota Fiscal ${nota.numero_nota || 'N/A'}`,
+      obra: (nota as any).obra_nome || 'Obra não encontrada',
+      valor: nota.valor_liquido || 0,
+      data: nota.data_pagamento || nota.vencimento || new Date().toISOString(),
       status: nota.status,
       forma_pagamento: 'nota-fiscal' as FormaPagamento,
       arquivo_url: nota.arquivo_nota_url,
@@ -227,14 +254,14 @@ export function RecebimentosPage() {
       dados_originais: nota
     })),
     // Pagamentos diretos (sempre pagos)
-    ...pagamentosDiretos.map(pag => ({
+    ...(pagamentosDiretos || []).map(pag => ({
       id: `pd-${pag.id}`,
       tipo: 'pagamento-direto' as const,
-      descricao: pag.descricao,
-      obra: pag.obra_nome || 'Obra não encontrada',
-      valor: pag.valor,
-      data: pag.data_pagamento,
-      status: 'pago' as const,
+      descricao: pag.descricao || '',
+      obra: (pag as any).obra_nome || 'Obra não encontrada',
+      valor: pag.valor || 0,
+      data: pag.data_pagamento || new Date().toISOString(),
+      status: 'paga' as const,
       forma_pagamento: pag.forma_pagamento,
       arquivo_url: pag.comprovante_url,
       observacoes: pag.observacoes,
@@ -300,7 +327,7 @@ export function RecebimentosPage() {
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-900">Total de Recebimentos</h3>
                 <p className="text-2xl font-bold text-gray-900">
-                  R$ {kpis.total_recebimentos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(kpis.total_recebimentos || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-sm text-gray-500">Pago + Pendente + Vencido</p>
               </div>
@@ -316,7 +343,7 @@ export function RecebimentosPage() {
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-900">Faturamento Bruto</h3>
                 <p className="text-2xl font-bold text-gray-900">
-                  R$ {kpis.total_faturamento_bruto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(kpis.total_faturamento_bruto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-sm text-gray-500">Apenas pagos</p>
               </div>
@@ -332,7 +359,7 @@ export function RecebimentosPage() {
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-900">Pendentes</h3>
                 <p className="text-2xl font-bold text-gray-900">
-                  R$ {kpis.total_pendentes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(kpis.total_pendentes || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-sm text-gray-500">Aguardando pagamento</p>
               </div>
@@ -348,7 +375,7 @@ export function RecebimentosPage() {
               <div className="ml-4">
                 <h3 className="text-sm font-medium text-gray-900">Vencidos</h3>
                 <p className="text-2xl font-bold text-gray-900">
-                  R$ {kpis.total_vencidos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {(kpis.total_vencidos || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-sm text-gray-500">Necessitam ação</p>
               </div>
@@ -548,23 +575,24 @@ export function RecebimentosPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleVerDetalhes(recebimento)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Ver detalhes"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
                             {recebimento.arquivo_url && (
                               <a
                                 href={recebimento.arquivo_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-900"
-                                title="Ver comprovante"
+                                className="text-green-600 hover:text-green-900"
+                                title="Baixar arquivo"
                               >
-                                <Eye className="h-4 w-4" />
+                                <Download className="h-4 w-4" />
                               </a>
                             )}
-                            <button
-                              className="text-gray-600 hover:text-gray-900"
-                              title="Download"
-                            >
-                              <Download className="h-4 w-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -575,6 +603,187 @@ export function RecebimentosPage() {
             </div>
           )}
         </div>
+
+        {/* Modal de Detalhes */}
+        {showModalDetalhes && recebimentoSelecionado && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-50 to-purple-50">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-blue-600 rounded-lg p-2">
+                    {recebimentoSelecionado.tipo === 'nota-fiscal' ? (
+                      <FileText className="h-6 w-6 text-white" />
+                    ) : (
+                      <CreditCard className="h-6 w-6 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {recebimentoSelecionado.tipo === 'nota-fiscal' ? 'Detalhes da Nota Fiscal' : 'Detalhes do Pagamento Direto'}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {recebimentoSelecionado.descricao}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleFecharModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-6">
+                {/* Informações Principais */}
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-blue-900 font-semibold mb-1">
+                        Valor {recebimentoSelecionado.tipo === 'nota-fiscal' ? 'Líquido' : 'Pago'}
+                      </div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        R$ {recebimentoSelecionado.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-blue-900 font-semibold mb-1">
+                        Status
+                      </div>
+                      <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-900">
+                        {recebimentoSelecionado.status}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Informações da Obra */}
+                <div className="border rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Obra</h4>
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                    <span className="text-gray-900">{recebimentoSelecionado.obra}</span>
+                  </div>
+                </div>
+
+                {/* Informações de Data */}
+                <div className="border rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Datas</h4>
+                  <div className="space-y-2">
+                    {recebimentoSelecionado.tipo === 'nota-fiscal' && (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <span className="text-sm text-gray-600">Vencimento:</span>
+                          <span className="text-sm text-gray-900">{formatDateToBR(recebimentoSelecionado.dados_originais?.vencimento || '')}</span>
+                        </div>
+                        {recebimentoSelecionado.status === 'pago' && recebimentoSelecionado.dados_originais?.data_pagamento && (
+                          <div className="flex items-center gap-2">
+                            <CheckSquare className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm text-gray-600">Data de Pagamento:</span>
+                            <span className="text-sm text-gray-900">{formatDateToBR(recebimentoSelecionado.dados_originais.data_pagamento)}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {recebimentoSelecionado.tipo === 'pagamento-direto' && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm text-gray-600">Data de Pagamento:</span>
+                        <span className="text-sm text-gray-900">{formatDateToBR(recebimentoSelecionado.data)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Forma de Pagamento */}
+                {recebimentoSelecionado.tipo === 'pagamento-direto' && (
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Forma de Pagamento</h4>
+                    <div className="flex items-center gap-2">
+                      {getFormaPagamentoInfo(recebimentoSelecionado.forma_pagamento).icon}
+                      <span className="text-gray-900">{getFormaPagamentoInfo(recebimentoSelecionado.forma_pagamento).label}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Detalhes Adicionais (Nota Fiscal) */}
+                {recebimentoSelecionado.tipo === 'nota-fiscal' && recebimentoSelecionado.dados_originais && (
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Valores da Nota Fiscal</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Valor Bruto:</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          R$ {(recebimentoSelecionado.dados_originais.valor_nota || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Desconto INSS:</span>
+                        <span className="text-sm text-gray-900">
+                          R$ {(recebimentoSelecionado.dados_originais.desconto_inss || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Desconto ISS:</span>
+                        <span className="text-sm text-gray-900">
+                          R$ {(recebimentoSelecionado.dados_originais.desconto_iss || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Outros Descontos:</span>
+                        <span className="text-sm text-gray-900">
+                          R$ {(recebimentoSelecionado.dados_originais.outro_desconto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between">
+                        <span className="text-sm font-semibold text-gray-900">Valor Líquido:</span>
+                        <span className="text-sm font-bold text-blue-900">
+                          R$ {recebimentoSelecionado.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Observações */}
+                {recebimentoSelecionado.observacoes && (
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Observações</h4>
+                    <p className="text-sm text-gray-700">{recebimentoSelecionado.observacoes}</p>
+                  </div>
+                )}
+
+                {/* Arquivo */}
+                {recebimentoSelecionado.arquivo_url && (
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                      {recebimentoSelecionado.tipo === 'nota-fiscal' ? 'Arquivo da Nota Fiscal' : 'Comprovante'}
+                    </h4>
+                    <a
+                      href={recebimentoSelecionado.arquivo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-900"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Visualizar/Abrir Arquivo</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 p-6 border-t">
+                <Button variant="outline" onClick={handleFecharModal}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   )

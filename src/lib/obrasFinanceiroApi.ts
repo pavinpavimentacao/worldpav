@@ -25,21 +25,84 @@ import { calcularFaturamentoPrevisto } from '../utils/notas-fiscais-utils'
  * Lista faturamentos de uma obra
  */
 export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamento[]> {
-  const { data, error } = await supabase
+  console.log('🔍 [getObraFaturamentos] Buscando faturamentos da obra:', obraId)
+  
+  // Primeiro, tentar buscar faturamentos existentes na tabela
+  const { data: faturamentosExistentes, error } = await supabase
     .from('obras_financeiro_faturamentos')
     .select(`
       *,
       rua:obras_ruas(*)
     `)
     .eq('obra_id', obraId)
-    .order('data_finalizacao', { ascending: false })
+    .is('deleted_at', null) // ✅ Filtrar faturamentos excluídos
+    .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Erro ao buscar faturamentos:', error)
-    throw error
+  if (faturamentosExistentes && faturamentosExistentes.length > 0) {
+    console.log('✅ Faturamentos encontrados na tabela:', faturamentosExistentes.length)
+    return faturamentosExistentes
   }
 
-  return data || []
+  // Se não existem faturamentos, buscar diretamente das ruas finalizadas da obra
+  console.log('⚠️ Nenhum faturamento na tabela. Buscando diretamente das ruas...')
+  
+  const { data: ruas, error: ruasError } = await supabase
+    .from('obras_ruas')
+    .select('*')
+    .eq('obra_id', obraId)
+    .eq('status', 'concluida')
+    .not('metragem_executada', 'is', null)
+    .not('preco_por_m2', 'is', null)
+    .is('deleted_at', null)
+    .order('data_finalizacao', { ascending: false })
+
+  if (ruasError) {
+    console.error('❌ Erro ao buscar ruas:', ruasError)
+    throw ruasError
+  }
+
+  if (!ruas || ruas.length === 0) {
+    console.log('⚠️ Nenhuma rua finalizada encontrada')
+    return []
+  }
+
+  console.log('✅ Ruas finalizadas encontradas:', ruas.length)
+
+  // Converter ruas em faturamentos
+  const faturamentos: ObraFaturamento[] = ruas.map(rua => {
+    const metragem = parseFloat(rua.metragem_executada || '0')
+    const toneladas = parseFloat(rua.toneladas_executadas || '0')
+    const precoPorM2 = parseFloat(rua.preco_por_m2 || '0')
+    const valorTotal = metragem * precoPorM2
+    const espessura = parseFloat(rua.espessura_calculada || '0') || (toneladas / metragem / 2.4) * 100
+
+    return {
+      id: rua.id, // Usar ID da rua temporariamente
+      obra_id: obraId,
+      rua_id: rua.id,
+      rua: {
+        id: rua.id,
+        obra_id: obraId,
+        nome: rua.name,
+        metragem_planejada: parseFloat(rua.volume_planejamento || '0'),
+        status: rua.status,
+        ordem: rua.ordem || 0,
+        created_at: rua.created_at,
+        updated_at: rua.updated_at
+      },
+      metragem_executada: metragem,
+      toneladas_utilizadas: toneladas,
+      espessura_calculada: espessura,
+      preco_por_m2: precoPorM2,
+      valor_total: valorTotal,
+      data_finalizacao: rua.data_finalizacao || rua.updated_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+      created_at: rua.created_at,
+      updated_at: rua.updated_at
+    }
+  })
+
+  console.log('💰 Faturamentos gerados das ruas:', faturamentos.length)
+  return faturamentos
 }
 
 /**

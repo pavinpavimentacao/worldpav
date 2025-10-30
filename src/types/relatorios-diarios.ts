@@ -62,6 +62,7 @@ export interface CreateRelatorioDiarioData {
   obra_id: string
   rua_id: string
   equipe_id?: string
+  tipo_equipe?: string  // 'pavimentacao', 'maquinas', 'apoio'
   equipe_is_terceira?: boolean
   data_inicio: string
   data_fim?: string
@@ -92,6 +93,7 @@ export interface MaquinarioSelecionavel {
 export interface EquipeSelecionavel {
   id: string
   nome: string
+  tipo_equipe?: string  // 'pavimentacao', 'maquinas', 'apoio'
   is_terceira: boolean
   parceiro_id?: string
   parceiro_nome?: string

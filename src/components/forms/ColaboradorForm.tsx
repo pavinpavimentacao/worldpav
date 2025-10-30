@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, User } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Select } from '../ui/select';
+import { FloatingSelect } from '../shared/FloatingSelect';
 import { supabase } from '../../lib/supabase';
 import { toast } from '../../lib/toast-hooks';
+import { getEquipes } from '../../lib/equipesApi';
 import {
   Colaborador,
   ColaboradorInsert,
@@ -34,12 +35,14 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
 
   // Form state
   const [nome, setNome] = useState(colaborador?.nome || '');
+  const [equipeId, setEquipeId] = useState(colaborador?.equipe_id || '');
   const [tipoEquipe, setTipoEquipe] = useState<TipoEquipe>(
-    colaborador?.tipo_equipe || 'massa'
+    colaborador?.tipo_equipe || 'equipe_a'
   );
   const [funcao, setFuncao] = useState<FuncaoColaborador>(
     colaborador?.funcao || 'Ajudante'
   );
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string }>>([]);
   const [tipoContrato, setTipoContrato] = useState(
     colaborador?.tipo_contrato || 'fixo'
   );
@@ -75,9 +78,10 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [equipamentos, setEquipamentos] = useState<any[]>([]);
 
-  // Load equipamentos
+  // Load equipes e equipamentos
   useEffect(() => {
     loadEquipamentos();
+    loadEquipes();
   }, [companyId]);
 
   // Atualizar função quando tipo de equipe mudar
@@ -100,6 +104,16 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
       setEquipamentos(data || []);
     } catch (error) {
       console.error('Erro ao carregar equipamentos:', error);
+    }
+  };
+
+  const loadEquipes = async () => {
+    try {
+      const equipesData = await getEquipes(companyId);
+      setEquipes(equipesData);
+    } catch (error) {
+      console.error('Erro ao carregar equipes:', error);
+      toast.error('Erro ao carregar equipes');
     }
   };
 
@@ -126,7 +140,8 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
     try {
       const colaboradorData = {
         nome: nome.trim(),
-        tipo_equipe: tipoEquipe,
+        tipo_equipe: tipoEquipe, // Manter para compatibilidade
+        equipe_id: equipeId || null, // ✅ Novo: usar equipe_id
         funcao,
         tipo_contrato: tipoContrato,
         salario_fixo: parseFloat(salarioFixo) || 0,
@@ -222,13 +237,19 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Equipe <span className="text-red-500">*</span>
+                  Equipe <span className="text-red-500">*</span>
                 </label>
-                <Select
-                  value={tipoEquipe}
-                  onChange={(value) => setTipoEquipe(value as TipoEquipe)}
-                  options={TIPO_EQUIPE_OPTIONS}
-                  required
+                <FloatingSelect
+                  value={equipeId}
+                  onChange={(value) => setEquipeId(value)}
+                  options={[
+                    { value: '', label: 'Selecione a equipe' },
+                    ...equipes.map(eq => ({
+                      value: eq.id,
+                      label: eq.name
+                    }))
+                  ]}
+                  disabled={equipes.length === 0}
                 />
               </div>
 
@@ -236,11 +257,10 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Função <span className="text-red-500">*</span>
                 </label>
-                <Select
+                <FloatingSelect
                   value={funcao}
                   onChange={(value) => setFuncao(value as FuncaoColaborador)}
                   options={funcoesOptions}
-                  required
                 />
               </div>
 
@@ -248,7 +268,7 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Tipo de Contrato
                 </label>
-                <Select
+                <FloatingSelect
                   value={tipoContrato}
                   onChange={(value) => setTipoContrato(value as 'fixo' | 'diarista')}
                   options={TIPO_CONTRATO_OPTIONS}
@@ -388,7 +408,7 @@ export const ColaboradorForm: React.FC<ColaboradorFormProps> = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Equipamento Vinculado
                 </label>
-                <Select
+                <FloatingSelect
                   value={equipamentoId}
                   onChange={setEquipamentoId}
                   options={[

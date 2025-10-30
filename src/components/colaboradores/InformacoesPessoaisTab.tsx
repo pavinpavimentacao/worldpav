@@ -11,6 +11,8 @@ import {
 } from '../../types/colaboradores';
 import { logMockOperation } from '../../config/mock-config';
 import { formatCPF, formatPhone, formatEmail, unformatCPF, unformatPhone, isValidCPF, isValidEmail, isValidPhone } from '../../utils/formatters';
+import { getEquipes } from '../../lib/equipesApi';
+import { getOrCreateDefaultCompany } from '../../lib/company-utils';
 
 interface InformacoesPessoaisTabProps {
   colaborador: ColaboradorExpandido;
@@ -26,6 +28,7 @@ export const InformacoesPessoaisTab: React.FC<InformacoesPessoaisTabProps> = ({
   const [formData, setFormData] = useState<Partial<ColaboradorExpandido>>({
     nome: colaborador.nome || '',
     tipo_equipe: colaborador.tipo_equipe || 'massa',
+    equipe_id: colaborador.equipe_id || '', // ✅ Adicionar equipe_id
     funcao: colaborador.funcao || 'Ajudante',
     tipo_contrato: colaborador.tipo_contrato || 'fixo',
     salario_fixo: colaborador.salario_fixo || 0,
@@ -40,6 +43,9 @@ export const InformacoesPessoaisTab: React.FC<InformacoesPessoaisTabProps> = ({
     data_pagamento_1: colaborador.data_pagamento_1 || '',
     data_pagamento_2: colaborador.data_pagamento_2 || '',
   });
+  
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingEquipes, setLoadingEquipes] = useState(true);
 
   // Estados para validação
   const [validationErrors, setValidationErrors] = useState<{
@@ -48,11 +54,31 @@ export const InformacoesPessoaisTab: React.FC<InformacoesPessoaisTabProps> = ({
     email?: string;
   }>({});
 
+  // Carregar equipes
+  useEffect(() => {
+    const loadEquipes = async () => {
+      try {
+        setLoadingEquipes(true);
+        const companyId = await getOrCreateDefaultCompany();
+        const equipesData = await getEquipes(companyId);
+        setEquipes(equipesData);
+        console.log('✅ [InformacoesPessoaisTab] Equipes carregadas:', equipesData);
+      } catch (error) {
+        console.error('❌ [InformacoesPessoaisTab] Erro ao carregar equipes:', error);
+      } finally {
+        setLoadingEquipes(false);
+      }
+    };
+    
+    loadEquipes();
+  }, []);
+
   // Sincronizar formData quando colaborador mudar (ex: após salvar)
   useEffect(() => {
     setFormData({
       nome: colaborador.nome || '',
       tipo_equipe: colaborador.tipo_equipe || 'massa',
+      equipe_id: colaborador.equipe_id || '', // ✅ Adicionar equipe_id
       funcao: colaborador.funcao || 'Ajudante',
       tipo_contrato: colaborador.tipo_contrato || 'fixo',
       salario_fixo: colaborador.salario_fixo || 0,
@@ -249,16 +275,19 @@ export const InformacoesPessoaisTab: React.FC<InformacoesPessoaisTabProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tipo de Equipe
+              Equipe
             </label>
             <Select
-              value={formData.tipo_equipe || ''}
-              onChange={(value) => handleChange('tipo_equipe', value as TipoEquipe)}
+              value={formData.equipe_id || ''}
+              onChange={(value) => handleChange('equipe_id', value)}
               options={[
-                { value: '', label: 'Selecione...' },
-                ...TIPO_EQUIPE_OPTIONS,
+                { value: '', label: 'Selecione a equipe' },
+                ...equipes.map(eq => ({
+                  value: eq.id,
+                  label: eq.name
+                }))
               ]}
-              disabled={isLoading}
+              disabled={isLoading || loadingEquipes || equipes.length === 0}
             />
           </div>
 

@@ -104,7 +104,8 @@ export interface ColaboradorUpdateData {
 
 export interface ColaboradorFilters {
   searchTerm?: string
-  tipo_equipe?: 'massa' | 'administrativa' | 'todos'
+  tipo_equipe?: 'massa' | 'administrativa' | 'todos' | 'pavimentacao' | 'maquinas' | 'apoio'
+  equipe_id?: string // ✅ Adicionar filtro por equipe_id
   status?: 'ativo' | 'inativo' | 'ferias' | 'afastado' | 'todos'
 }
 
@@ -143,12 +144,23 @@ export async function getColaboradores(
     if (filters) {
       // Filtro de status
       if (filters.status && filters.status !== 'todos') {
-        query = query.eq('status', filters.status)
+        if (filters.status === 'ativo') {
+          query = query.eq('status', 'ativo')
+        } else if (filters.status === 'inativo') {
+          query = query.eq('status', 'inativo')
+        } else {
+          query = query.eq('status', filters.status)
+        }
       }
 
-      // Filtro de tipo de equipe
-      if (filters.tipo_equipe && filters.tipo_equipe !== 'todos') {
+      // ✅ Filtro por equipe_id (prioritário sobre tipo_equipe)
+      if (filters.equipe_id && filters.equipe_id.trim().length > 0) {
+        query = query.eq('equipe_id', filters.equipe_id)
+        console.log('🔍 [ColaboradoresApi] Filtrando por equipe_id:', filters.equipe_id)
+      } else if (filters.tipo_equipe && filters.tipo_equipe !== 'todos') {
+        // Filtro de tipo de equipe (fallback para compatibilidade)
         query = query.eq('tipo_equipe', filters.tipo_equipe)
+        console.log('🔍 [ColaboradoresApi] Filtrando por tipo_equipe:', filters.tipo_equipe)
       }
 
       // Busca por nome
@@ -165,7 +177,18 @@ export async function getColaboradores(
       throw new Error(`Erro ao buscar colaboradores: ${error.message}`)
     }
 
-    console.log('Colaboradores encontrados:', data?.length || 0)
+    console.log('✅ [ColaboradoresApi] Colaboradores encontrados:', data?.length || 0)
+    
+    // Log detalhado do primeiro colaborador para debug
+    if (data && data.length > 0) {
+      console.log('📋 [ColaboradoresApi] Primeiro colaborador:', {
+        id: data[0].id,
+        name: data[0].name,
+        equipe_id: data[0].equipe_id,
+        tipo_equipe: data[0].tipo_equipe
+      });
+    }
+    
     return data || []
   } catch (error) {
     console.error('Erro ao buscar colaboradores:', error)
@@ -356,6 +379,167 @@ export async function getColaboradoresAtivos(
   }
 }
 
+/**
+ * Busca estatísticas de colaboradores
+ */
+export async function getColaboradoresStats(
+  companyId: string
+): Promise<ColaboradorStats> {
+  try {
+    const { data, error } = await supabase
+      .from('colaboradores')
+      .select('status, tipo_equipe, position')
+      .eq('company_id', companyId)
+      .is('deleted_at', null)
+
+    if (error) throw error
+
+    const stats: ColaboradorStats = {
+      total: data?.length || 0,
+      por_status: [],
+      por_tipo_equipe: [],
+      por_funcao: []
+    }
+
+    // Agrupar por status
+    const statusCounts: Record<string, number> = {}
+    const tipoEquipeCounts: Record<string, number> = {}
+    const funcaoCounts: Record<string, number> = {}
+
+    data?.forEach((col) => {
+      statusCounts[col.status] = (statusCounts[col.status] || 0) + 1
+      if (col.tipo_equipe) {
+        tipoEquipeCounts[col.tipo_equipe] = (tipoEquipeCounts[col.tipo_equipe] || 0) + 1
+      }
+      if (col.position) {
+        funcaoCounts[col.position] = (funcaoCounts[col.position] || 0) + 1
+      }
+    })
+
+    stats.por_status = Object.entries(statusCounts).map(([status, quantidade]) => ({
+      status,
+      quantidade
+    }))
+
+    stats.por_tipo_equipe = Object.entries(tipoEquipeCounts).map(([tipo, quantidade]) => ({
+      tipo,
+      quantidade
+    }))
+
+    stats.por_funcao = Object.entries(funcaoCounts).map(([funcao, quantidade]) => ({
+      funcao,
+      quantidade
+    }))
+
+    return stats
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca equipes disponíveis para controle diário
+ */
+export async function getEquipes(
+  companyId: string
+): Promise<Array<{ id: string; nome: string; count: number; tipo_equipe: string }>> {
+  try {
+    console.log('🔍 [ColaboradoresApi] Buscando equipes da tabela equipes para company_id:', companyId);
+    
+    // ✅ Tentar buscar da tabela equipes primeiro
+    try {
+      const { data: equipesData, error: equipesError } = await supabase
+        .from('equipes')
+        .select('id, name, prefixo, descricao')
+        .eq('company_id', companyId)
+        .is('deleted_at', null)
+        .order('name', { ascending: true });
+
+      if (!equipesError && equipesData && equipesData.length > 0) {
+        console.log('✅ [ColaboradoresApi] Equipes encontradas na tabela equipes:', equipesData.length);
+        
+        // Contar colaboradores por equipe
+        const equipesComContagem = await Promise.all(
+          equipesData.map(async (equipe) => {
+            const { count } = await supabase
+              .from('colaboradores')
+              .select('*', { count: 'exact', head: true })
+              .eq('equipe_id', equipe.id)
+              .is('deleted_at', null);
+
+            return {
+              id: equipe.id,
+              nome: equipe.name,
+              count: count || 0,
+              tipo_equipe: equipe.descricao || 'equipe'
+            };
+          })
+        );
+
+        console.log('✅ [ColaboradoresApi] Retornando equipes da tabela:', equipesComContagem);
+        return equipesComContagem;
+      }
+    } catch (e) {
+      console.warn('⚠️ [ColaboradoresApi] Erro ao buscar da tabela equipes, usando fallback:', e);
+    }
+    
+    // ✅ FALLBACK: Agrupar por tipo_equipe
+    console.log('🔄 [ColaboradoresApi] Usando fallback por tipo_equipe...');
+    
+    const { data: colaboradoresData, error: colaboradoresError } = await supabase
+      .from('colaboradores')
+      .select('id, name, tipo_equipe')
+      .eq('company_id', companyId)
+      .eq('status', 'ativo')
+      .is('deleted_at', null)
+      .not('tipo_equipe', 'is', null);
+
+    if (colaboradoresError) {
+      console.error('Erro ao buscar colaboradores:', colaboradoresError);
+      throw new Error(`Erro ao buscar colaboradores: ${colaboradoresError.message}`);
+    }
+
+    console.log(`Colaboradores encontrados: ${colaboradoresData?.length || 0}`);
+    
+    const colaboradoresPorTipo: Record<string, Array<{ id: string; name: string; tipo_equipe: string }>> = {};
+    colaboradoresData?.forEach(col => {
+      if (col.tipo_equipe) {
+        if (!colaboradoresPorTipo[col.tipo_equipe]) {
+          colaboradoresPorTipo[col.tipo_equipe] = [];
+        }
+        colaboradoresPorTipo[col.tipo_equipe].push(col);
+      }
+    });
+
+    const equipes: Array<{ id: string; nome: string; count: number; tipo_equipe: string }> = []
+    
+    const mapeamentoEquipes: Record<string, string> = {
+      'pavimentacao': 'Equipe A',
+      'maquinas': 'Equipe B',
+      'apoio': 'Equipe de Apoio'
+    }
+
+    Object.entries(colaboradoresPorTipo).forEach(([tipoEquipe, colaboradores]) => {
+      const nomeEquipe = mapeamentoEquipes[tipoEquipe] || `Equipe ${tipoEquipe}`
+      const equipeId = colaboradores[0].id
+      
+      equipes.push({
+        id: equipeId,
+        nome: nomeEquipe,
+        count: colaboradores.length,
+        tipo_equipe: tipoEquipe
+      })
+    })
+
+    return equipes
+  } catch (error) {
+    console.error('Erro ao buscar equipes:', error)
+    throw error
+  }
+}
+
+
 // ============================================================================
 // CAMADA DE COMPATIBILIDADE (para migração gradual)
 // ============================================================================
@@ -379,7 +563,7 @@ export function toColaboradorLegacy(simples: ColaboradorSimples): any {
     return mapeamento[tipoEquipe] || 'equipe_a';
   };
 
-  return {
+  const resultado = {
     id: simples.id,
     nome: simples.name,
     tipo_equipe: mapearTipoEquipeBancoParaFrontend(simples.tipo_equipe),
@@ -403,7 +587,19 @@ export function toColaboradorLegacy(simples: ColaboradorSimples): any {
     qtd_passagens_por_dia: simples.qtd_passagens_por_dia,
     equipamento_vinculado_id: simples.equipamento_vinculado_id,
     equipe_id: simples.equipe_id
-  }
+  };
+  
+  // Log para debug
+  console.log('🔄 [toColaboradorLegacy] Convertendo colaborador:', {
+    id: simples.id,
+    name: simples.name,
+    equipe_id_original: simples.equipe_id,
+    equipe_id_resultado: resultado.equipe_id,
+    tipo_equipe_original: simples.tipo_equipe,
+    tipo_equipe_resultado: resultado.tipo_equipe
+  });
+  
+  return resultado;
 }
 
 

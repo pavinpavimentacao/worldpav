@@ -4,8 +4,8 @@ import { Select } from "../shared/Select"
 import { DatePicker } from '../ui/date-picker'
 import { Input } from '../ui/input'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+// ⚙️ DADOS REAIS
+const USE_MOCK = false
 
 interface Despesa {
   id: string
@@ -44,7 +44,7 @@ export function DespesasTab({ mesAno }: DespesasTabProps) {
 
     if (filtroObra) {
       resultado = resultado.filter(d => 
-        d.obra_nome?.toLowerCase().includes(filtroObra.toLowerCase()) ||
+        (d.obra_nome || '').toLowerCase().includes(filtroObra.toLowerCase()) ||
         d.descricao.toLowerCase().includes(filtroObra.toLowerCase())
       )
     }
@@ -62,65 +62,11 @@ export function DespesasTab({ mesAno }: DespesasTabProps) {
 
       if (USE_MOCK) {
         await new Promise(resolve => setTimeout(resolve, 300))
-        
-        // Dados mockados
-        setDespesas([
-          {
-            id: '1',
-            data_despesa: '2025-01-18',
-            categoria: 'Diesel',
-            descricao: 'Abastecimento Rolo Compactador',
-            obra_nome: 'Pavimentação Rua das Flores - Osasco',
-            maquinario_nome: 'Rolo Compactador CAT-001',
-            valor: 550.00
-          },
-          {
-            id: '2',
-            data_despesa: '2025-01-20',
-            categoria: 'Materiais',
-            descricao: 'Compra de areia',
-            obra_nome: 'Pavimentação Rua das Flores - Osasco',
-            valor: 1200.00
-          },
-          {
-            id: '3',
-            data_despesa: '2025-01-22',
-            categoria: 'Diesel',
-            descricao: 'Abastecimento Caminhão',
-            obra_nome: 'Avenida Central - Barueri',
-            maquinario_nome: 'Caminhão Mercedes 2024',
-            valor: 850.00
-          },
-          {
-            id: '4',
-            data_despesa: '2025-01-23',
-            categoria: 'Manutenção',
-            descricao: 'Troca de óleo - Rolo Compactador',
-            obra_nome: 'Pavimentação Rua das Flores - Osasco',
-            maquinario_nome: 'Rolo Compactador CAT-001',
-            valor: 450.00
-          },
-          {
-            id: '5',
-            data_despesa: '2025-01-25',
-            categoria: 'Materiais',
-            descricao: 'Cimento Portland',
-            obra_nome: 'Avenida Central - Barueri',
-            valor: 980.00
-          },
-          {
-            id: '6',
-            data_despesa: '2025-01-27',
-            categoria: 'Outros',
-            descricao: 'Equipamentos de segurança',
-            obra_nome: 'Avenida Central - Barueri',
-            valor: 320.00
-          }
-        ])
+        setDespesas([])
       } else {
-        // TODO: Implementar chamada real da API
-        // const data = await getFinancialConsolidado(mesAno)
-        // setDespesas(data.despesas)
+        const { getFinancialConsolidado } = await import('../../lib/financialConsolidadoApi')
+        const data = await getFinancialConsolidado(mesAno)
+        setDespesas((data.despesas || []) as any)
       }
     } catch (error) {
       console.error('Erro ao carregar despesas:', error)

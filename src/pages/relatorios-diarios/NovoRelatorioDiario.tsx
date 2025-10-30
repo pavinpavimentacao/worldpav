@@ -38,6 +38,7 @@ export function NovoRelatorioDiario() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [equipeIsTerceira, setEquipeIsTerceira] = useState(false)
+  const [tipoEquipe, setTipoEquipe] = useState<string>('') // ✅ Adicionar estado para tipo_equipe
   const [maquinariosSelecionados, setMaquinariosSelecionados] = useState<string[]>([])
   const [espessuraCalculada, setEspessuraCalculada] = useState(0)
   const [sucessoMensagem, setSucessoMensagem] = useState('')
@@ -95,6 +96,7 @@ export function NovoRelatorioDiario() {
         obra_id: data.obra_id,
         rua_id: data.rua_id,
         equipe_id: data.equipe_id,
+        tipo_equipe: tipoEquipe, // ✅ Incluir tipo_equipe
         equipe_is_terceira: equipeIsTerceira,
         data_inicio: data.data_inicio,
         data_fim: data.data_fim,
@@ -109,14 +111,14 @@ export function NovoRelatorioDiario() {
         }))
       })
 
-      // Finalizar rua
-      await finalizarRua(
-        data.rua_id,
-        relatorio.id,
-        data.data_fim || data.data_inicio,
-        data.metragem_feita,
-        data.toneladas_aplicadas
-      )
+      // Finalizar rua (comentado - o trigger já faz isso automaticamente)
+      // await finalizarRua(
+      //   data.rua_id,
+      //   relatorio.id,
+      //   data.data_fim || data.data_inicio,
+      //   data.metragem_feita,
+      //   data.toneladas_aplicadas
+      // )
 
       // Criar faturamento (assumindo R$ 25/m² como padrão - TODO: buscar da obra)
       await criarFaturamentoRua(
@@ -242,9 +244,10 @@ export function NovoRelatorioDiario() {
               {/* Equipe */}
               <EquipeSelector
                 equipeId={watch('equipe_id') || ''}
-                onChange={(equipeId, isTerceira) => {
+                onChange={(equipeId, isTerceira, tipoEquipe) => {
                   setValue('equipe_id', equipeId)
                   setEquipeIsTerceira(isTerceira)
+                  setTipoEquipe(tipoEquipe || '') // ✅ Salvar tipo_equipe
                 }}
               />
             </div>

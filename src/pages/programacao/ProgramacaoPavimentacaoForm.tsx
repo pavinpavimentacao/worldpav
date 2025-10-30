@@ -7,14 +7,12 @@ import { Layout } from "../../components/layout/Layout";
 import { Button } from "../../components/shared/Button";
 import { Input } from '../../components/ui/input';
 import { DatePicker } from '../../components/ui/date-picker';
-import { SelecionarClienteObraRua } from '../../components/relatorios-diarios/SelecionarClienteObraRua';
-import { EquipeSelector } from '../../components/relatorios-diarios/EquipeSelector';
-import { MaquinariosSelector } from '../../components/relatorios-diarios/MaquinariosSelector';
-import { ServicosObra } from '../../components/programacao/ServicosObra';
 import { ArrowLeft, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { FaixaAsfalto, faixaAsfaltoLabels, faixaAsfaltoDescricoes } from '../../types/parceiros';
 import { Select } from "../../components/shared/Select";
-import { TIPOS_SERVICO_OPTIONS } from '../../types/programacao-pavimentacao';
+import { ProgramacaoPavimentacaoAPI } from '../../lib/programacao-pavimentacao-api';
+import { getClientes } from '../../lib/clientesApi';
+import { getOrCreateDefaultCompany } from '../../lib/company-utils';
 
 // Schema de validação
 const programacaoSchema = z.object({
@@ -43,6 +41,15 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
   const [sucessoMensagem, setSucessoMensagem] = useState('');
   const [erroMensagem, setErroMensagem] = useState('');
 
+  // Estados para dados reais
+  const [clientes, setClientes] = useState<Array<{ id: string; name: string; company_name: string | null }>>([]);
+  const [obras, setObras] = useState<Array<{ id: string; name: string; cliente_id: string }>>([]);
+  const [ruas, setRuas] = useState<Array<{ id: string; name: string; obra_id: string; metragem?: number; espessura?: string; faixa?: string }>>([]);
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string; prefixo: string; tipo_equipe?: string }>>([]);
+  const [maquinarios, setMaquinarios] = useState<Array<{ id: string; nome: string; tipo: string; prefixo?: string }>>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [companyId, setCompanyId] = useState<string>('');
+
   const {
     register,
     handleSubmit,
@@ -55,6 +62,91 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
 
   // Watch dos valores
   const data = watch('data');
+  const clienteId = watch('cliente_id');
+  const obraId = watch('obra_id');
+
+  // Carregar company ID primeiro
+  React.useEffect(() => {
+    const carregarCompanyId = async () => {
+      try {
+        const id = await getOrCreateDefaultCompany();
+        setCompanyId(id);
+      } catch (err) {
+        console.error('Erro ao carregar company ID:', err);
+        setErroMensagem('Erro ao carregar empresa');
+      }
+    };
+
+    carregarCompanyId();
+  }, []);
+
+  // Carregar dados iniciais quando company ID estiver disponível
+  React.useEffect(() => {
+    if (!companyId) return;
+
+    const carregarDados = async () => {
+      try {
+        setLoadingData(true);
+        const [clientesData, equipesData, maquinariosData] = await Promise.all([
+          getClientes(companyId), // Usar API de clientes com filtro de company_id
+          ProgramacaoPavimentacaoAPI.getEquipes(),
+          ProgramacaoPavimentacaoAPI.getMaquinarios()
+        ]);
+
+        // Mapear dados da API de clientes para o formato esperado
+        const clientesMapeados = clientesData.map(cliente => ({
+          id: cliente.id,
+          name: cliente.name,
+          company_name: cliente.empresa
+        }));
+
+        setClientes(clientesMapeados);
+        setEquipes(equipesData);
+        setMaquinarios(maquinariosData);
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        setErroMensagem(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    carregarDados();
+  }, [companyId]);
+
+  // Carregar obras quando cliente muda
+  React.useEffect(() => {
+    if (clienteId) {
+      const carregarObras = async () => {
+        try {
+          const obrasData = await ProgramacaoPavimentacaoAPI.getObras(clienteId);
+          setObras(obrasData);
+          setRuas([]); // Limpar ruas
+          setValue('obra_id', '');
+          setValue('rua_id', '');
+        } catch (err) {
+          console.error('Erro ao carregar obras:', err);
+        }
+      };
+      carregarObras();
+    }
+  }, [clienteId, setValue]);
+
+  // Carregar ruas quando obra muda
+  React.useEffect(() => {
+    if (obraId) {
+      const carregarRuas = async () => {
+        try {
+          const ruasData = await ProgramacaoPavimentacaoAPI.getRuas(obraId);
+          setRuas(ruasData);
+          setValue('rua_id', '');
+        } catch (err) {
+          console.error('Erro ao carregar ruas:', err);
+        }
+      };
+      carregarRuas();
+    }
+  }, [obraId, setValue]);
 
   async function onSubmit(formData: ProgramacaoFormData) {
     try {
@@ -68,14 +160,28 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
         return;
       }
 
-      // Criar programação (mock por enquanto)
-      const programacao = {
-        ...formData,
+      // Criar programação via API
+      const programacaoData = {
+        data: formData.data,
+        cliente_id: formData.cliente_id,
+        obra: obras.find(o => o.id === formData.obra_id)?.name || '',
+        rua: ruas.find(r => r.id === formData.rua_id)?.name || '',
+        obra_id: formData.obra_id, // ID da obra no banco de dados
+        rua_id: formData.rua_id, // ID da rua no banco de dados
+        prefixo_equipe: equipes.find(e => e.id === formData.equipe_id)?.prefixo || '',
         maquinarios: maquinariosSelecionados,
-        equipe_is_terceira: equipeIsTerceira,
-        company_id: 'company-1', // TODO: pegar da sessão
+        metragem_prevista: formData.metragem_prevista,
+        quantidade_toneladas: formData.quantidade_toneladas,
+        faixa_realizar: formData.faixa_realizar,
+        horario_inicio: formData.horario_inicio,
+        observacoes: formData.observacoes,
+        tipo_servico: formData.tipo_servico,
+        espessura: formData.espessura,
+        espessura_media_solicitada: formData.espessura_media_solicitada, // Campo correto para espessura
+        company_id: '39cf8b61-6737-4aa5-af3f-51fba9f12345' // ID da empresa Worldpav
       };
 
+      const programacao = await ProgramacaoPavimentacaoAPI.create(programacaoData);
       console.log('Programação criada:', programacao);
 
       setSucessoMensagem('Programação criada com sucesso!');
@@ -92,6 +198,19 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
     }
   }
 
+  if (loadingData) {
+    return (
+      <Layout>
+        <div className="p-6 max-w-6xl mx-auto">
+          <div className="flex items-center justify-center space-x-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="text-lg text-gray-600">Carregando dados...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -99,7 +218,7 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
-            onClick={() => navigate('/programacao')}
+            onClick={() => navigate('/programacao-pavimentacao')}
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -140,19 +259,75 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
 
             <div className="space-y-4">
               {/* Cliente, Obra, Rua */}
-              <SelecionarClienteObraRua
-                clienteId={watch('cliente_id') || ''}
-                obraId={watch('obra_id') || ''}
-                ruaId={watch('rua_id') || ''}
-                onClienteChange={(value) => setValue('cliente_id', value)}
-                onObraChange={(value) => setValue('obra_id', value)}
-                onRuaChange={(value) => setValue('rua_id', value)}
-              />
-              {(errors.cliente_id || errors.obra_id || errors.rua_id) && (
-                <p className="text-sm text-red-600">
-                  {errors.cliente_id?.message || errors.obra_id?.message || errors.rua_id?.message}
-                </p>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Cliente <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={clienteId || ''}
+                    onChange={(value) => setValue('cliente_id', value)}
+                    options={[
+                      { value: '', label: 'Selecione o cliente' },
+                      ...clientes.map(cliente => ({
+                        value: cliente.id,
+                        label: cliente.name
+                      }))
+                    ]}
+                    placeholder="Selecione o cliente"
+                    required
+                  />
+                  {errors.cliente_id && (
+                    <p className="text-sm text-red-600">{errors.cliente_id.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Obra <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={obraId || ''}
+                    onChange={(value) => setValue('obra_id', value)}
+                    options={[
+                      { value: '', label: clienteId ? 'Selecione a obra' : 'Selecione um cliente primeiro' },
+                      ...obras.map(obra => ({
+                        value: obra.id,
+                        label: obra.name
+                      }))
+                    ]}
+                    placeholder="Selecione a obra"
+                    disabled={!clienteId}
+                    required
+                  />
+                  {errors.obra_id && (
+                    <p className="text-sm text-red-600">{errors.obra_id.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Rua <span className="text-red-500">*</span>
+                  </label>
+                  <Select
+                    value={watch('rua_id') || ''}
+                    onChange={(value) => setValue('rua_id', value)}
+                    options={[
+                      { value: '', label: obraId ? 'Selecione a rua' : 'Selecione uma obra primeiro' },
+                      ...ruas.map(rua => ({
+                        value: rua.id,
+                        label: rua.name
+                      }))
+                    ]}
+                    placeholder="Selecione a rua"
+                    disabled={!obraId}
+                    required
+                  />
+                  {errors.rua_id && (
+                    <p className="text-sm text-red-600">{errors.rua_id.message}</p>
+                  )}
+                </div>
+              </div>
 
               {/* Data e Horário */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -173,16 +348,27 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
               </div>
 
               {/* Equipe */}
-              <EquipeSelector
-                equipeId={watch('equipe_id') || ''}
-                onChange={(equipeId, isTerceira) => {
-                  setValue('equipe_id', equipeId);
-                  setEquipeIsTerceira(isTerceira);
-                }}
-              />
-              {errors.equipe_id && (
-                <p className="text-sm text-red-600">{errors.equipe_id.message}</p>
-              )}
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Equipe <span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={watch('equipe_id') || ''}
+                  onChange={(value) => setValue('equipe_id', value)}
+                  options={[
+                    { value: '', label: 'Selecione a equipe' },
+                    ...equipes.map(equipe => ({
+                      value: equipe.id,
+                      label: equipe.name
+                    }))
+                  ]}
+                  placeholder="Selecione a equipe"
+                  required
+                />
+                {errors.equipe_id && (
+                  <p className="text-sm text-red-600">{errors.equipe_id.message}</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -277,10 +463,50 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
           {/* Seção 3: Maquinários */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Maquinários Utilizados</h2>
-            <MaquinariosSelector
-              maquinariosSelecionados={maquinariosSelecionados}
-              onChange={setMaquinariosSelecionados}
-            />
+            
+            {maquinarios.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {maquinarios.map((maquinario) => {
+                  const isSelected = maquinariosSelecionados.includes(maquinario.id);
+                  
+                  return (
+                    <div
+                      key={maquinario.id}
+                      className={`cursor-pointer p-4 border rounded-lg transition-all ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                      onClick={() => {
+                        if (isSelected) {
+                          setMaquinariosSelecionados(prev => prev.filter(id => id !== maquinario.id));
+                        } else {
+                          setMaquinariosSelecionados(prev => [...prev, maquinario.id]);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          className="w-4 h-4 text-blue-600"
+                        />
+                        <div>
+                          <h4 className="font-semibold">{maquinario.nome}</h4>
+                          <p className="text-sm text-gray-500">{maquinario.tipo}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhum maquinário cadastrado ainda.</p>
+                <p className="text-sm">Cadastre maquinários na seção Maquinários para utilizá-los aqui.</p>
+              </div>
+            )}
           </div>
 
           {/* Seção 4: Informações Adicionais */}
@@ -289,113 +515,27 @@ const ProgramacaoPavimentacaoForm: React.FC = () => {
               Informações Adicionais (Opcional)
             </h2>
 
-            {/* Serviços da Obra */}
-            <ServicosObra obraId={watch('obra_id') || ''} />
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Observações
-              </label>
-              <textarea
-                {...register('observacoes')}
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Adicione observações sobre a programação (opcional)..."
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Observações
+                </label>
+                <textarea
+                  {...register('observacoes')}
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Adicione observações sobre a programação (opcional)..."
+                />
+              </div>
             </div>
           </div>
-
-          {/* Preview da Programação */}
-          {(watch('cliente_id') || watch('data') || watch('metragem_prevista') || watch('quantidade_toneladas')) && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-300 p-6">
-              <h2 className="text-xl font-bold text-blue-900 mb-4 flex items-center gap-2">
-                <CheckCircle className="h-6 w-6 text-blue-600" />
-                Preview da Programação
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {watch('data') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-500 font-medium">Data</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
-                      {new Date(watch('data') + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                )}
-
-                {watch('equipe_id') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-500 font-medium">Equipe</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">{watch('equipe_id')}</p>
-                  </div>
-                )}
-
-                {watch('metragem_prevista') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-500 font-medium">Metragem Prevista</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
-                      {watch('metragem_prevista')?.toLocaleString('pt-BR')} m²
-                    </p>
-                  </div>
-                )}
-
-                {watch('quantidade_toneladas') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-500 font-medium">Quantidade de Toneladas</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
-                      {watch('quantidade_toneladas')?.toLocaleString('pt-BR')} ton
-                    </p>
-                  </div>
-                )}
-
-                {watch('faixa_realizar') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-500 font-medium">Faixa a Ser Realizada</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
-                      {watch('faixa_realizar')}
-                    </p>
-                  </div>
-                )}
-
-                {watch('espessura_media_solicitada') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="text-xs text-gray-500 font-medium">Espessura Média Solicitada</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
-                      {watch('espessura_media_solicitada')} cm
-                    </p>
-                  </div>
-                )}
-
-                {maquinariosSelecionados.length > 0 && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200 md:col-span-2">
-                    <p className="text-xs text-gray-500 font-medium mb-2">Maquinários</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {maquinariosSelecionados.length} maquinário(s) selecionado(s)
-                    </p>
-                  </div>
-                )}
-
-                {watch('observacoes') && (
-                  <div className="bg-white rounded-lg p-3 border border-blue-200 md:col-span-2">
-                    <p className="text-xs text-gray-500 font-medium mb-2">Observações</p>
-                    <p className="text-sm text-gray-900 italic">{watch('observacoes')}</p>
-                  </div>
-                )}
-              </div>
-
-              <p className="text-xs text-blue-600 mt-4 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Revise as informações antes de salvar
-              </p>
-            </div>
-          )}
 
           {/* Ações */}
           <div className="flex items-center justify-end gap-4 bg-white rounded-lg border border-gray-200 p-6">
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate('/programacao')}
+              onClick={() => navigate('/programacao-pavimentacao')}
               disabled={loading}
             >
               Cancelar

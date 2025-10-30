@@ -86,6 +86,7 @@ export interface Colaborador {
   id: string;
   nome: string;
   tipo_equipe: TipoEquipe;
+  equipe_id?: string | null; // ✅ ID da equipe na tabela equipes
   funcao: FuncaoColaborador;
   tipo_contrato: TipoContrato;
   salario_fixo: number;

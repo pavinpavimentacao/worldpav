@@ -121,6 +121,7 @@ export interface CreateRegistroDiariaData {
   data_pagamento?: string;
   observacoes?: string;
   relacao_diaria_id?: string;
+  status_pagamento?: 'pendente' | 'pago' | 'cancelado';
 }
 
 // Estatísticas do Controle Diário
@@ -148,7 +149,10 @@ export function calcularValorTotalDiaria(
 }
 
 // Helper para formatar valor em reais
-export function formatarValor(valor: number): string {
+export function formatarValor(valor: number | undefined | null): string {
+  if (valor === undefined || valor === null || isNaN(valor)) {
+    return 'R$ 0,00';
+  }
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 

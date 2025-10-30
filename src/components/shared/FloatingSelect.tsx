@@ -71,14 +71,23 @@ export const FloatingSelect: React.FC<FloatingSelectProps> = ({
                 {safeOptions.map((option) => (
                   <FloatingActionPanelButton
                     key={option.value}
-                    onClick={() => {
-                      onChange(option.value)
+                    onClick={(e) => {
+                      console.log('🔍 [FloatingSelect] Clique na opção:', option.label, 'value:', option.value)
+                      e.preventDefault()
+                      e.stopPropagation()
+                      try {
+                        onChange(option.value)
+                        console.log('✅ [FloatingSelect] onChange chamado com sucesso')
+                      } catch (error) {
+                        console.error('❌ [FloatingSelect] Erro ao chamar onChange:', error)
+                      }
                       closePanel()
                     }}
                     className={cn(
-                      "justify-between !text-gray-900 hover:!bg-gray-100",
+                      "justify-between !text-gray-900 hover:!bg-gray-100 !cursor-pointer",
                       option.value === value && "!bg-blue-50 !text-blue-600 !font-medium hover:!bg-blue-100"
                     )}
+                    disabled={disabled}
                   >
                     <span>{option.label}</span>
                     {option.value === value && (

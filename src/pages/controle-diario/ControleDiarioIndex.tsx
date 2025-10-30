@@ -3,14 +3,14 @@
  * Sistema de controle diário de colaboradores e pagamento de diárias
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ClipboardList, DollarSign, History, Users, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
 import { Layout } from "../../components/layout/Layout";
 import { RelacaoDiariaTab } from '../../components/controle-diario/RelacaoDiariaTab';
 import { DiariasTab } from '../../components/controle-diario/DiariasTab';
 import { HistoricoTab } from '../../components/controle-diario/HistoricoTab';
 import { getEstatisticasControleDiario } from '../../mocks/controle-diario-mock';
-import { formatarValor } from '../../types/controle-diario';
+import { formatarValor, EstatisticasControleDiario } from '../../types/controle-diario';
 
 type TabType = 'relacao' | 'diarias' | 'historico';
 
@@ -23,9 +23,26 @@ interface Tab {
 
 const ControleDiarioIndex: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('relacao');
-  
-  // Estatísticas
-  const stats = useMemo(() => getEstatisticasControleDiario(), []);
+  const [stats, setStats] = useState<EstatisticasControleDiario>({
+    totalRelacoes: 0,
+    totalPresencas: 0,
+    totalAusencias: 0,
+    totalFaltas: 0,
+    totalAtestados: 0,
+    totalMudancas: 0,
+    totalDiarias: 0,
+    valorTotalDiarias: 0,
+    diariasPendentes: 0,
+    valorPendente: 0
+  });
+
+  useEffect(() => {
+    async function loadStats() {
+      const data = await getEstatisticasControleDiario();
+      setStats(data);
+    }
+    loadStats();
+  }, []);
 
   const tabs: Tab[] = [
     {

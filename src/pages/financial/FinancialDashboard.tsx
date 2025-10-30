@@ -9,8 +9,8 @@ import { ResumoGeralTab } from '../../components/financial/ResumoGeralTab'
 import { ReceitasTab } from '../../components/financial/ReceitasTab'
 import { DespesasTab } from '../../components/financial/DespesasTab'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+// ⚙️ DADOS REAIS
+const USE_MOCK = false
 
 type TabType = 'resumo' | 'receitas' | 'despesas'
 
@@ -74,9 +74,14 @@ export function FinancialDashboard() {
           saldoAtual: 50800.00
         })
       } else {
-        // TODO: Implementar chamada real da API
-        // const data = await getFinancialConsolidado(mesAno)
-        // setResumo(data)
+        const { getFinancialConsolidado } = await import('../../lib/financialConsolidadoApi')
+        const data = await getFinancialConsolidado(mesAno)
+        setResumo({
+          totalReceitas: data.totalReceitas,
+          totalDespesas: data.totalDespesas,
+          lucroLiquido: data.lucroLiquido,
+          saldoAtual: data.saldoAtual,
+        })
       }
     } catch (error) {
       console.error('Erro ao carregar dados financeiros:', error)

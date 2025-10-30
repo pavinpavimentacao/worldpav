@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, User, Shield, Award, AlertTriangle, FileText, Save } from 'lucide-react';
+import { ArrowLeft, User, Shield, Award, AlertTriangle, FileText, Save, Calendar, DollarSign } from 'lucide-react';
 import { Layout } from "../../components/layout/Layout";
 import { Button } from "../../components/shared/Button";
 import { InformacoesPessoaisTab } from '../../components/colaboradores/InformacoesPessoaisTab';
@@ -8,11 +8,13 @@ import { DocumentacaoPessoalTab } from '../../components/colaboradores/Documenta
 import { CertificadosCompletosTab } from '../../components/colaboradores/CertificadosCompletosTab';
 import { MultasTab } from '../../components/colaboradores/MultasTab';
 import { ArquivosTab } from '../../components/colaboradores/ArquivosTab';
+import { ControleDiarioTab } from '../../components/colaboradores/ControleDiarioTab';
+import { DiariasTab } from '../../components/colaboradores/DiariasTab';
 import { ColaboradorExpandido } from '../../types/colaboradores';
 import { toast } from '../../lib/toast-hooks';
 import { getColaboradorById, updateColaborador, toColaboradorLegacy, type ColaboradorSimples } from '../../lib/colaboradoresApi';
 
-type TabType = 'informacoes' | 'documentacao' | 'certificados' | 'multas' | 'arquivos';
+type TabType = 'informacoes' | 'documentacao' | 'certificados' | 'multas' | 'arquivos' | 'controle-diario' | 'diarias';
 
 interface Tab {
   id: TabType;
@@ -26,6 +28,8 @@ const TABS: Tab[] = [
   { id: 'certificados', label: 'Certificados & NR', icon: <Award className="h-4 w-4" /> },
   { id: 'multas', label: 'Multas', icon: <AlertTriangle className="h-4 w-4" /> },
   { id: 'arquivos', label: 'Arquivos', icon: <FileText className="h-4 w-4" /> },
+  { id: 'controle-diario', label: 'Controle Diário', icon: <Calendar className="h-4 w-4" /> },
+  { id: 'diarias', label: 'Diárias', icon: <DollarSign className="h-4 w-4" /> },
 ];
 
 export default function ColaboradorDetalhes() {
@@ -107,6 +111,12 @@ export default function ColaboradorDetalhes() {
           frontend: data.tipo_equipe,
           banco: dataParaBanco.tipo_equipe
         });
+      }
+      
+      // ✅ Enviar equipe_id se existir
+      if (data.equipe_id !== undefined) {
+        dataParaBanco.equipe_id = data.equipe_id;
+        console.log('✅ Enviando equipe_id:', data.equipe_id);
       }
       
       if (data.tipo_contrato !== undefined) dataParaBanco.tipo_contrato = data.tipo_contrato;
@@ -268,6 +278,20 @@ export default function ColaboradorDetalhes() {
 
             {activeTab === 'arquivos' && (
               <ArquivosTab colaboradorId={colaborador.id} />
+            )}
+
+            {activeTab === 'controle-diario' && (
+              <ControleDiarioTab 
+                colaboradorId={colaborador.id} 
+                colaboradorNome={colaborador.nome}
+              />
+            )}
+
+            {activeTab === 'diarias' && (
+              <DiariasTab 
+                colaboradorId={colaborador.id} 
+                colaboradorNome={colaborador.nome}
+              />
             )}
           </div>
         </div>

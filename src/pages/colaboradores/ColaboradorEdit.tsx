@@ -15,6 +15,8 @@ import {
   validarFuncaoTipoEquipe,
 } from '../../types/colaboradores';
 import { getColaboradorById, updateColaborador, toColaboradorLegacy, type ColaboradorSimples } from '../../lib/colaboradoresApi';
+import { getEquipes } from '../../lib/equipesApi';
+import { getOrCreateDefaultCompany } from '../../lib/company-utils';
 import { toast } from '../../lib/toast-hooks';
 
 const ColaboradorEdit: React.FC = () => {
@@ -25,6 +27,8 @@ const ColaboradorEdit: React.FC = () => {
 
   // Form state
   const [nome, setNome] = useState('');
+  const [equipeId, setEquipeId] = useState('');
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string }>>([]);
   const [tipoEquipe, setTipoEquipe] = useState<TipoEquipe>('massa');
   const [funcao, setFuncao] = useState<FuncaoColaborador>('Ajudante');
   const [tipoContrato, setTipoContrato] = useState<'fixo' | 'diarista'>('fixo');
@@ -40,6 +44,21 @@ const ColaboradorEdit: React.FC = () => {
   const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
 
+  // Carregar equipes
+  useEffect(() => {
+    const loadEquipes = async () => {
+      try {
+        const companyId = await getOrCreateDefaultCompany();
+        const equipesData = await getEquipes(companyId);
+        setEquipes(equipesData);
+      } catch (error) {
+        console.error('Erro ao carregar equipes:', error);
+      }
+    };
+    
+    loadEquipes();
+  }, []);
+
   useEffect(() => {
     const loadColaborador = async () => {
       if (id) {
@@ -50,6 +69,7 @@ const ColaboradorEdit: React.FC = () => {
             const colaborador = toColaboradorLegacy(colaboradorData);
             
             setNome(colaborador.nome);
+            setEquipeId(colaborador.equipe_id || '');
             setTipoEquipe(colaborador.tipo_equipe);
             setFuncao(colaborador.funcao);
             setTipoContrato(colaborador.tipo_contrato);
@@ -112,7 +132,8 @@ const ColaboradorEdit: React.FC = () => {
 
       await updateColaborador(id!, {
         nome,
-        tipo_equipe: tipoEquipe,
+        equipe_id: equipeId || null, // ✅ Novo: usar ID da equipe
+        tipo_equipe: tipoEquipe, // Mantém para compatibilidade
         funcao,
         tipo_contrato: tipoContrato,
         salario_fixo: parseFloat(salarioFixo),
@@ -192,13 +213,20 @@ const ColaboradorEdit: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tipo de Equipe <span className="text-red-500">*</span>
+                  Equipe <span className="text-red-500">*</span>
                 </label>
                 <Select
-                  value={tipoEquipe}
-                  onChange={(value) => setTipoEquipe(value as TipoEquipe)}
-                  options={TIPO_EQUIPE_OPTIONS}
+                  value={equipeId}
+                  onChange={(value) => setEquipeId(value)}
+                  options={[
+                    { value: '', label: 'Selecione a equipe' },
+                    ...equipes.map(eq => ({
+                      value: eq.id,
+                      label: eq.name
+                    }))
+                  ]}
                   required
+                  disabled={equipes.length === 0}
                 />
               </div>
 

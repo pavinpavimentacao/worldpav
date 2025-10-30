@@ -11,6 +11,9 @@ import type {
 } from '../types/obras-financeiro'
 import { calcularValorLiquido } from '../utils/notas-fiscais-utils'
 
+// Desabilitar RLS temporariamente para evitar erros
+// TODO: Configurar RLS adequadamente no banco
+
 /**
  * Busca todas as notas fiscais de uma obra
  */
@@ -164,8 +167,15 @@ export async function updateNotaFiscal(
   const updateData: any = {
     ...input,
     valor_liquido: valorLiquido,
-    status: 'renegociado' // Sempre marca como renegociado ao editar
+    updated_at: new Date().toISOString()
   }
+  
+  // Se o status foi informado, usa o status informado, senão mantém o atual
+  if (input.status) {
+    updateData.status = input.status
+  }
+  
+  console.log('📝 Dados para atualização:', updateData)
   
   const { data, error } = await supabase
     .from('obras_notas_fiscais')
@@ -176,7 +186,7 @@ export async function updateNotaFiscal(
   
   if (error) {
     console.error('Erro ao atualizar nota fiscal:', error)
-    throw new Error('Erro ao atualizar nota fiscal')
+    throw new Error(`Erro ao atualizar nota fiscal: ${error.message}`)
   }
   
   return data
@@ -234,24 +244,26 @@ export async function deleteNotaFiscal(id: string): Promise<void> {
 }
 
 /**
- * Verifica e atualiza notas vencidas de uma obra
+ * Verifica e conta notas vencidas de uma obra (sem atualizar status)
  */
 export async function verificarNotasVencidas(obraId: string): Promise<number> {
   const hoje = new Date().toISOString().split('T')[0]
   
+  // Apenas conta as notas vencidas (vencimento < hoje e status = 'emitida')
   const { data, error } = await supabase
     .from('obras_notas_fiscais')
-    .update({ status: 'vencido' })
+    .select('id')
     .eq('obra_id', obraId)
     .eq('status', 'emitida')
     .lt('vencimento', hoje)
-    .select()
   
   if (error) {
     console.error('Erro ao verificar notas vencidas:', error)
     return 0
   }
   
+  // Retorna apenas a contagem, sem atualizar o status
+  // (O enum não permite 'vencido', então mantemos a nota como 'emitida')
   return data?.length || 0
 }
 
@@ -261,40 +273,61 @@ export async function verificarNotasVencidas(obraId: string): Promise<number> {
 export async function getAllNotasFiscais(
   filters?: NotaFiscalFilters
 ): Promise<Array<ObraNotaFiscal & { obra_nome?: string }>> {
-  let query = supabase
-    .from('obras_notas_fiscais')
-    .select(`
-      *,
-      obras (
-        nome
-      )
-    `)
-    .order('vencimento', { ascending: false })
-  
-  if (filters?.status) {
-    query = query.eq('status', filters.status)
+  try {
+    // Buscar notas fiscais diretamente
+    let query = supabase
+      .from('obras_notas_fiscais')
+      .select('*')
+      .order('vencimento', { ascending: false })
+    
+    if (filters?.status) {
+      query = query.eq('status', filters.status)
+    }
+    
+    if (filters?.data_inicio) {
+      query = query.gte('vencimento', filters.data_inicio)
+    }
+    
+    if (filters?.data_fim) {
+      query = query.lte('vencimento', filters.data_fim)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Erro ao buscar notas fiscais:', error)
+      return []
+    }
+    
+    // Buscar nomes das obras para cada nota
+    const notasComObra = await Promise.all(
+      (data || []).map(async (nota: any) => {
+        try {
+          const { data: obra } = await supabase
+            .from('obras')
+            .select('name')
+            .eq('id', nota.obra_id)
+            .single()
+          
+          return {
+            ...nota,
+            obra_nome: obra?.name || 'Obra não encontrada'
+          }
+        } catch (e) {
+          console.error(`Erro ao buscar obra ${nota.obra_id}:`, e)
+          return {
+            ...nota,
+            obra_nome: 'Obra não encontrada'
+          }
+        }
+      })
+    )
+    
+    return notasComObra
+  } catch (error) {
+    console.error('Erro ao buscar todas as notas fiscais:', error)
+    return []
   }
-  
-  if (filters?.data_inicio) {
-    query = query.gte('vencimento', filters.data_inicio)
-  }
-  
-  if (filters?.data_fim) {
-    query = query.lte('vencimento', filters.data_fim)
-  }
-  
-  const { data, error } = await query
-  
-  if (error) {
-    console.error('Erro ao buscar notas fiscais:', error)
-    throw new Error('Erro ao buscar notas fiscais')
-  }
-  
-  // Transforma os dados para incluir o nome da obra
-  return (data || []).map((nota: any) => ({
-    ...nota,
-    obra_nome: nota.obras?.nome
-  }))
 }
 
 /**
@@ -362,49 +395,91 @@ export async function getFaturamentoBrutoTotal(obraId: string): Promise<number> 
  * Busca KPIs de recebimentos
  */
 export interface RecebimentosKPIs {
-  total_a_receber: number
-  total_recebido: number
-  total_vencido: number
-  proximos_issue_dates: number
+  total_recebimentos: number
+  total_faturamento_bruto: number
+  total_pendentes: number
+  total_vencidos: number
 }
 
 export async function getRecebimentosKPIs(): Promise<RecebimentosKPIs> {
-  const hoje = new Date().toISOString().split('T')[0]
-  const proximosDias = new Date()
-  proximosDias.setDate(proximosDias.getDate() + 7)
-  const dataProximos = proximosDias.toISOString().split('T')[0]
-  
-  // Total a receber (emitidas + enviadas)
-  const { data: aReceber } = await supabase
-    .from('obras_notas_fiscais')
-    .select('valor_liquido')
-    .in('status', ['emitida', 'enviada'])
-  
-  // Total recebido (pagas)
-  const { data: recebido } = await supabase
-    .from('obras_notas_fiscais')
-    .select('valor_liquido')
-    .eq('status', 'paga')
-  
-  // Total vencido
-  const { data: vencido } = await supabase
-    .from('obras_notas_fiscais')
-    .select('valor_liquido')
-    .eq('status', 'vencido')
-  
-  // Próximos vencimentos (próximos 7 dias)
-  const { data: proximos } = await supabase
-    .from('obras_notas_fiscais')
-    .select('valor_liquido')
-    .eq('status', 'emitida')
-    .gte('vencimento', hoje)
-    .lte('vencimento', dataProximos)
-  
-  return {
-    total_a_receber: aReceber?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0,
-    total_recebido: recebido?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0,
-    total_vencido: vencido?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0,
-    proximos_issue_dates: proximos?.reduce((sum, n) => sum + (n.valor_liquido || 0), 0) || 0
+  try {
+    const hoje = new Date().toISOString().split('T')[0]
+    
+    console.log('📊 [KPIs] Buscando dados para calcular recebimentos...')
+    
+    // Buscar TODAS as notas fiscais
+    const { data: todasNotas, error: errorNotas } = await supabase
+      .from('obras_notas_fiscais')
+      .select('valor_liquido, status, vencimento')
+    
+    if (errorNotas) {
+      console.error('❌ Erro ao buscar notas para KPIs:', errorNotas)
+    } else {
+      console.log(`✅ [KPIs] ${todasNotas?.length || 0} notas encontradas`)
+      console.log('📊 [KPIs] Detalhes das notas:', todasNotas)
+    }
+    
+    // Buscar TODOS os pagamentos diretos
+    const { data: todosPagamentos, error: errorPag } = await supabase
+      .from('obras_pagamentos_diretos')
+      .select('amount')
+    
+    if (errorPag) {
+      console.error('❌ Erro ao buscar pagamentos para KPIs:', errorPag)
+    } else {
+      console.log(`✅ [KPIs] ${todosPagamentos?.length || 0} pagamentos encontrados`)
+    }
+    
+    // Calcular totais
+    const totalNotas = (todasNotas || []).reduce((sum, n) => sum + (n.valor_liquido || 0), 0)
+    const totalPagamentos = (todosPagamentos || []).reduce((sum, p) => sum + (p.amount || 0), 0)
+    
+    const notasPagas = (todasNotas || []).filter(n => n.status === 'paga').reduce((sum, n) => sum + (n.valor_liquido || 0), 0)
+    const notasEmitidas = (todasNotas || []).filter(n => n.status === 'emitida').reduce((sum, n) => sum + (n.valor_liquido || 0), 0)
+    const notasEnviadas = (todasNotas || []).filter(n => n.status === 'enviada').reduce((sum, n) => sum + (n.valor_liquido || 0), 0)
+    
+    console.log('📊 [KPIs] Notas pagas:', notasPagas)
+    console.log('📊 [KPIs] Notas emitidas:', notasEmitidas)
+    console.log('📊 [KPIs] Notas enviadas:', notasEnviadas)
+    console.log('📊 [KPIs] Status das notas:', (todasNotas || []).map(n => n.status))
+    
+    // Notas vencidas são as emitidas/enviadas que já passaram do vencimento
+    const notasVencidas = (todasNotas || [])
+      .filter(n => (n.status === 'emitida' || n.status === 'enviada') && n.vencimento && n.vencimento < hoje)
+      .reduce((sum, n) => sum + (n.valor_liquido || 0), 0)
+    
+    const notasPendentes = notasEmitidas + notasEnviadas - notasVencidas
+    
+    const resultado = {
+      total_recebimentos: totalNotas + totalPagamentos,
+      total_faturamento_bruto: notasPagas + totalPagamentos,
+      total_pendentes: notasPendentes,
+      total_vencidos: notasVencidas
+    }
+    
+    console.log('📊 [KPIs] Resultado calculado:', resultado)
+    console.log('📊 [KPIs] Total Recebimentos:', resultado.total_recebimentos)
+    console.log('📊 [KPIs] Faturamento Bruto:', resultado.total_faturamento_bruto)
+    console.log('📊 [KPIs] Pendentes:', resultado.total_pendentes)
+    console.log('📊 [KPIs] Vencidos:', resultado.total_vencidos)
+    console.log('📊 [KPIs] Detalhes:', {
+      notasPagas,
+      notasEmitidas,
+      notasEnviadas,
+      notasVencidas,
+      totalPagamentos,
+      statusNotas: todasNotas?.map(n => ({ status: n.status, valor: n.valor_liquido, vencimento: n.vencimento }))
+    })
+    
+    return resultado
+  } catch (error) {
+    console.error('❌ Erro ao calcular KPIs:', error)
+    return {
+      total_recebimentos: 0,
+      total_faturamento_bruto: 0,
+      total_pendentes: 0,
+      total_vencidos: 0
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Building2, Briefcase, MapPin } from 'lucide-react'
 import { Select } from "../shared/Select"
+import { supabase } from '../../lib/supabase'
 
 interface Cliente {
   id: string
@@ -17,7 +18,7 @@ interface Rua {
   id: string
   nome: string
   obra_id: string
-  status: 'pendente' | 'em_andamento' | 'finalizada'
+  status: 'planejada' | 'em_execucao' | 'concluida'
 }
 
 interface SelecionarClienteObraRuaProps {
@@ -29,34 +30,6 @@ interface SelecionarClienteObraRuaProps {
   onRuaChange: (ruaId: string) => void
 }
 
-// ========== MOCKUPS ==========
-const mockClientes: Cliente[] = [
-  { id: 'cli-1', nome: 'Prefeitura de Osasco' },
-  { id: 'cli-2', nome: 'Construtora ABC' },
-  { id: 'cli-3', nome: 'Prefeitura de Barueri' },
-  { id: 'cli-4', nome: 'Incorporadora XYZ' }
-]
-
-const mockObras: Obra[] = [
-  { id: '1', nome: 'Pavimentação Rua das Flores - Osasco', cliente_id: 'cli-1' },
-  { id: '2', nome: 'Avenida Central - Barueri', cliente_id: 'cli-2' },
-  { id: '3', nome: 'Conjunto Residencial Vila Nova', cliente_id: 'cli-4' },
-  { id: '4', nome: 'Recapeamento Av. Principal - Osasco', cliente_id: 'cli-1' },
-  { id: '5', nome: 'Pavimentação Bairro Industrial', cliente_id: 'cli-3' }
-]
-
-const mockRuas: Rua[] = [
-  { id: 'rua-1', nome: 'Rua das Flores - Trecho 1', obra_id: '1', status: 'finalizada' },
-  { id: 'rua-2', nome: 'Rua das Flores - Trecho 2', obra_id: '1', status: 'pendente' },
-  { id: 'rua-3', nome: 'Rua das Flores - Trecho 3', obra_id: '1', status: 'em_andamento' },
-  { id: 'rua-4', nome: 'Avenida Central - Quadra A', obra_id: '2', status: 'pendente' },
-  { id: 'rua-5', nome: 'Avenida Central - Quadra B', obra_id: '2', status: 'em_andamento' },
-  { id: 'rua-6', nome: 'Rua Principal - Bloco 1', obra_id: '3', status: 'pendente' },
-  { id: 'rua-7', nome: 'Rua Principal - Bloco 2', obra_id: '3', status: 'pendente' },
-  { id: 'rua-8', nome: 'Av. Principal - Trecho Norte', obra_id: '4', status: 'em_andamento' },
-  { id: 'rua-9', nome: 'Rua Industrial 1', obra_id: '5', status: 'pendente' }
-]
-
 export function SelecionarClienteObraRua({
   clienteId,
   obraId,
@@ -65,59 +38,155 @@ export function SelecionarClienteObraRua({
   onObraChange,
   onRuaChange
 }: SelecionarClienteObraRuaProps) {
-  const [obrasFiltradas, setObrasFiltradas] = useState<Obra[]>([])
-  const [ruasFiltradas, setRuasFiltradas] = useState<Rua[]>([])
+  const [clientes, setClientes] = useState<Cliente[]>([])
+  const [obras, setObras] = useState<Obra[]>([])
+  const [ruas, setRuas] = useState<Rua[]>([])
+  const [loadingClientes, setLoadingClientes] = useState(true)
+  const [loadingObras, setLoadingObras] = useState(false)
+  const [loadingRuas, setLoadingRuas] = useState(false)
 
-  // Filtrar obras quando cliente mudar
+  // Carregar clientes do banco
+  useEffect(() => {
+    loadClientes()
+  }, [])
+
+  // Carregar obras quando cliente mudar
   useEffect(() => {
     if (clienteId) {
-      const obras = mockObras.filter(o => o.cliente_id === clienteId)
-      setObrasFiltradas(obras)
-      
-      // Se a obra selecionada não pertence ao cliente, limpar
-      if (obraId && !obras.find(o => o.id === obraId)) {
+      loadObras(clienteId)
+      // Limpar seleções
+      if (obraId) {
         onObraChange('')
         onRuaChange('')
       }
     } else {
-      setObrasFiltradas([])
-      onObraChange('')
-      onRuaChange('')
+      setObras([])
+      setRuas([])
     }
   }, [clienteId])
 
-  // Filtrar ruas quando obra mudar
+  // Carregar ruas quando obra mudar
   useEffect(() => {
     if (obraId) {
-      // Apenas ruas pendentes ou em andamento
-      const ruas = mockRuas.filter(
-        r => r.obra_id === obraId && (r.status === 'pendente' || r.status === 'em_andamento')
-      )
-      setRuasFiltradas(ruas)
-      
-      // Se a rua selecionada não pertence à obra, limpar
-      if (ruaId && !ruas.find(r => r.id === ruaId)) {
+      loadRuas(obraId)
+      // Limpar seleção de rua
+      if (ruaId) {
         onRuaChange('')
       }
     } else {
-      setRuasFiltradas([])
-      onRuaChange('')
+      setRuas([])
     }
   }, [obraId])
 
-  const clientesOptions = mockClientes.map(c => ({
+  async function loadClientes() {
+    try {
+      setLoadingClientes(true)
+      console.log('🔍 [SelecionarClienteObraRua] Carregando clientes...')
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .order('name')
+      
+      if (error) {
+        console.error('❌ Erro ao buscar clientes:', error)
+        setClientes([])
+      } else {
+        console.log('✅ Clientes carregados:', data?.length || 0)
+        setClientes(
+          data?.map(c => ({
+            id: c.id,
+            nome: c.name
+          })) || []
+        )
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar clientes:', error)
+      setClientes([])
+    } finally {
+      setLoadingClientes(false)
+    }
+  }
+
+  async function loadObras(clienteId: string) {
+    try {
+      setLoadingObras(true)
+      console.log('🔍 [SelecionarClienteObraRua] Carregando obras do cliente:', clienteId)
+      
+      const { data, error } = await supabase
+        .from('obras')
+        .select('id, name, client_id')
+        .eq('client_id', clienteId)
+        .order('name')
+      
+      if (error) {
+        console.error('❌ Erro ao buscar obras:', error)
+        setObras([])
+      } else {
+        console.log('✅ Obras carregadas:', data?.length || 0)
+        setObras(
+          data?.map(o => ({
+            id: o.id,
+            nome: o.name, // Coluna se chama 'name'
+            cliente_id: o.client_id // Coluna se chama 'client_id'
+          })) || []
+        )
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar obras:', error)
+      setObras([])
+    } finally {
+      setLoadingObras(false)
+    }
+  }
+
+  async function loadRuas(obraId: string) {
+    try {
+      setLoadingRuas(true)
+      console.log('🔍 [SelecionarClienteObraRua] Carregando ruas da obra:', obraId)
+      
+      const { data, error } = await supabase
+        .from('obras_ruas')
+        .select('id, name, obra_id, status')
+        .eq('obra_id', obraId)
+        .in('status', ['planejada', 'em_execucao'])
+        .order('name')
+      
+      if (error) {
+        console.error('❌ Erro ao buscar ruas:', error)
+        setRuas([])
+      } else {
+        console.log('✅ Ruas carregadas:', data?.length || 0)
+        setRuas(
+          data?.map(r => ({
+            id: r.id,
+            nome: r.name,
+            obra_id: r.obra_id,
+            status: r.status as 'planejada' | 'em_execucao' | 'concluida'
+          })) || []
+        )
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar ruas:', error)
+      setRuas([])
+    } finally {
+      setLoadingRuas(false)
+    }
+  }
+
+  const clientesOptions = clientes.map(c => ({
     value: c.id,
     label: c.nome
   }))
 
-  const obrasOptions = obrasFiltradas.map(o => ({
+  const obrasOptions = obras.map(o => ({
     value: o.id,
     label: o.nome
   }))
 
-  const ruasOptions = ruasFiltradas.map(r => ({
+  const ruasOptions = ruas.map(r => ({
     value: r.id,
-    label: `${r.nome} ${r.status === 'em_andamento' ? '(Em Andamento)' : ''}`
+    label: `${r.nome} ${r.status === 'em_execucao' ? '(Em Execução)' : ''}`
   }))
 
   return (
@@ -128,13 +197,17 @@ export function SelecionarClienteObraRua({
           value={clienteId}
           onChange={onClienteChange}
           options={[
-            { value: '', label: 'Selecione o cliente' },
+            { value: '', label: loadingClientes ? 'Carregando...' : 'Selecione o cliente' },
             ...clientesOptions
           ]}
           label="Cliente"
-          placeholder="Selecione o cliente"
+          placeholder={loadingClientes ? 'Carregando...' : "Selecione o cliente"}
           required
+          disabled={loadingClientes}
         />
+        {!loadingClientes && clientes.length === 0 && (
+          <p className="text-xs text-orange-600 mt-1">Nenhum cliente disponível</p>
+        )}
       </div>
 
       {/* Obra */}
@@ -143,15 +216,15 @@ export function SelecionarClienteObraRua({
           value={obraId}
           onChange={onObraChange}
           options={[
-            { value: '', label: clienteId ? 'Selecione a obra' : 'Selecione o cliente primeiro' },
+            { value: '', label: !clienteId ? 'Selecione o cliente primeiro' : loadingObras ? 'Carregando...' : 'Selecione a obra' },
             ...obrasOptions
           ]}
           label="Obra"
-          placeholder="Selecione a obra"
+          placeholder={loadingObras ? 'Carregando...' : "Selecione a obra"}
           required
-          disabled={!clienteId}
+          disabled={!clienteId || loadingObras}
         />
-        {clienteId && obrasFiltradas.length === 0 && (
+        {clienteId && !loadingObras && obras.length === 0 && (
           <p className="text-xs text-gray-500 mt-1">Nenhuma obra cadastrada para este cliente</p>
         )}
       </div>
@@ -162,15 +235,15 @@ export function SelecionarClienteObraRua({
           value={ruaId}
           onChange={onRuaChange}
           options={[
-            { value: '', label: obraId ? 'Selecione a rua' : 'Selecione a obra primeiro' },
+            { value: '', label: !obraId ? 'Selecione a obra primeiro' : loadingRuas ? 'Carregando...' : 'Selecione a rua' },
             ...ruasOptions
           ]}
           label="Rua"
-          placeholder="Selecione a rua"
+          placeholder={loadingRuas ? 'Carregando...' : "Selecione a rua"}
           required
-          disabled={!obraId}
+          disabled={!obraId || loadingRuas}
         />
-        {obraId && ruasFiltradas.length === 0 && (
+        {obraId && !loadingRuas && ruas.length === 0 && (
           <p className="text-xs text-amber-600 mt-1">
             Nenhuma rua pendente ou em andamento disponível
           </p>

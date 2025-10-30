@@ -4,9 +4,9 @@ import { Button } from "../shared/Button"
 import { Select } from "../shared/Select"
 import { DatePicker } from '../ui/date-picker'
 import { CurrencyInput } from '../ui/currency-input'
-import { NumberInput } from '../ui/number-input-fixed'
 import { calcularValorAbastecimento } from '../../utils/diesel-calculations'
 import { supabase } from '../../lib/supabase'
+import { getRuasByObra } from '../../lib/obrasRuasApi'
 
 interface AdicionarDieselModalProps {
   isOpen: boolean
@@ -18,6 +18,7 @@ interface AdicionarDieselModalProps {
     posto: string
     km_hodometro?: number
     obra_id?: string
+    rua_id?: string
     observacoes?: string
   }) => Promise<void>
   maquinarioId: string
@@ -25,7 +26,7 @@ interface AdicionarDieselModalProps {
 
 interface ObraAtiva {
   id: string
-  nome: string
+  name: string
 }
 
 export function AdicionarDieselModal({
@@ -40,11 +41,14 @@ export function AdicionarDieselModal({
   const [posto, setPosto] = useState('')
   const [kmHodometro, setKmHodometro] = useState('')
   const [obraId, setObraId] = useState('')
+  const [ruaId, setRuaId] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [obrasAtivas, setObrasAtivas] = useState<ObraAtiva[]>([])
+  const [ruas, setRuas] = useState<{id: string, name: string}[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [loadingObras, setLoadingObras] = useState(false)
+  const [loadingRuas, setLoadingRuas] = useState(false)
 
   // Cálculo automático do valor total
   const valorTotal = quantidadeLitros && precoPorLitro
@@ -58,14 +62,24 @@ export function AdicionarDieselModal({
     }
   }, [isOpen])
 
+  // Carregar ruas quando obra mudar
+  useEffect(() => {
+    if (obraId) {
+      loadRuasByObra(obraId)
+    } else {
+      setRuas([])
+      setRuaId('')
+    }
+  }, [obraId])
+
   const loadObrasAtivas = async () => {
     setLoadingObras(true)
     try {
       const { data, error } = await supabase
         .from('obras')
-        .select('id, nome')
-        .in('status', ['planejada', 'em_andamento'])
-        .order('nome')
+        .select('id, name')
+        .in('status', ['planejamento', 'andamento'])
+        .order('name', { ascending: true })
 
       if (error) throw error
       setObrasAtivas(data || [])
@@ -73,6 +87,19 @@ export function AdicionarDieselModal({
       console.error('Erro ao carregar obras:', err)
     } finally {
       setLoadingObras(false)
+    }
+  }
+
+  const loadRuasByObra = async (obraId: string) => {
+    setLoadingRuas(true)
+    try {
+      const ruasData = await getRuasByObra(obraId)
+      setRuas(ruasData.map(rua => ({ id: rua.id, name: rua.name })))
+    } catch (err) {
+      console.error('Erro ao carregar ruas:', err)
+      setRuas([])
+    } finally {
+      setLoadingRuas(false)
     }
   }
 
@@ -110,6 +137,7 @@ export function AdicionarDieselModal({
         posto: posto.trim() || 'Não informado',
         km_hodometro: kmHodometro ? parseFloat(kmHodometro) : undefined,
         obra_id: obraId || undefined,
+        rua_id: ruaId || undefined,
         observacoes: observacoes.trim() || undefined
       })
 
@@ -120,6 +148,7 @@ export function AdicionarDieselModal({
       setPosto('')
       setKmHodometro('')
       setObraId('')
+      setRuaId('')
       setObservacoes('')
       onClose()
     } catch (err: any) {
@@ -173,13 +202,15 @@ export function AdicionarDieselModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Quantidade de Litros *
               </label>
-              <NumberInput
-                value={Number(quantidadeLitros) || 0}
-                onChange={(value) => setQuantidadeLitros(value.toString())}
-                placeholder="0,00"
-                min={0}
-                decimals={2}
+              <input
+                type="number"
+                value={quantidadeLitros}
+                onChange={(e) => setQuantidadeLitros(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.01"
                 disabled={isSubmitting}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -266,7 +297,7 @@ export function AdicionarDieselModal({
                 { value: '', label: loadingObras ? 'Carregando...' : 'Nenhuma (uso geral)' },
                 ...obrasAtivas.map(obra => ({
                   value: obra.id,
-                  label: obra.nome
+                  label: obra.name
                 }))
               ]}
               disabled={isSubmitting || loadingObras}
@@ -280,6 +311,33 @@ export function AdicionarDieselModal({
               </div>
             )}
           </div>
+
+          {/* Rua */}
+          {obraId && (
+            <div>
+              <Select
+                label="Rua"
+                value={ruaId}
+                onChange={setRuaId}
+                options={[
+                  { value: '', label: loadingRuas ? 'Carregando...' : 'Nenhuma (uso geral)' },
+                  ...ruas.map(rua => ({
+                    value: rua.id,
+                    label: rua.name
+                  }))
+                ]}
+                disabled={isSubmitting || loadingRuas}
+              />
+              {ruaId && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg flex items-start gap-2">
+                  <Info className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-green-800">
+                    O abastecimento será associado à rua específica selecionada
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Observações */}
           <div>

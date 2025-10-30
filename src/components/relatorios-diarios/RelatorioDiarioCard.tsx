@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   FileText, 
@@ -10,20 +10,58 @@ import {
   Weight, 
   Users,
   Building,
-  ChevronRight
+  ChevronRight,
+  Edit,
+  Trash2
 } from 'lucide-react'
 import { RelatorioDiario } from '../../types/relatorios-diarios'
 import { faixaAsfaltoLabels } from '../../types/parceiros'
+import { deleteRelatorioDiario } from '../../lib/relatoriosDiariosApi'
+import { toast } from '../../lib/toast'
 
 interface RelatorioDiarioCardProps {
   relatorio: RelatorioDiario
+  onDelete?: (id: string) => void
 }
 
-export function RelatorioDiarioCard({ relatorio }: RelatorioDiarioCardProps) {
+export function RelatorioDiarioCard({ relatorio, onDelete }: RelatorioDiarioCardProps) {
   const navigate = useNavigate()
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleClick = () => {
     navigate(`/relatorios-diarios/${relatorio.id}`)
+  }
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigate(`/relatorios-diarios/${relatorio.id}/editar`)
+  }
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    try {
+      setIsDeleting(true)
+      await deleteRelatorioDiario(relatorio.id)
+      toast.success('Relatório excluído com sucesso!')
+      if (onDelete) {
+        onDelete(relatorio.id)
+      }
+    } catch (error: any) {
+      console.error('Erro ao excluir relatório:', error)
+      toast.error(error.message || 'Erro ao excluir relatório')
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteConfirm(false)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false)
   }
 
   return (
@@ -43,7 +81,23 @@ export function RelatorioDiarioCard({ relatorio }: RelatorioDiarioCardProps) {
           </div>
         </div>
 
-        <ChevronRight className="h-5 w-5 text-gray-400" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleEdit}
+            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Editar relatório"
+          >
+            <Edit className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleDeleteClick}
+            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Excluir relatório"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          <ChevronRight className="h-5 w-5 text-gray-400" />
+        </div>
       </div>
 
       {/* Informações Principais */}
@@ -152,6 +206,36 @@ export function RelatorioDiarioCard({ relatorio }: RelatorioDiarioCardProps) {
           <p className="text-xs text-gray-600 line-clamp-2">
             <strong>Obs:</strong> {relatorio.observacoes}
           </p>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={(e) => {
+          if (e.target === e.currentTarget) handleDeleteCancel()
+        }}>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Confirmar Exclusão</h3>
+            <p className="text-gray-600 mb-4">
+              Tem certeza que deseja excluir o relatório <strong>{relatorio.numero}</strong>? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={handleDeleteCancel}
+                disabled={isDeleting}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

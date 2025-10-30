@@ -370,7 +370,7 @@ export default function DashboardWorldPav() {
                   <Settings className="h-5 w-5 text-gray-600" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">Maquinários</h3>
+                  <h3 className="font-medium text-gray-900">Equipamentos</h3>
                   <p className="text-sm text-gray-500">Equipamentos de pavimentação</p>
                 </div>
               </div>

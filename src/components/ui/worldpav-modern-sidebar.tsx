@@ -42,12 +42,13 @@ const navigationItems: NavigationItem[] = [
   { id: "obras", name: "Obras", icon: Construction, href: "/obras" },
   { id: "programacao", name: "Programação", icon: Calendar, href: "/programacao-pavimentacao" },
   { id: "colaboradores", name: "Colaboradores", icon: UserCheck, href: "/colaboradores" },
+  { id: "equipes", name: "Equipes", icon: Users, href: "/equipes" },
   { id: "controle-diario", name: "Controle Diário", icon: ClipboardCheck, href: "/controle-diario" },
   { id: "relatorios-diarios", name: "Relatórios Diários", icon: ClipboardList, href: "/relatorios-diarios" },
   { id: "recebimentos", name: "Recebimentos", icon: CreditCard, href: "/recebimentos" },
   { id: "contas-pagar", name: "Contas a Pagar", icon: FileText, href: "/contas-pagar" },
   { id: "financeiro", name: "Financeiro", icon: Calculator, href: "/financial" },
-  { id: "maquinarios", name: "Maquinários", icon: Settings, href: "/maquinarios" },
+  { id: "maquinarios", name: "Equipamentos", icon: Settings, href: "/maquinarios" },
   { id: "parceiros", name: "Parceiros", icon: Handshake, href: "/parceiros" },
   { id: "guardas", name: "Guardas", icon: Shield, href: "/guardas" },
 ];
@@ -64,6 +65,7 @@ export function WorldPavModernSidebar({ className = "", onNavigate }: WorldPavMo
     if (path.startsWith('/obras')) return 'obras';
     if (path.startsWith('/programacao-pavimentacao')) return 'programacao';
     if (path.startsWith('/colaboradores')) return 'colaboradores';
+    if (path.startsWith('/equipes')) return 'equipes';
     if (path.startsWith('/controle-diario')) return 'controle-diario';
     if (path.startsWith('/relatorios-diarios')) return 'relatorios-diarios';
     if (path.startsWith('/recebimentos')) return 'recebimentos';

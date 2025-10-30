@@ -13,7 +13,7 @@ import MoreMenu from '../pages/mobile/MoreMenu'
 // Clientes
 import ClientsList from '../pages/clients/ClientsList'
 import NewClient from '../pages/clients/NewClient'
-import ClientDetailsNew from '../pages/clients/ClientDetailsNew'
+import ClientDetails from '../pages/clients/ClientDetails'
 import ClientEdit from '../pages/clients/ClientEdit'
 
 // Maquinários
@@ -23,10 +23,16 @@ import EditarMaquinario from '../pages/maquinarios/EditarMaquinario'
 import DetalhesMaquinario from '../pages/maquinarios/DetalhesMaquinario'
 
 // Colaboradores
-import ColaboradoresList from '../pages/colaboradores/ColaboradoresListMock'
+import ColaboradoresList from '../pages/colaboradores/ColaboradoresList'
 import ColaboradorDetalhes from '../pages/colaboradores/ColaboradorDetalhes'
 import ColaboradorEdit from '../pages/colaboradores/ColaboradorEdit'
 import NovoColaborador from '../pages/colaboradores/NovoColaborador'
+
+// Equipes
+import EquipesList from '../pages/equipes/EquipesList'
+import NovaEquipe from '../pages/equipes/NovaEquipe'
+import EquipeDetalhes from '../pages/equipes/EquipeDetalhes'
+import EditarEquipe from '../pages/equipes/EditarEquipe'
 
 // Reports
 import ReportsList from '../pages/reports/ReportsList'
@@ -65,6 +71,7 @@ import NovoServico from '../pages/servicos/NovoServico'
 import RelatoriosDiariosList from '../pages/relatorios-diarios/RelatoriosDiariosList'
 import NovoRelatorioDiario from '../pages/relatorios-diarios/NovoRelatorioDiario'
 import RelatorioDiarioDetails from '../pages/relatorios-diarios/RelatorioDiarioDetails'
+import EditarRelatorioDiario from '../pages/relatorios-diarios/EditarRelatorioDiario'
 
 // Parceiros
 import ParceirosList from '../pages/parceiros/ParceirosList'
@@ -76,14 +83,21 @@ import NovoCarregamento from '../pages/parceiros/NovoCarregamento'
 // Guardas
 import GuardasIndex from '../pages/guardas/GuardasIndex'
 
-// Controle Diário
-import ControleDiarioIndex from '../pages/controle-diario/ControleDiarioIndex'
-import NovaRelacaoDiaria from '../pages/controle-diario/NovaRelacaoDiaria'
+  // Controle Diário
+  import ControleDiarioIndex from '../pages/controle-diario/ControleDiarioIndex'
+  import NovaRelacaoDiaria from '../pages/controle-diario/NovaRelacaoDiaria'
+  import EditarRelacaoDiaria from '../pages/controle-diario/EditarRelacaoDiaria'
 
 // Contas a Pagar
 import ContasPagarList from '../pages/contas-pagar/ContasPagarList'
 import ContaPagarForm from '../pages/contas-pagar/ContaPagarForm'
 import ContaPagarDetails from '../pages/contas-pagar/ContaPagarDetails'
+
+// Contratos
+import NewContrato from '../pages/contratos/NewContrato'
+
+// Documentação
+import NewDocumentacao from '../pages/documentacao/NewDocumentacao'
 
 // Demos (Desenvolvimento)
 import ModernSidebarDemo from '../pages/ModernSidebarDemo'
@@ -150,7 +164,7 @@ export const router = createBrowserRouter([
     path: '/clients/:id',
     element: (
       <RequireAuth>
-        <ClientDetailsNew />
+        <ClientDetails />
       </RequireAuth>
     ),
     errorElement: <GenericError />
@@ -235,6 +249,44 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth>
         <ColaboradorEdit />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+
+  // ==================== EQUIPES ====================
+  {
+    path: '/equipes',
+    element: (
+      <RequireAuth>
+        <EquipesList />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/equipes/new',
+    element: (
+      <RequireAuth>
+        <NovaEquipe />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/equipes/:id',
+    element: (
+      <RequireAuth>
+        <EquipeDetalhes />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
+    path: '/equipes/:id/edit',
+    element: (
+      <RequireAuth>
+        <EditarEquipe />
       </RequireAuth>
     ),
     errorElement: <GenericError />
@@ -451,6 +503,15 @@ export const router = createBrowserRouter([
     errorElement: <GenericError />
   },
   {
+    path: '/relatorios-diarios/:id/editar',
+    element: (
+      <RequireAuth>
+        <EditarRelatorioDiario />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+  {
     path: '/relatorios-diarios/:id',
     element: (
       <RequireAuth>
@@ -537,6 +598,15 @@ export const router = createBrowserRouter([
     ),
     errorElement: <GenericError />
   },
+  {
+    path: '/controle-diario/editar/:id',
+    element: (
+      <RequireAuth>
+        <EditarRelacaoDiaria />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
 
   // ==================== CONTAS A PAGAR ====================
   {
@@ -571,6 +641,28 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth>
         <ContaPagarForm />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+
+  // ==================== CONTRATOS ====================
+  {
+    path: '/contratos/new',
+    element: (
+      <RequireAuth>
+        <NewContrato />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+
+  // ==================== DOCUMENTAÇÃO ====================
+  {
+    path: '/documentacao/new',
+    element: (
+      <RequireAuth>
+        <NewDocumentacao />
       </RequireAuth>
     ),
     errorElement: <GenericError />

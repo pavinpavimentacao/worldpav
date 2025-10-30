@@ -3,8 +3,8 @@ import { Search, FileText, Calendar } from 'lucide-react'
 import { DatePicker } from '../ui/date-picker'
 import { Input } from '../ui/input'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
+// ⚙️ DADOS REAIS
+const USE_MOCK = false
 
 interface Faturamento {
   id: string
@@ -35,8 +35,8 @@ export function ReceitasTab({ mesAno }: ReceitasTabProps) {
 
     if (filtroObra) {
       resultado = resultado.filter(f => 
-        f.obra_nome.toLowerCase().includes(filtroObra.toLowerCase()) ||
-        f.rua_nome.toLowerCase().includes(filtroObra.toLowerCase())
+        (f.obra_nome || '').toLowerCase().includes(filtroObra.toLowerCase()) ||
+        (f.rua_nome || '').toLowerCase().includes(filtroObra.toLowerCase())
       )
     }
 
@@ -53,38 +53,20 @@ export function ReceitasTab({ mesAno }: ReceitasTabProps) {
 
       if (USE_MOCK) {
         await new Promise(resolve => setTimeout(resolve, 300))
-        
-        // Dados mockados
-        setFaturamentos([
-          {
-            id: '1',
-            data_pagamento: '2025-01-20',
-            obra_nome: 'Pavimentação Rua das Flores - Osasco',
-            rua_nome: 'Rua das Flores',
-            valor_total: 18500.00,
-            numero_nota_fiscal: 'NF-001/2025'
-          },
-          {
-            id: '2',
-            data_pagamento: '2025-01-22',
-            obra_nome: 'Pavimentação Rua das Flores - Osasco',
-            rua_nome: 'Rua dos Girassóis',
-            valor_total: 17750.00,
-            numero_nota_fiscal: 'NF-002/2025'
-          },
-          {
-            id: '3',
-            data_pagamento: '2025-01-25',
-            obra_nome: 'Avenida Central - Barueri',
-            rua_nome: 'Avenida Central',
-            valor_total: 30000.00,
-            numero_nota_fiscal: 'NF-003/2025'
-          }
-        ])
+        setFaturamentos([])
       } else {
-        // TODO: Implementar chamada real da API
-        // const data = await getFinancialConsolidado(mesAno)
-        // setFaturamentos(data.faturamentos)
+        const { getFinancialConsolidado } = await import('../../lib/financialConsolidadoApi')
+        const data = await getFinancialConsolidado(mesAno)
+        setFaturamentos(
+          (data.faturamentos || []).map((f: any) => ({
+            id: f.id,
+            data_pagamento: f.data_pagamento,
+            obra_nome: f.obra_nome || '',
+            rua_nome: f.rua_nome || '',
+            valor_total: f.valor_total,
+            numero_nota_fiscal: f.numero_nota_fiscal || undefined,
+          }))
+        )
       }
     } catch (error) {
       console.error('Erro ao carregar faturamentos:', error)

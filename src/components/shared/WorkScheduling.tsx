@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { format } from 'date-fns'
+import { ProgramacaoPavimentacaoAPI } from '../../lib/programacao-pavimentacao-api'
+import { ProgramacaoDetalhesModal } from '../programacao/ProgramacaoDetalhesModal'
 
 type ScheduledWork = {
   id: string
@@ -30,6 +32,27 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
 }) => {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar')
+  const [loading, setLoading] = useState(false)
+  const [programacoes, setProgramacoes] = useState<any[]>([])
+  const [programacaoSelecionada, setProgramacaoSelecionada] = useState<any>(null)
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false)
+  
+  // Função para carregar programações reais
+  React.useEffect(() => {
+    const carregarProgramacoes = async () => {
+      setLoading(true)
+      try {
+        const data = await ProgramacaoPavimentacaoAPI.getAll()
+        setProgramacoes(data)
+      } catch (error) {
+        console.error('Erro ao carregar programações:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    carregarProgramacoes()
+  }, [])
 
   // Mock data - será substituído por dados reais do banco
   const mockScheduledWorks: ScheduledWork[] = [
@@ -79,31 +102,44 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
     }
   ]
 
-  const filteredWorks = clientId 
-    ? mockScheduledWorks.filter(work => work.client_name.toLowerCase().includes(clientId.toLowerCase()))
-    : mockScheduledWorks
+  // Usar dados reais em vez de mock
+  const filteredWorks = clientId && programacoes.length > 0
+    ? programacoes.filter(prog => prog.cliente_id === clientId)
+    : programacoes
+    
+  // Função para abrir modal de detalhes
+  const abrirDetalhes = (programacao: any) => {
+    setProgramacaoSelecionada(programacao)
+    setShowDetalhesModal(true)
+  }
+  
+  // Função para fechar modal
+  const fecharDetalhes = () => {
+    setShowDetalhesModal(false)
+    setProgramacaoSelecionada(null)
+  }
 
   function getStatusBadge(status: string) {
     const variants = {
-      'agendada': 'secondary',
-      'em_andamento': 'warning',
-      'concluida': 'success',
-      'cancelada': 'danger'
+      'agendada': 'default',
+      'em_andamento': 'secondary',
+      'concluida': 'default',
+      'cancelada': 'destructive'
     } as const
-    return variants[status as keyof typeof variants] || 'secondary'
+    return variants[status as keyof typeof variants] || 'default'
   }
 
   function getPriorityBadge(priority: string) {
     const variants = {
-      'baixa': 'secondary',
-      'media': 'warning',
-      'alta': 'danger'
+      'baixa': 'default',
+      'media': 'secondary',
+      'alta': 'destructive'
     } as const
-    return variants[priority as keyof typeof variants] || 'secondary'
+    return variants[priority as keyof typeof variants] || 'default'
   }
 
   function getCompanyBadge(company: string) {
-    return company === 'WorldPav' ? 'primary' : 'info'
+    return company === 'WorldPav' ? 'default' : 'secondary'
   }
 
   return (
@@ -118,14 +154,14 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
         </div>
         <div className="flex gap-2">
           <Button 
-            variant={viewMode === 'calendar' ? 'primary' : 'outline'}
+            variant={viewMode === 'calendar' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('calendar')}
           >
             📅 Calendário
           </Button>
           <Button 
-            variant={viewMode === 'list' ? 'primary' : 'outline'}
+            variant={viewMode === 'list' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setViewMode('list')}
           >
@@ -201,13 +237,13 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
                     <p className="text-sm text-gray-500 mt-1">📍 {work.location}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Badge variant={getStatusBadge(work.status)} size="sm">
+                    <Badge variant={getStatusBadge(work.status)}>
                       {work.status.replace('_', ' ').toUpperCase()}
                     </Badge>
-                    <Badge variant={getPriorityBadge(work.priority)} size="sm">
+                    <Badge variant={getPriorityBadge(work.priority)}>
                       {work.priority.toUpperCase()}
                     </Badge>
-                    <Badge variant={getCompanyBadge(work.responsible_company)} size="sm">
+                    <Badge variant={getCompanyBadge(work.responsible_company)}>
                       {work.responsible_company}
                     </Badge>
                   </div>
@@ -235,8 +271,8 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
                 <div className="mb-4">
                   <span className="text-gray-500 text-sm">Equipamentos necessários:</span>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {work.equipment_required.map((equipment, index) => (
-                      <Badge key={index} variant="secondary" size="sm">
+                    {work.equipment_required.map((equipment: string, index: number) => (
+                      <Badge key={index} variant="secondary">
                         {equipment}
                       </Badge>
                     ))}
@@ -251,11 +287,8 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
                 )}
 
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" size="sm">
-                    📝 Editar
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    📋 Relatório
+                  <Button variant="outline" size="sm" onClick={() => abrirDetalhes(work)}>
+                    👁️ Ver Detalhes
                   </Button>
                   {onWorkSelect && (
                     <Button size="sm" onClick={() => onWorkSelect(work)}>
@@ -296,6 +329,14 @@ export const WorkScheduling: React.FC<WorkSchedulingProps> = ({
           </Button>
         </div>
       </div>
+      
+      {/* Modal de Detalhes */}
+      {showDetalhesModal && programacaoSelecionada && (
+        <ProgramacaoDetalhesModal 
+          programacao={programacaoSelecionada}
+          onClose={fecharDetalhes}
+        />
+      )}
     </div>
   )
 }

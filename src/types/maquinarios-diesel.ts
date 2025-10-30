@@ -14,6 +14,11 @@ export interface MaquinarioDiesel {
     id: string
     nome: string
   }
+  rua_id?: string
+  rua?: {
+    id: string
+    name: string
+  }
   quantidade_litros: number
   preco_por_litro: number
   valor_total: number
@@ -29,6 +34,7 @@ export interface MaquinarioDiesel {
 export interface CreateDieselInput {
   maquinario_id: string
   obra_id?: string
+  rua_id?: string
   quantidade_litros: number
   preco_por_litro: number
   data_abastecimento: string
@@ -39,6 +45,7 @@ export interface CreateDieselInput {
 
 export interface UpdateDieselInput {
   obra_id?: string
+  rua_id?: string
   quantidade_litros?: number
   preco_por_litro?: number
   data_abastecimento?: string

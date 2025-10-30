@@ -17,15 +17,15 @@ export const DENSIDADE_ASFALTO = 2.4
 
 /**
  * Calcula a espessura da camada de asfalto
- * Fórmula: toneladas / metragem / densidade
+ * Fórmula: (toneladas / metragem / densidade) * 100
  * 
  * @param toneladas - Quantidade de toneladas utilizadas
  * @param metragem - Área em metros quadrados
- * @returns Espessura em centímetros
+ * @returns Espessura em centímetros (multiplicada por 100 para valores mais legíveis)
  */
 export function calcularEspessura(toneladas: number, metragem: number): number {
   if (metragem <= 0) return 0
-  return toneladas / metragem / DENSIDADE_ASFALTO
+  return (toneladas / metragem / DENSIDADE_ASFALTO) * 100
 }
 
 /**

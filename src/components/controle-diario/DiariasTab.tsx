@@ -3,13 +3,12 @@
  * Gestão de pagamento de diárias para colaboradores
  */
 
-import React, { useState, useMemo } from 'react';
-import { Plus, DollarSign, Calendar, User, Edit2, Trash2, Check, X, TrendingUp, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Plus, DollarSign, Calendar, User, Edit2, Trash2, Check, X, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from "../shared/Button";
 import { Input } from '../ui/input';
 import { CurrencyInput } from '../ui/currency-input';
 import { toast } from '../../lib/toast-hooks';
-import { mockColaboradores } from '../../mocks/colaboradores-mock';
 import {
   listarRegistrosDiarias,
   criarRegistroDiaria,
@@ -18,13 +17,108 @@ import {
 } from '../../mocks/controle-diario-mock';
 import { RegistroDiaria, formatarValor, calcularValorTotalDiaria } from '../../types/controle-diario';
 import { formatDateBR } from '../../utils/date-format';
+import { supabase } from '../../lib/supabase';
+import { getCurrentCompanyId } from '../../lib/utils';
+import { WORLDPAV_COMPANY_ID } from '../../lib/company-utils';
+
+interface ColaboradorOption {
+  id: string;
+  nome: string;
+  funcao: string;
+}
 
 export const DiariasTab: React.FC = () => {
-  const [diarias, setDiarias] = useState<RegistroDiaria[]>(listarRegistrosDiarias());
+  const [diarias, setDiarias] = useState<RegistroDiaria[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [diariaSelecionada, setDiariaSelecionada] = useState<RegistroDiaria | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [colaboradores, setColaboradores] = useState<ColaboradorOption[]>([]);
+  const [companyId, setCompanyId] = useState<string>('');
+  const [loadingColaboradores, setLoadingColaboradores] = useState(true);
+
+  // Carregar companyId do usuário
+  useEffect(() => {
+    async function loadUserCompany() {
+      try {
+        // Usar diretamente o Company ID do WorldPav como padrão
+        // Se necessário, pode fazer fallback para getCurrentCompanyId() no futuro
+        setCompanyId(WORLDPAV_COMPANY_ID);
+        console.log('✅ Company ID carregado (WorldPav):', WORLDPAV_COMPANY_ID);
+      } catch (error) {
+        console.error('Erro ao carregar empresa do usuário:', error);
+        // Em caso de erro, usar WorldPav como padrão
+        setCompanyId(WORLDPAV_COMPANY_ID);
+        console.log('⚠️ Usando WorldPav como Company ID padrão');
+      }
+    }
+
+    loadUserCompany();
+  }, []);
+
+  // Carregar colaboradores quando companyId estiver disponível
+  useEffect(() => {
+    async function loadColaboradores() {
+      if (!companyId) return;
+
+      try {
+        setLoadingColaboradores(true);
+        const { data, error } = await supabase
+          .from('colaboradores')
+          .select('id, name, position, tipo_equipe, status')
+          .eq('company_id', companyId)
+          .eq('status', 'ativo')
+          .is('deleted_at', null)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        // Adaptar dados do banco para o formato esperado
+        // Incluir colaboradores de pavimentação e máquinas (equipe de massa)
+        const colaboradoresAdaptados: ColaboradorOption[] = (data || [])
+          .filter((c: any) => c.tipo_equipe === 'pavimentacao' || c.tipo_equipe === 'maquinas')
+          .map((c: any) => ({
+            id: c.id,
+            nome: c.name || 'Nome não informado',
+            funcao: c.position || 'Função não informada',
+          }));
+
+        setColaboradores(colaboradoresAdaptados);
+        console.log(`✅ ${colaboradoresAdaptados.length} colaboradores de equipe de massa (pavimentação + máquinas) carregados`);
+      } catch (error) {
+        console.error('Erro ao carregar colaboradores:', error);
+        toast.error('Erro ao carregar colaboradores');
+      } finally {
+        setLoadingColaboradores(false);
+      }
+    }
+
+    loadColaboradores();
+  }, [companyId]);
+
+  useEffect(() => {
+    async function loadDiarias() {
+      try {
+        setLoading(true);
+        const data = await listarRegistrosDiarias();
+        console.log('🔍 Diárias carregadas:', data.map(d => ({ 
+          id: d.id, 
+          colaborador: d.colaborador_nome, 
+          status: d.status_pagamento,
+          valor: d.valor_total 
+        })));
+        setDiarias(data);
+      } catch (error) {
+        console.error('Erro ao carregar diárias:', error);
+        toast.error('Erro ao carregar diárias');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDiarias();
+  }, []);
 
   // Form fields
   const [colaboradorId, setColaboradorId] = useState('');
@@ -39,11 +133,6 @@ export const DiariasTab: React.FC = () => {
   // Filtros
   const [filtroColaborador, setFiltroColaborador] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendente' | 'pago'>('todos');
-
-  // Colaboradores ativos de pavimentação
-  const colaboradoresPavimentacao = mockColaboradores.filter(
-    (c) => c.ativo && (c.tipo_equipe === 'pavimentacao' || c.tipo_equipe === 'ambas')
-  );
 
   // Filtrar diárias
   const diariasFiltradas = useMemo(() => {
@@ -109,11 +198,9 @@ export const DiariasTab: React.FC = () => {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const colaborador = colaboradores.find((c) => c.id === colaboradorId);
 
-      const colaborador = colaboradoresPavimentacao.find((c) => c.id === colaboradorId);
-
-      const novaDiaria = criarRegistroDiaria({
+      const novaDiaria = await criarRegistroDiaria({
         colaborador_id: colaboradorId,
         quantidade: qtd,
         valor_unitario: valorUnit,
@@ -138,23 +225,37 @@ export const DiariasTab: React.FC = () => {
     }
   };
 
-  const handleMarcarPago = (diaria: RegistroDiaria) => {
-    const atualizada = atualizarRegistroDiaria(diaria.id, {
-      status_pagamento: 'pago',
-      data_pagamento: new Date().toISOString().split('T')[0],
-    });
+  const handleMarcarPago = async (diaria: RegistroDiaria) => {
+    try {
+      console.log('🔍 [handleMarcarPago] Iniciando marcação como pago para:', diaria);
+      
+      const atualizada = await atualizarRegistroDiaria(diaria.id, {
+        status_pagamento: 'pago',
+        data_pagamento: new Date().toISOString().split('T')[0],
+      });
 
-    if (atualizada) {
-      setDiarias((prev) => prev.map((d) => (d.id === diaria.id ? atualizada : d)));
-      toast.success('Diária marcada como paga!');
+      console.log('✅ [handleMarcarPago] Diária atualizada:', atualizada);
+
+      if (atualizada) {
+        setDiarias((prev) => prev.map((d) => (d.id === diaria.id ? atualizada : d)));
+        toast.success('Diária marcada como paga!');
+      }
+    } catch (error: any) {
+      console.error('❌ [handleMarcarPago] Erro ao marcar como pago:', error);
+      toast.error(`Erro ao marcar diária como paga: ${error.message}`);
     }
   };
 
-  const handleDeletar = (id: string) => {
+  const handleDeletar = async (id: string) => {
     if (window.confirm('Deseja realmente excluir este registro de diária?')) {
-      if (deletarRegistroDiaria(id)) {
-        setDiarias((prev) => prev.filter((d) => d.id !== id));
-        toast.success('Diária excluída com sucesso!');
+      try {
+        const sucesso = await deletarRegistroDiaria(id);
+        if (sucesso) {
+          setDiarias((prev) => prev.filter((d) => d.id !== id));
+          toast.success('Diária excluída com sucesso!');
+        }
+      } catch (error: any) {
+        toast.error('Erro ao excluir diária');
       }
     }
   };
@@ -166,6 +267,17 @@ export const DiariasTab: React.FC = () => {
     const desc = parseFloat(desconto) || 0;
     return calcularValorTotalDiaria(qtd, valorUnit, adic, desc);
   }, [quantidade, valorUnitario, adicional, desconto]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Carregando diárias...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -418,15 +530,22 @@ export const DiariasTab: React.FC = () => {
                   onChange={(e) => setColaboradorId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   required
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || loadingColaboradores}
                 >
-                  <option value="">Selecione um colaborador</option>
-                  {colaboradoresPavimentacao.map((col) => (
+                  <option value="">
+                    {loadingColaboradores ? 'Carregando colaboradores...' : 'Selecione um colaborador'}
+                  </option>
+                  {colaboradores.map((col) => (
                     <option key={col.id} value={col.id}>
                       {col.nome} - {col.funcao}
                     </option>
                   ))}
                 </select>
+                {colaboradores.length === 0 && !loadingColaboradores && (
+                  <p className="text-sm text-orange-600 mt-1">
+                    ⚠️ Nenhum colaborador de equipe de massa encontrado
+                  </p>
+                )}
               </div>
 
               {/* Grid 2 colunas */}

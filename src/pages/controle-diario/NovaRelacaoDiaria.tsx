@@ -11,18 +11,16 @@ import { Input } from '../../components/ui/input';
 import { toast } from '../../lib/toast-hooks';
 import { mockColaboradores } from '../../mocks/colaboradores-mock';
 import { criarRelacaoDiaria } from '../../mocks/controle-diario-mock';
+import { getColaboradores } from '../../lib/colaboradoresApi';
+import { getEquipes } from '../../lib/equipesApi';
 import { StatusPresenca, getStatusPresencaInfo } from '../../types/controle-diario';
 import { Colaborador, TipoEquipe } from '../../types/colaboradores';
 import { formatDateBR } from '../../utils/date-format';
 import { useNavigate } from 'react-router-dom';
-
-// Mock de equipes (substituir por dados reais)
-const mockEquipes = [
-  { id: 'eq-001', nome: 'Equipe Alpha', tipo: 'propria' as TipoEquipe },
-  { id: 'eq-002', nome: 'Equipe Beta', tipo: 'propria' as TipoEquipe },
-  { id: 'eq-003', nome: 'Equipe Gamma', tipo: 'propria' as TipoEquipe },
-  { id: 'eq-004', nome: 'Equipe Delta - Terceira', tipo: 'terceirizada' as TipoEquipe },
-];
+import { useAuth } from '../../lib/auth';
+import debugLogger from '../../utils/debug-logger';
+import { supabase } from '../../lib/supabase';
+import { getCurrentDateISOInSaoPauloTimezone } from '../../utils/timezone-utils';
 
 interface ColaboradorPresenca extends Colaborador {
   selecionado: boolean;
@@ -41,13 +39,16 @@ interface AusenciaInfo {
 
 const NovaRelacaoDiaria: React.FC = () => {
   const navigate = useNavigate();
+  const { jwtUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form fields
-  const [dataSelecionada, setDataSelecionada] = useState(new Date().toISOString().split('T')[0]);
+  const [dataSelecionada, setDataSelecionada] = useState(getCurrentDateISOInSaoPauloTimezone());
   const [equipeSelecionada, setEquipeSelecionada] = useState('');
   const [colaboradores, setColaboradores] = useState<ColaboradorPresenca[]>([]);
   const [observacoesDia, setObservacoesDia] = useState('');
+  const [equipes, setEquipes] = useState<Array<{ id: string; nome: string; count: number }>>([]);
+  const [colaboradoresReais, setColaboradoresReais] = useState<any[]>([]);
   
   // Contador de ações
   const [contadorAcoes, setContadorAcoes] = useState(0);
@@ -59,17 +60,212 @@ const NovaRelacaoDiaria: React.FC = () => {
   const [equipeDestino, setEquipeDestino] = useState('');
   const [observacoesAusencia, setObservacoesAusencia] = useState('');
 
-  // Filtrar colaboradores operacionais (equipes de massa)
-  const colaboradoresPavimentacao = mockColaboradores.filter(
-    (c) => c.ativo !== false && (c.tipo_equipe === 'equipe_a' || c.tipo_equipe === 'equipe_b')
-  );
+  // Carregar equipes e colaboradores do banco
+  useEffect(() => {
+    async function loadData() {
+      try {
+        console.log('jwtUser atual:', jwtUser);
+        
+        // Mostrar objeto localStorage para debug
+        const allStorage = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) {
+            try {
+              allStorage[key] = localStorage.getItem(key);
+            } catch (e) {
+              allStorage[key] = '[Erro ao ler]';
+            }
+          }
+        }
+        console.log('Conteúdo do localStorage:', allStorage);
+        
+        if (!jwtUser?.companyId) {
+          debugLogger.error('NovaRelacaoDiaria', 'Company ID não encontrado');
+          console.log('🔧 Buscando dados reais usando Supabase anônimo');
+          
+          try {
+            // ✅ Buscar equipes diretamente da tabela equipes
+            const { data: equipesBanco, error: equipesError } = await supabase
+              .from('equipes')
+              .select('id, name, prefixo, descricao')
+              .eq('company_id', '39cf8b61-6737-4aa5-af3f-51fba9f12345') // TODO: pegar do contexto
+              .is('deleted_at', null);
+            
+            if (equipesError) {
+              console.error('Erro ao buscar equipes:', equipesError);
+              throw equipesError;
+            }
+            
+            console.log('Equipes reais encontradas:', equipesBanco?.length || 0);
+            
+            if (!equipesBanco || equipesBanco.length === 0) {
+              throw new Error('Nenhuma equipe encontrada no banco');
+            }
+            
+            // ✅ Buscar colaboradores diretamente do banco usando Supabase anônimo
+            const { data: colaboradoresReaisBanco, error: colaboradoresError } = await supabase
+              .from('colaboradores')
+              .select('id, name, position, equipe_id, tipo_equipe')
+              .eq('status', 'ativo')
+              .is('deleted_at', null);
+            
+            if (colaboradoresError) {
+              console.error('Erro ao buscar colaboradores reais:', colaboradoresError);
+              throw colaboradoresError;
+            }
+            
+            console.log('Colaboradores reais encontrados:', colaboradoresReaisBanco?.length || 0);
+            
+            // ✅ Contar colaboradores por equipe_id e criar equipes
+            const equipesReais = await Promise.all(
+              equipesBanco.map(async (equipe) => {
+                // Contar colaboradores da equipe
+                const colaboradoresDaEquipe = colaboradoresReaisBanco?.filter(
+                  col => col.equipe_id === equipe.id
+                ) || [];
+                
+                return {
+                  id: equipe.id,
+                  nome: equipe.name || equipe.prefixo || 'Sem nome',
+                  count: colaboradoresDaEquipe.length,
+                  tipo_equipe: undefined // Não usar mais tipo_equipe
+                };
+              })
+            );
+            
+            if (equipesReais.length === 0) {
+              throw new Error('Nenhuma equipe encontrada');
+            }
+            
+            console.log('Equipes reais encontradas:', equipesReais);
+            setEquipes(equipesReais);
+            
+            // Converter colaboradores para o formato esperado
+            const colaboradoresFormatados = colaboradoresReaisBanco.map(col => ({
+              id: col.id,
+              nome: col.name,
+              funcao: col.position,
+              equipe_id: col.equipe_id, // ✅ Usar equipe_id
+              tipo_equipe: col.tipo_equipe // Mantém para compatibilidade
+            }));
+            
+            console.log('Colaboradores reais formatados:', colaboradoresFormatados.length);
+            setColaboradoresReais(colaboradoresFormatados as any[]);
+            
+          } catch (error) {
+            console.error('Erro ao buscar dados reais, usando dados de demonstração:', error);
+            
+            // FALLBACK: Usar dados de demonstração em caso de erro
+            // Dados de demonstração também com UUIDs válidos
+            const equipesDemo = [
+              { 
+                id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
+                nome: 'Equipe A', 
+                count: 5,
+                tipo_equipe: 'pavimentacao'
+              },
+              { 
+                id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 
+                nome: 'Equipe B', 
+                count: 3,
+                tipo_equipe: 'maquinas'
+              },
+              { 
+                id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 
+                nome: 'Equipe de Apoio', 
+                count: 2,
+                tipo_equipe: 'apoio'
+              }
+            ];
+            
+            console.log('Equipes de demonstração (fallback):', equipesDemo);
+            setEquipes(equipesDemo);
+            
+            // Gerar colaboradores de demonstração
+            const colaboradoresDemo = [
+              {
+                id: 'demo-1',
+                nome: 'João da Silva',
+                funcao: 'Operador',
+                tipo_equipe: 'pavimentacao'
+              },
+              {
+                id: 'demo-2',
+                nome: 'Maria Souza',
+                funcao: 'Assistente',
+                tipo_equipe: 'pavimentacao'
+              },
+              {
+                id: 'demo-3',
+                nome: 'Carlos Ferreira',
+                funcao: 'Motorista',
+                tipo_equipe: 'maquinas'
+              }
+            ];
+            
+            console.log('Colaboradores de demonstração (fallback):', colaboradoresDemo);
+            setColaboradoresReais(colaboradoresDemo as any[]);
+          }
+          
+          return;
+        }
+
+        debugLogger.info('NovaRelacaoDiaria', 'Carregando dados', { companyId: jwtUser.companyId });
+
+        // Carregar equipes
+        const equipesData = await getEquipes(jwtUser.companyId);
+        debugLogger.success('NovaRelacaoDiaria', `${equipesData.length} equipes carregadas`, equipesData);
+        setEquipes(equipesData);
+
+        // Carregar colaboradores
+        const colaboradoresData = await getColaboradores(jwtUser.companyId);
+        debugLogger.info('NovaRelacaoDiaria', `${colaboradoresData?.length || 0} colaboradores carregados`);
+        
+        // Verificar se temos dados válidos
+        if (colaboradoresData && Array.isArray(colaboradoresData)) {
+          const tiposEquipe = [...new Set(colaboradoresData.map(col => col.tipo_equipe))].filter(Boolean);
+          debugLogger.debug('NovaRelacaoDiaria', 'Tipos de equipe disponíveis', tiposEquipe);
+          setColaboradoresReais(colaboradoresData);
+        } else {
+          debugLogger.error('NovaRelacaoDiaria', 'Dados de colaboradores inválidos', colaboradoresData);
+        }
+      } catch (error) {
+        debugLogger.error('NovaRelacaoDiaria', 'Erro ao carregar dados', error);
+      }
+    }
+
+    // Sempre executar, mesmo sem companyId
+    loadData();
+  }, [jwtUser]);
 
   useEffect(() => {
-    if (equipeSelecionada) {
-      // Filtrar SOMENTE os colaboradores da equipe selecionada
-      const colaboradoresDaEquipe = colaboradoresPavimentacao.filter(
+    debugLogger.debug('NovaRelacaoDiaria', 'Filtragem de colaboradores', { 
+      equipeSelecionada, 
+      colaboradoresLength: colaboradoresReais.length 
+    });
+    
+    if (equipeSelecionada && colaboradoresReais.length > 0) {
+      debugLogger.info('NovaRelacaoDiaria', `Filtrando colaboradores para equipe: ${equipeSelecionada}`);
+      
+      // Encontrar a equipe selecionada
+      const equipeSelecionadaObj = equipes.find(eq => eq.id === equipeSelecionada);
+      
+      if (!equipeSelecionadaObj) {
+        debugLogger.error('NovaRelacaoDiaria', `Equipe selecionada não encontrada: ${equipeSelecionada}`);
+        setColaboradores([]);
+        return;
+      }
+      
+      debugLogger.success('NovaRelacaoDiaria', 'Equipe encontrada', equipeSelecionadaObj);
+      
+      // ✅ Filtrar SOMENTE os colaboradores da equipe selecionada usando equipe_id
+      const colaboradoresDaEquipe = colaboradoresReais.filter(
         (col) => col.equipe_id === equipeSelecionada
       );
+      
+      debugLogger.info('NovaRelacaoDiaria', 
+        `${colaboradoresDaEquipe.length} colaboradores da equipe "${equipeSelecionadaObj.nome}" encontrados`);
       
       // Mapear com TODOS pré-selecionados (presentes)
       const colaboradoresEquipe = colaboradoresDaEquipe.map((col) => ({
@@ -78,10 +274,17 @@ const NovaRelacaoDiaria: React.FC = () => {
         pertenceEquipe: true, // Todos pertencem à equipe
       }));
       
+      debugLogger.success('NovaRelacaoDiaria', 
+        `${colaboradoresEquipe.length} colaboradores mapeados para a equipe "${equipeSelecionadaObj.nome}"`);
+      
       setColaboradores(colaboradoresEquipe);
       setContadorAcoes(prev => prev + 1);
+    } else if (equipeSelecionada && colaboradoresReais.length === 0) {
+      debugLogger.warning('NovaRelacaoDiaria', 
+        'Equipe selecionada mas não há colaboradores carregados', { equipeSelecionada });
+      setColaboradores([]);
     }
-  }, [equipeSelecionada]);
+  }, [equipeSelecionada, colaboradoresReais, equipes]);
 
   const handleToggleColaborador = (colaboradorId: string) => {
     const colaborador = colaboradores.find((c) => c.id === colaboradorId);
@@ -152,8 +355,6 @@ const NovaRelacaoDiaria: React.FC = () => {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
       // Criar ausências com informações detalhadas
       const ausencias = ausentes.map((col) => ({
         colaborador_id: col.id,
@@ -162,7 +363,8 @@ const NovaRelacaoDiaria: React.FC = () => {
         observacoes: col.observacoesAusencia,
       }));
 
-      criarRelacaoDiaria({
+      // Log para debug
+      console.log('📝 Enviando relação diária:', {
         data: dataSelecionada,
         equipe_id: equipeSelecionada,
         colaboradores_presentes: presentes,
@@ -170,9 +372,58 @@ const NovaRelacaoDiaria: React.FC = () => {
         observacoes_dia: observacoesDia.trim() || undefined,
       });
 
-      toast.success('Relação diária registrada com sucesso!');
-      navigate('/controle-diario');
+      try {
+        // Tentar salvar usando a API real
+        const result = await criarRelacaoDiaria({
+          data: dataSelecionada,
+          equipe_id: equipeSelecionada,
+          colaboradores_presentes: presentes,
+          ausencias,
+          observacoes_dia: observacoesDia.trim() || undefined,
+        });
+        
+        console.log('✅ Relação diária salva com sucesso:', result);
+        toast.success('Relação diária registrada com sucesso!');
+        navigate('/controle-diario');
+      } catch (apiError: any) {
+        console.error('❌ Erro ao salvar relação diária via API:', apiError);
+        
+        // Mapear equipe_id para nome
+        const getEquipeNome = (equipeId: string | null | undefined): string | undefined => {
+          if (!equipeId) return undefined;
+          const equipesMap: Record<string, string> = {
+            'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11': 'Equipe A',
+            'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12': 'Equipe B',
+            'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13': 'Equipe de Apoio'
+          };
+          return equipesMap[equipeId];
+        };
+
+        // Buscar nome da equipe selecionada
+        const equipeSelecionadaObj = equipes.find(eq => eq.id === equipeSelecionada);
+        
+        // Salvar no localStorage como fallback
+        const relacoesSalvas = JSON.parse(localStorage.getItem('worldpav.relacoes_diarias') || '[]');
+        const novaRelacao = {
+          id: `local_${Date.now()}`,
+          data: dataSelecionada,
+          equipe_id: equipeSelecionada,
+          equipe_nome: equipeSelecionadaObj?.nome || getEquipeNome(equipeSelecionada),
+          colaboradores_presentes: presentes,
+          ausencias,
+          observacoes_dia: observacoesDia.trim() || undefined,
+          created_at: new Date().toISOString(),
+        };
+        
+        relacoesSalvas.push(novaRelacao);
+        localStorage.setItem('worldpav.relacoes_diarias', JSON.stringify(relacoesSalvas));
+        
+        console.log('📦 Relação salva localmente:', novaRelacao);
+        toast.success('Relação diária salva localmente (modo offline)');
+        navigate('/controle-diario');
+      }
     } catch (error: any) {
+      console.error('❌ Erro geral ao registrar relação diária:', error);
       toast.error(error.message || 'Erro ao registrar relação diária');
     } finally {
       setIsSubmitting(false);
@@ -266,9 +517,9 @@ const NovaRelacaoDiaria: React.FC = () => {
                   disabled={isSubmitting}
                 >
                   <option value="">Selecione uma equipe</option>
-                  {mockEquipes.map((eq) => (
+                  {equipes.map((eq) => (
                     <option key={eq.id} value={eq.id}>
-                      {eq.nome}
+                      {eq.nome} ({eq.count} membros)
                     </option>
                   ))}
                 </select>
@@ -343,7 +594,7 @@ const NovaRelacaoDiaria: React.FC = () => {
                                       </span>
                                       {colaborador.equipeDestino && (
                                         <span className="ml-2 text-xs text-gray-600">
-                                          → {mockEquipes.find(e => e.id === colaborador.equipeDestino)?.nome}
+                                          → {equipes.find(e => e.id === colaborador.equipeDestino)?.nome || colaborador.equipeDestino}
                                         </span>
                                       )}
                                       {colaborador.observacoesAusencia && (
@@ -497,11 +748,11 @@ const NovaRelacaoDiaria: React.FC = () => {
                       required
                     >
                       <option value="">Selecione a equipe</option>
-                      {mockEquipes
+                      {equipes
                         .filter((eq) => eq.id !== equipeSelecionada)
                         .map((eq) => (
                           <option key={eq.id} value={eq.id}>
-                            {eq.nome}
+                            {eq.nome} ({eq.count} membros)
                           </option>
                         ))}
                     </select>

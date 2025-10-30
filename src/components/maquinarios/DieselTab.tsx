@@ -12,77 +12,7 @@ import {
   getMaquinarioDieselStats 
 } from '../../lib/maquinariosDieselApi'
 
-// ⚙️ MODO MOCK - Altere para false quando o banco estiver configurado
-const USE_MOCK = true
-
-const mockAbastecimentos: MaquinarioDiesel[] = [
-  {
-    id: '1',
-    maquinario_id: '1',
-    maquinario: {
-      id: '1',
-      nome: 'Vibroacabadora CAT'
-    },
-    obra_id: '1',
-    obra: {
-      id: '1',
-      nome: 'Pavimentação Rua das Flores - Osasco'
-    },
-    quantidade_litros: 120,
-    preco_por_litro: 5.50,
-    valor_total: 660.00,
-    data_abastecimento: '2025-01-20',
-    posto: 'Posto Shell',
-    km_hodometro: 12500,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: '2',
-    maquinario_id: '1',
-    maquinario: {
-      id: '1',
-      nome: 'Vibroacabadora CAT'
-    },
-    obra_id: '1',
-    obra: {
-      id: '1',
-      nome: 'Pavimentação Rua das Flores - Osasco'
-    },
-    quantidade_litros: 100,
-    preco_por_litro: 5.45,
-    valor_total: 545.00,
-    data_abastecimento: '2025-01-15',
-    posto: 'Posto Ipiranga',
-    km_hodometro: 12350,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  },
-  {
-    id: '3',
-    maquinario_id: '1',
-    maquinario: {
-      id: '1',
-      nome: 'Vibroacabadora CAT'
-    },
-    quantidade_litros: 80,
-    preco_por_litro: 5.60,
-    valor_total: 448.00,
-    data_abastecimento: '2025-01-10',
-    posto: 'Posto BR',
-    km_hodometro: 12200,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  }
-]
-
-const mockStats: DieselStats = {
-  total_litros: 300,
-  total_gasto: 1653.00,
-  media_preco_litro: 5.51,
-  consumo_medio: 2.5,
-  abastecimentos_count: 3
-}
+// Usando dados reais do banco de dados
 
 interface DieselTabProps {
   maquinarioId: string
@@ -103,18 +33,12 @@ export function DieselTab({ maquinarioId }: DieselTabProps) {
     try {
       setLoading(true)
       
-      if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-        setAbastecimentos(mockAbastecimentos)
-        setStats(mockStats)
-      } else {
-        const [abastecimentosData, statsData] = await Promise.all([
-          getMaquinarioDiesel(maquinarioId),
-          getMaquinarioDieselStats(maquinarioId)
-        ])
-        setAbastecimentos(abastecimentosData)
-        setStats(statsData)
-      }
+      const [abastecimentosData, statsData] = await Promise.all([
+        getMaquinarioDiesel(maquinarioId),
+        getMaquinarioDieselStats(maquinarioId)
+      ])
+      setAbastecimentos(abastecimentosData)
+      setStats(statsData)
     } catch (error) {
       console.error('Erro ao carregar diesel:', error)
       addToast({ message: 'Erro ao carregar dados de diesel', type: 'error' })
@@ -125,34 +49,17 @@ export function DieselTab({ maquinarioId }: DieselTabProps) {
 
   const handleAdicionar = async (data: any) => {
     try {
-      if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 300))
-        const novoAbastecimento: MaquinarioDiesel = {
-          id: String(Date.now()),
-          maquinario_id: maquinarioId,
-          quantidade_litros: data.quantidade_litros,
-          preco_por_litro: data.preco_por_litro,
-          valor_total: data.quantidade_litros * data.preco_por_litro,
-          data_abastecimento: data.data_abastecimento,
-          posto: data.posto,
-          km_hodometro: data.km_hodometro,
-          obra_id: data.obra_id,
-          observacoes: data.observacoes,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        setAbastecimentos([novoAbastecimento, ...abastecimentos])
-      } else {
-        await createAbastecimentoDiesel({
-          maquinario_id: maquinarioId,
-          ...data
-        })
-        loadData()
-      }
+      await createAbastecimentoDiesel({
+        maquinario_id: maquinarioId,
+        ...data
+      })
+      await loadData()
+      
       addToast({ message: 'Abastecimento adicionado com sucesso!', type: 'success' })
+      setModalOpen(false)
     } catch (error) {
       console.error('Erro ao adicionar abastecimento:', error)
-      throw error
+      addToast({ message: 'Erro ao adicionar abastecimento', type: 'error' })
     }
   }
 
@@ -160,16 +67,11 @@ export function DieselTab({ maquinarioId }: DieselTabProps) {
     if (!confirm('Tem certeza que deseja deletar este abastecimento?')) return
 
     try {
-      if (USE_MOCK) {
-        await new Promise(resolve => setTimeout(resolve, 300))
-        setAbastecimentos(abastecimentos.filter(a => a.id !== id))
-      } else {
-        await deleteAbastecimentoDiesel(id)
-        loadData()
-      }
-      addToast({ message: 'Abastecimento deletado', type: 'success' })
+      await deleteAbastecimentoDiesel(id)
+      await loadData()
+      addToast({ message: 'Abastecimento deletado com sucesso!', type: 'success' })
     } catch (error) {
-      console.error('Erro ao deletar:', error)
+      console.error('Erro ao deletar abastecimento:', error)
       addToast({ message: 'Erro ao deletar abastecimento', type: 'error' })
     }
   }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,62 +12,122 @@ import {
   CheckCircle2,
   Circle
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { DatePicker } from './ui/date-picker';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { DatePicker } from '../ui/date-picker';
 import { parseDate, getLocalTimeZone, today } from '@internationalized/date';
 import { toast } from 'sonner';
+import { ProgramacaoPavimentacaoAPI } from '../../lib/programacao-pavimentacao-api';
 
 // Schema de validação com Zod
 const programacaoSchema = z.object({
   equipe: z.string().min(1, 'Selecione uma equipe'),
   cliente: z.string().min(1, 'Selecione um cliente'),
   obra: z.string().min(1, 'Selecione uma obra'),
-  localizacao: z.string().min(3, 'Informe a localização da obra'),
+  rua: z.string().min(1, 'Selecione uma rua'),
   maquinarios: z.array(z.string()).min(1, 'Selecione pelo menos um maquinário'),
   data_programacao: z.string().min(1, 'Selecione a data da programação'),
+  metragem_prevista: z.number().min(0.01, 'Metragem deve ser maior que zero'),
+  quantidade_toneladas: z.number().min(0.01, 'Quantidade deve ser maior que zero'),
+  faixa_realizar: z.string().min(1, 'Informe a faixa a realizar'),
+  horario_inicio: z.string().optional(),
+  observacoes: z.string().optional(),
+  tipo_servico: z.string().optional(),
+  espessura: z.string().optional(),
 });
 
 type ProgramacaoFormData = z.infer<typeof programacaoSchema>;
 
-// Dados mockados para teste
-const MOCK_DATA = {
-  equipes: [
-    { id: '1', nome: 'Equipe A' },
-    { id: '2', nome: 'Equipe B' },
-    { id: '3', nome: 'Equipe C' },
-  ],
-  clientes: [
-    { id: '1', nome: 'Prefeitura Municipal' },
-    { id: '2', nome: 'Construtora Alfa' },
-    { id: '3', nome: 'Construtora Beta' },
-  ],
-  obras: {
-    '1': [
-      { id: '1', nome: 'Avenida Brasil' },
-      { id: '2', nome: 'Rua das Flores' },
-      { id: '3', nome: 'Via Expressa Norte' },
-    ],
-    '2': [
-      { id: '4', nome: 'Condomínio Sol' },
-      { id: '5', nome: 'Residencial Vila Nova' },
-    ],
-    '3': [
-      { id: '6', nome: 'Distrito Industrial' },
-      { id: '7', nome: 'Parque Empresarial' },
-    ],
-  },
-  maquinarios: [
-    { id: '1', nome: 'Vibroacabadora', descricao: 'Modelo VT-100' },
-    { id: '2', nome: 'Rolo Pneumático', descricao: 'Modelo RP-50' },
-    { id: '3', nome: 'Caminhão Pipa', descricao: '15.000 litros' },
-    { id: '4', nome: 'Fresadora', descricao: 'Modelo FR-200' },
-    { id: '5', nome: 'Rolo Compactador', descricao: 'Modelo RC-75' },
-    { id: '6', nome: 'Escavadeira', descricao: 'Modelo EC-300' },
-  ],
+// Dados reais do banco de dados
+const useProgramacaoData = () => {
+  const [clientes, setClientes] = useState<Array<{ id: string; name: string }>>([]);
+  const [obras, setObras] = useState<Array<{ id: string; name: string; cliente_id: string }>>([]);
+  const [ruas, setRuas] = useState<Array<{ id: string; name: string; obra_id: string; metragem?: number; espessura?: string; faixa?: string }>>([]);
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string; prefixo: string; tipo_equipe?: string }>>([]);
+  const [maquinarios, setMaquinarios] = useState<Array<{ id: string; nome: string; tipo: string; prefixo?: string }>>([]);
+  const [ruaDetails, setRuaDetails] = useState<{ metragem?: number; espessura?: string; faixa?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [clientesData, equipesData, maquinariosData] = await Promise.all([
+          ProgramacaoPavimentacaoAPI.getClientes(),
+          ProgramacaoPavimentacaoAPI.getEquipes(),
+          ProgramacaoPavimentacaoAPI.getMaquinarios()
+        ]);
+
+        setClientes(clientesData);
+        setEquipes(equipesData);
+        setMaquinarios(maquinariosData);
+
+        console.log('✅ Dados carregados:', {
+          clientes: clientesData.length,
+          equipes: equipesData.length,
+          maquinarios: maquinariosData.length
+        });
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, []);
+
+  const carregarObras = async (clienteId: string) => {
+    try {
+      const obrasData = await ProgramacaoPavimentacaoAPI.getObras(clienteId);
+      setObras(obrasData);
+      setRuas([]); // Limpar ruas quando mudar cliente
+    } catch (err) {
+      console.error('Erro ao carregar obras:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar obras');
+    }
+  };
+
+  const carregarRuas = async (obraId: string) => {
+    try {
+      const ruasData = await ProgramacaoPavimentacaoAPI.getRuas(obraId);
+      setRuas(ruasData);
+    } catch (err) {
+      console.error('Erro ao carregar ruas:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar ruas');
+    }
+  };
+
+  const carregarDetalhesRua = async (ruaId: string) => {
+    try {
+      const details = await ProgramacaoPavimentacaoAPI.getRuaDetails(ruaId);
+      setRuaDetails(details);
+    } catch (err) {
+      console.error('Erro ao carregar detalhes da rua:', err);
+      setRuaDetails(null);
+    }
+  };
+
+  return { 
+    clientes, 
+    obras, 
+    ruas, 
+    equipes, 
+    maquinarios, 
+    ruaDetails,
+    loading, 
+    error,
+    carregarObras,
+    carregarRuas,
+    carregarDetalhesRua
+  };
 };
 
 interface ProgramacaoPavimentacaoFormProps {
@@ -80,8 +140,21 @@ export function ProgramacaoPavimentacaoForm({
   onCancel 
 }: ProgramacaoPavimentacaoFormProps) {
   const [selectedMaquinarios, setSelectedMaquinarios] = useState<string[]>([]);
-  const [obrasDisponiveis, setObrasDisponiveis] = useState<typeof MOCK_DATA.obras['1']>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  const {
+    clientes,
+    obras,
+    ruas,
+    equipes,
+    maquinarios,
+    ruaDetails,
+    loading,
+    error,
+    carregarObras,
+    carregarRuas,
+    carregarDetalhesRua
+  } = useProgramacaoData();
 
   const {
     register,
@@ -96,23 +169,61 @@ export function ProgramacaoPavimentacaoForm({
       equipe: '',
       cliente: '',
       obra: '',
-      localizacao: '',
+      rua: '',
       maquinarios: [],
       data_programacao: '',
+      metragem_prevista: 0,
+      quantidade_toneladas: 0,
+      faixa_realizar: '',
+      horario_inicio: '',
+      observacoes: '',
+      tipo_servico: '',
+      espessura: '',
     }
   });
 
   const clienteSelecionado = watch('cliente');
+  const obraSelecionada = watch('obra');
+  const ruaSelecionada = watch('rua');
 
   // Atualiza obras disponíveis quando cliente muda
   useEffect(() => {
     if (clienteSelecionado) {
-      setObrasDisponiveis(MOCK_DATA.obras[clienteSelecionado as keyof typeof MOCK_DATA.obras] || []);
+      carregarObras(clienteSelecionado);
       setValue('obra', ''); // Reseta obra quando cliente muda
-    } else {
-      setObrasDisponiveis([]);
+      setValue('rua', ''); // Reseta rua quando cliente muda
     }
-  }, [clienteSelecionado, setValue]);
+  }, [clienteSelecionado, setValue, carregarObras]);
+
+  // Atualiza ruas disponíveis quando obra muda
+  useEffect(() => {
+    if (obraSelecionada) {
+      carregarRuas(obraSelecionada);
+      setValue('rua', ''); // Reseta rua quando obra muda
+    }
+  }, [obraSelecionada, setValue, carregarRuas]);
+
+  // Atualiza detalhes da rua quando rua muda
+  useEffect(() => {
+    if (ruaSelecionada) {
+      carregarDetalhesRua(ruaSelecionada);
+    }
+  }, [ruaSelecionada]);
+
+  // Preenche campos com dados da rua selecionada
+  useEffect(() => {
+    if (ruaDetails) {
+      if (ruaDetails.metragem) {
+        setValue('metragem_prevista', ruaDetails.metragem);
+      }
+      if (ruaDetails.espessura) {
+        setValue('espessura', ruaDetails.espessura);
+      }
+      if (ruaDetails.faixa) {
+        setValue('faixa_realizar', ruaDetails.faixa);
+      }
+    }
+  }, [ruaDetails, setValue]);
 
   // Toggle de seleção de maquinário
   const toggleMaquinario = (id: string) => {
@@ -132,31 +243,95 @@ export function ProgramacaoPavimentacaoForm({
     }
   };
 
-  const onSubmit = (data: ProgramacaoFormData) => {
-    console.log('📋 Programação criada:', data);
-    
-    // Preview dos dados
-    const preview = {
-      equipe: MOCK_DATA.equipes.find(e => e.id === data.equipe)?.nome,
-      cliente: MOCK_DATA.clientes.find(c => c.id === data.cliente)?.nome,
-      obra: obrasDisponiveis.find(o => o.id === data.obra)?.nome,
-      localizacao: data.localizacao,
-      maquinarios: MOCK_DATA.maquinarios
-        .filter(m => data.maquinarios.includes(m.id))
-        .map(m => m.nome),
-      data: data.data_programacao,
-    };
+  const onSubmit = async (data: ProgramacaoFormData) => {
+    try {
+      
+      // Buscar nomes para preview
+      const equipeSelecionada = equipes.find(e => e.id === data.equipe);
+      const clienteSelecionado = clientes.find(c => c.id === data.cliente);
+      const obraSelecionada = obras.find(o => o.id === data.obra);
+      const ruaSelecionadaParaPreview = ruas.find(r => r.id === data.rua);
+      const maquinariosSelecionados = maquinarios.filter(m => data.maquinarios.includes(m.id));
 
-    console.log('👁️ Preview da programação:', preview);
-    
-    toast.success('Programação criada com sucesso!', {
-      description: `Obra: ${preview.obra} - ${preview.maquinarios.length} maquinários`,
-    });
+      // Criar programação via API
+      const programacaoData = {
+        cliente_id: data.cliente,
+        obra: obraSelecionada?.name || '',
+        rua: ruaSelecionadaParaPreview?.name || '', // Nome da rua para exibição
+        obra_id: data.obra, // ID da obra no banco de dados
+        rua_id: data.rua, // ID da rua no banco de dados (campo 'rua' contém o ID)
+        prefixo_equipe: equipeSelecionada?.prefixo || '',
+        maquinarios: data.maquinarios,
+        metragem_prevista: data.metragem_prevista,
+        quantidade_toneladas: data.quantidade_toneladas,
+        faixa_realizar: data.faixa_realizar,
+        horario_inicio: data.horario_inicio,
+        observacoes: data.observacoes,
+        tipo_servico: data.tipo_servico,
+        espessura_media_solicitada: data.espessura,
+        data: data.data_programacao,
+        company_id: '39cf8b61-6737-4aa5-af3f-51fba9f12345' // ID da empresa Worldpav
+      };
 
-    if (onSubmitProp) {
-      onSubmitProp(data);
+          console.log('🔍 [Form] Dados enviados para API:', programacaoData);
+
+      const programacaoCriada = await ProgramacaoPavimentacaoAPI.create(programacaoData);
+      
+      console.log('✅ Programação criada com sucesso:', programacaoCriada);
+      
+      toast.success('Programação criada com sucesso!', {
+        description: `Obra: ${obraSelecionada?.name} - ${maquinariosSelecionados.length} maquinários`,
+      });
+
+      if (onSubmitProp) {
+        onSubmitProp(data);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao criar programação:', error);
+      toast.error('Erro ao criar programação', {
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+      });
     }
   };
+
+  // Estados de loading e error
+  if (loading) {
+    return (
+      <div className="w-full max-w-7xl mx-auto space-y-6">
+        <Card className="border-2 shadow-lg">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-center space-x-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-lg text-gray-600">Carregando dados...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full max-w-7xl mx-auto space-y-6">
+        <Card className="border-2 border-red-200 shadow-lg">
+          <CardContent className="p-8">
+            <div className="text-center space-y-4">
+              <div className="text-red-600 text-6xl">⚠️</div>
+              <h3 className="text-xl font-semibold text-red-800">Erro ao carregar dados</h3>
+              <p className="text-red-600">{error}</p>
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-50"
+              >
+                Tentar Novamente
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -208,9 +383,9 @@ export function ProgramacaoPavimentacaoForm({
                           <SelectValue placeholder="Selecione a equipe" />
                         </SelectTrigger>
                         <SelectContent>
-                          {MOCK_DATA.equipes.map((equipe) => (
+                          {equipes.map((equipe) => (
                             <SelectItem key={equipe.id} value={equipe.id}>
-                              {equipe.nome}
+                              {equipe.name} ({equipe.prefixo})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -238,9 +413,9 @@ export function ProgramacaoPavimentacaoForm({
                           <SelectValue placeholder="Selecione o cliente" />
                         </SelectTrigger>
                         <SelectContent>
-                          {MOCK_DATA.clientes.map((cliente) => (
+                          {clientes.map((cliente) => (
                             <SelectItem key={cliente.id} value={cliente.id}>
-                              {cliente.nome}
+                              {cliente.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -280,9 +455,9 @@ export function ProgramacaoPavimentacaoForm({
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          {obrasDisponiveis.map((obra) => (
+                          {obras.map((obra) => (
                             <SelectItem key={obra.id} value={obra.id}>
-                              {obra.nome}
+                              {obra.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -294,19 +469,44 @@ export function ProgramacaoPavimentacaoForm({
                   )}
                 </div>
 
-                {/* Localização */}
+                {/* Rua */}
                 <div className="space-y-2">
-                  <Label htmlFor="localizacao" className="text-sm font-medium flex items-center gap-2">
+                  <Label htmlFor="rua" className="text-sm font-medium flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Localização <span className="text-red-500">*</span>
+                    Rua <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    {...register('localizacao')}
-                    placeholder="Ex: Avenida Principal, km 5"
-                    className={`h-12 transition-all ${errors.localizacao ? 'border-red-500' : ''}`}
+                  <Controller
+                    name="rua"
+                    control={control}
+                    render={({ field }) => (
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                        disabled={!obraSelecionada}
+                      >
+                        <SelectTrigger 
+                          className={`h-12 transition-all ${errors.rua ? 'border-red-500' : ''}`}
+                        >
+                          <SelectValue 
+                            placeholder={
+                              obraSelecionada 
+                                ? "Selecione a rua" 
+                                : "Selecione uma obra primeiro"
+                            } 
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ruas.map((rua) => (
+                            <SelectItem key={rua.id} value={rua.id}>
+                              {rua.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   />
-                  {errors.localizacao && (
-                    <p className="text-sm text-red-500">{errors.localizacao.message}</p>
+                  {errors.rua && (
+                    <p className="text-sm text-red-500">{errors.rua.message}</p>
                   )}
                 </div>
               </div>
@@ -330,7 +530,7 @@ export function ProgramacaoPavimentacaoForm({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {MOCK_DATA.maquinarios.map((maquinario) => {
+                {maquinarios.map((maquinario) => {
                   const isSelected = selectedMaquinarios.includes(maquinario.id);
                   
                   return (
@@ -374,7 +574,7 @@ export function ProgramacaoPavimentacaoForm({
                                 {maquinario.nome}
                               </h4>
                               <p className={`text-sm ${isSelected ? 'text-blue-700' : 'text-gray-500'}`}>
-                                {maquinario.descricao}
+                                {maquinario.tipo}
                               </p>
                             </div>
                           </div>
@@ -389,7 +589,123 @@ export function ProgramacaoPavimentacaoForm({
               )}
             </motion.div>
 
-            {/* Seção 3: Data da Programação */}
+            {/* Seção 3: Informações Adicionais da Rua */}
+            {ruaSelecionada && ruaDetails && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.25 }}
+                className="space-y-6 pt-6 border-t"
+              >
+                <div className="flex items-center gap-2 mb-4">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-xl font-semibold">Informações da Rua</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Metragem Prevista */}
+                  <div className="space-y-2">
+                    <Label htmlFor="metragem_prevista" className="text-sm font-medium">
+                      Metragem Prevista (m²) <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      {...register('metragem_prevista', { valueAsNumber: true })}
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="Ex: 1500.50"
+                      className={`h-12 transition-all ${errors.metragem_prevista ? 'border-red-500' : ''}`}
+                    />
+                    {errors.metragem_prevista && (
+                      <p className="text-sm text-red-500">{errors.metragem_prevista.message}</p>
+                    )}
+                  </div>
+
+                  {/* Quantidade de Toneladas */}
+                  <div className="space-y-2">
+                    <Label htmlFor="quantidade_toneladas" className="text-sm font-medium">
+                      Quantidade (ton) <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      {...register('quantidade_toneladas', { valueAsNumber: true })}
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="Ex: 25.5"
+                      className={`h-12 transition-all ${errors.quantidade_toneladas ? 'border-red-500' : ''}`}
+                    />
+                    {errors.quantidade_toneladas && (
+                      <p className="text-sm text-red-500">{errors.quantidade_toneladas.message}</p>
+                    )}
+                  </div>
+
+                  {/* Faixa a Realizar */}
+                  <div className="space-y-2">
+                    <Label htmlFor="faixa_realizar" className="text-sm font-medium">
+                      Faixa a Realizar <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      {...register('faixa_realizar')}
+                      placeholder="Ex: Faixa 1 e 2"
+                      className={`h-12 transition-all ${errors.faixa_realizar ? 'border-red-500' : ''}`}
+                    />
+                    {errors.faixa_realizar && (
+                      <p className="text-sm text-red-500">{errors.faixa_realizar.message}</p>
+                    )}
+                  </div>
+
+                  {/* Horário de Início */}
+                  <div className="space-y-2">
+                    <Label htmlFor="horario_inicio" className="text-sm font-medium">
+                      Horário de Início
+                    </Label>
+                    <Input
+                      {...register('horario_inicio')}
+                      type="time"
+                      className="h-12 transition-all"
+                    />
+                  </div>
+
+                  {/* Tipo de Serviço */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo_servico" className="text-sm font-medium">
+                      Tipo de Serviço
+                    </Label>
+                    <Input
+                      {...register('tipo_servico')}
+                      placeholder="Ex: CBUQ, Imprimação"
+                      className="h-12 transition-all"
+                    />
+                  </div>
+
+                  {/* Espessura */}
+                  <div className="space-y-2">
+                    <Label htmlFor="espessura" className="text-sm font-medium">
+                      Espessura (cm)
+                    </Label>
+                    <Input
+                      {...register('espessura')}
+                      placeholder="Ex: 5cm"
+                      className="h-12 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Observações */}
+                <div className="space-y-2">
+                  <Label htmlFor="observacoes" className="text-sm font-medium">
+                    Observações
+                  </Label>
+                  <textarea
+                    {...register('observacoes')}
+                    placeholder="Observações adicionais sobre a programação..."
+                    className="w-full h-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  />
+                </div>
+              </motion.div>
+            )}
+
+            {/* Seção 4: Data da Programação */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

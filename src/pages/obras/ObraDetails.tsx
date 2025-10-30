@@ -9,7 +9,7 @@ import { NotasMedicoesTab } from '../../components/obras/NotasMedicoesTab'
 import { ObraVisaoGeralTab } from '../../components/obras/ObraVisaoGeralTab'
 import { ObraServicosTab } from '../../components/obras/ObraServicosTab'
 import { getObraById, Obra } from '../../lib/obrasApi'
-import { calcularValorTotalServicos, calcularPrecoPorM2 } from '../../lib/obrasServicosApi'
+import { calcularValorTotalServicos, calcularPrecoPorM2, calcularValorExecutadoPorMetragem } from '../../lib/obrasServicosApi'
 import { getFaturamentoBrutoTotal } from '../../lib/obrasNotasFiscaisApi'
 import { useToast } from '../../lib/toast-hooks'
 
@@ -51,9 +51,9 @@ const ObraDetails = () => {
         const precoPorM2 = await calcularPrecoPorM2(id)
         setPrecoPorM2Calculado(precoPorM2)
         
-        // Carregar o valor executado (faturamento bruto total)
-        const faturamentoBruto = await getFaturamentoBrutoTotal(id)
-        setValorExecutado(faturamentoBruto)
+        // Carregar o valor executado (preço por m² × metragem executada)
+        const valorExecutadoCalculado = await calcularValorExecutadoPorMetragem(id)
+        setValorExecutado(valorExecutadoCalculado)
       } catch (error) {
         console.error('Erro ao carregar obra:', error)
         addToast({ message: 'Erro ao carregar obra', type: 'error' })

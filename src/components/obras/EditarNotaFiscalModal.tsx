@@ -190,6 +190,7 @@ export function EditarNotaFiscalModal({
         desconto_inss: Number(formData.desconto_inss) || 0,
         desconto_iss: Number(formData.desconto_iss) || 0,
         outro_desconto: Number(formData.outro_desconto) || 0,
+        status: formData.status, // ✅ Incluir o status do formulário
         arquivo_nota_url: arquivoUrl || undefined,
         observacoes: formData.observacoes.trim() || undefined
       }
@@ -198,7 +199,7 @@ export function EditarNotaFiscalModal({
       
       addToast({
         type: 'success',
-        message: 'Nota fiscal atualizada com sucesso (Status: RENEGOCIADO)'
+        message: `Nota fiscal atualizada com sucesso (Status: ${formData.status.toUpperCase()})`
       })
       
       onSuccess()
@@ -222,6 +223,7 @@ export function EditarNotaFiscalModal({
       desconto_inss: '',
       desconto_iss: '',
       outro_desconto: '',
+      status: 'emitida',
       observacoes: ''
     })
     setArquivo(null)

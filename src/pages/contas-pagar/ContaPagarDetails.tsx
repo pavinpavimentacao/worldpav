@@ -18,10 +18,10 @@ import {
   MessageSquare
 } from 'lucide-react'
 import { Layout } from '../../components/layout/Layout'
-import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/format'
 import { formatDateSafe } from '../../utils/date-utils'
 import { useToast } from '../../lib/toast-hooks'
+import { getContaPagarById, deleteContaPagar } from '../../lib/contas-pagar-api'
 import type { ContaPagar } from '../../types/contas-pagar'
 import { STATUS_COLORS, calcularDiasParaVencimento } from '../../types/contas-pagar'
 
@@ -41,17 +41,21 @@ export default function ContaPagarDetails() {
   const carregarConta = async (contaId: string) => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('contas_pagar')
-        .select('*')
-        .eq('id', contaId)
-        .single()
+      console.log('🔍 [ContaPagarDetails] Carregando conta:', contaId)
 
-      if (error) throw error
-      setConta(data)
+      const contaData = await getContaPagarById(contaId)
+
+      if (!contaData) {
+        toast.error('Conta não encontrada')
+        navigate('/contas-pagar')
+        return
+      }
+
+      setConta(contaData)
+      console.log('✅ [ContaPagarDetails] Conta carregada:', contaData.numero_nota)
     } catch (error: any) {
-      console.error('Erro ao carregar conta:', error)
-      toast.error('Erro ao carregar dados da conta')
+      console.error('❌ [ContaPagarDetails] Erro ao carregar conta:', error)
+      toast.error(error.message || 'Erro ao carregar dados da conta')
       navigate('/contas-pagar')
     } finally {
       setLoading(false)
@@ -66,18 +70,15 @@ export default function ContaPagarDetails() {
     }
 
     try {
-      const { error } = await supabase
-        .from('contas_pagar')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
+      console.log('🗑️  [ContaPagarDetails] Excluindo conta:', id)
+      await deleteContaPagar(id)
 
       toast.success('Conta excluída com sucesso!')
+      console.log('✅ [ContaPagarDetails] Conta excluída com sucesso')
       navigate('/contas-pagar')
     } catch (error: any) {
-      console.error('Erro ao excluir conta:', error)
-      toast.error('Erro ao excluir conta')
+      console.error('❌ [ContaPagarDetails] Erro ao excluir conta:', error)
+      toast.error(error.message || 'Erro ao excluir conta')
     }
   }
 

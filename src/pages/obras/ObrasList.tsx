@@ -58,29 +58,54 @@ async function getObraDadosReais(obraId: string) {
       ruas: ruas.length
     })
 
-    // Calcular metragem executada (soma dos faturamentos)
-    const metragemFeita = faturamentos.reduce((total, fat) => total + (fat.metragem_executada || 0), 0)
+    // Calcular metragem executada (priorizar faturamentos, fallback para ruas)
+    const metragemFeita = faturamentos.length > 0 
+      ? faturamentos.reduce((total, fat) => total + (fat.metragem_executada || 0), 0)
+      : ruas.reduce((total, rua) => total + (rua.metragem_executada || 0), 0)
     
-    // Calcular metragem planejada (soma das ruas)
-    const metragemPlanejada = ruas.reduce((total, rua) => total + (rua.metragem_planejada || 0), 0)
+    // Calcular metragem planejada (soma das ruas - usar area se metragem_planejada for null)
+    const metragemPlanejada = ruas.reduce((total, rua) => total + (rua.metragem_planejada || rua.area || 0), 0)
     
-    // Calcular toneladas aplicadas (soma dos faturamentos)
-    const toneladasAplicadas = faturamentos.reduce((total, fat) => total + (fat.toneladas_utilizadas || 0), 0)
+    // Calcular toneladas aplicadas (priorizar faturamentos, fallback para ruas)
+    const toneladasAplicadas = faturamentos.length > 0
+      ? faturamentos.reduce((total, fat) => total + (fat.toneladas_aplicadas || 0), 0)
+      : ruas.reduce((total, rua) => total + (rua.toneladas_utilizadas || 0), 0)
     
-    // Calcular toneladas planejadas (soma das ruas)
-    const toneladasPlanejadas = ruas.reduce((total, rua) => total + (rua.toneladas_planejadas || 0), 0)
+    // Calcular toneladas planejadas (converter area m² para toneladas)
+    const toneladasPlanejadas = ruas.reduce((total, rua) => {
+      const area = rua.metragem_planejada || rua.area || 0
+      return total + (area / 10) // 1000 m² = 100 toneladas (fator 10)
+    }, 0)
     
-    // Calcular espessura média (média dos faturamentos)
-    const espessuraMedia = faturamentos.length > 0 
-      ? faturamentos.reduce((total, fat) => total + (fat.espessura_calculada || 0), 0) / faturamentos.length
-      : 0
+    // Calcular espessura média (priorizar faturamentos, fallback para ruas)
+    let espessuraMedia = 0
+    if (faturamentos.length > 0) {
+      espessuraMedia = faturamentos.reduce((total, fat) => total + (fat.espessura_calculada || 0), 0) / faturamentos.length
+    } else {
+      // Usar espessura já calculada das ruas ou calcular se não existir
+      const ruasComEspessura = ruas.filter(rua => rua.espessura_calculada || (rua.metragem_executada && rua.toneladas_utilizadas))
+      if (ruasComEspessura.length > 0) {
+        const totalEspessura = ruasComEspessura.reduce((total, rua) => {
+          if (rua.espessura_calculada) {
+            return total + rua.espessura_calculada
+          } else {
+            // Calcular espessura se não existir
+            const espessura = rua.toneladas_utilizadas / rua.metragem_executada / 2.4 // Densidade do asfalto
+            return total + espessura
+          }
+        }, 0)
+        espessuraMedia = totalEspessura / ruasComEspessura.length
+      }
+    }
     
     // Contar ruas (ruas finalizadas vs total)
-    const ruasFeitas = ruas.filter(rua => rua.status === 'finalizada').length
+    const ruasFeitas = ruas.filter(rua => rua.status === 'concluida' || rua.status === 'finalizada').length
     const totalRuas = ruas.length
     
-    // Calcular faturamento bruto (soma dos faturamentos)
-    const faturamentoBruto = faturamentos.reduce((total, fat) => total + (fat.valor_total || 0), 0)
+    // Calcular faturamento bruto (priorizar faturamentos, fallback para ruas)
+    const faturamentoBruto = faturamentos.length > 0
+      ? faturamentos.reduce((total, fat) => total + (fat.valor_total || 0), 0)
+      : ruas.reduce((total, rua) => total + (rua.valor_total || 0), 0)
 
     const dados = {
       metragemFeita,
@@ -291,7 +316,7 @@ export default function ObrasList() {
   }
 
   const formatThickness = (value: number) => {
-    return `${formatNumber(value, 1)} cm`
+    return `${formatNumber(value, 2)} cm`
   }
 
   return (
@@ -400,79 +425,6 @@ export default function ObrasList() {
           </div>
         </div>
 
-        {/* Média por Rua */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <span className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
-              <span className="text-indigo-600 text-sm font-bold">📊</span>
-            </span>
-            Média por Rua
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Média de Metragem por Rua */}
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Metragem Média</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {loading ? '...' : formatArea(stats?.media_metragem_por_rua || 0)}
-                  </p>
-                  <p className="text-xs text-blue-700 mt-1">por rua</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 text-lg">📏</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Média de Toneladas por Rua */}
-            <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-800">Toneladas Médias</p>
-                  <p className="text-2xl font-bold text-orange-900">
-                    {loading ? '...' : formatWeight(stats?.media_toneladas_por_rua || 0)}
-                  </p>
-                  <p className="text-xs text-orange-700 mt-1">por rua</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-200 rounded-full flex items-center justify-center">
-                  <span className="text-orange-600 text-lg">⚖️</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Média de Espessura por Rua */}
-            <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-800">Espessura Média</p>
-                  <p className="text-2xl font-bold text-green-900">
-                    {loading ? '...' : (stats?.media_espessura_por_rua || 0) > 0 ? formatThickness(stats?.media_espessura_por_rua || 0) : '-'}
-                  </p>
-                  <p className="text-xs text-green-700 mt-1">por rua</p>
-                </div>
-                <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-lg">📐</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Informação adicional */}
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-start space-x-2">
-              <span className="text-gray-500 text-sm">ℹ️</span>
-              <div className="text-sm text-gray-700">
-                <p className="font-medium">Cálculo das Médias:</p>
-                <p className="mt-1">
-                  As médias são calculadas baseadas nas ruas criadas de todas as obras ativas, 
-                  fornecendo uma referência para planejamento de novas obras.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Filtros */}
         <div className="bg-white p-4 rounded-lg shadow-sm border">

@@ -21,6 +21,7 @@ import { getRelatorioDiarioById } from '../../lib/relatoriosDiariosApi'
 import { RelatorioDiarioCompleto } from '../../types/relatorios-diarios'
 import { formatarHorario } from '../../utils/relatorios-diarios-utils'
 import { faixaAsfaltoLabels, faixaAsfaltoDescricoes } from '../../types/parceiros'
+import { jsPDF } from 'jspdf'
 
 export function RelatorioDiarioDetails() {
   const { id } = useParams<{ id: string }>()
@@ -43,6 +44,191 @@ export function RelatorioDiarioDetails() {
       console.error('Erro ao carregar relatório:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  function handleExportPDF() {
+    if (!relatorio) return
+
+    try {
+      console.log('🔍 Iniciando exportação PDF do relatório:', relatorio.numero)
+      
+      const pdf = new jsPDF('portrait', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      let yPosition = 20
+
+      // Cores
+      const primaryColor = [37, 99, 235] // Blue
+      const secondaryColor = [107, 114, 128] // Gray
+      const accentColor = [249, 115, 22] // Orange
+
+      // Cabeçalho
+      pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2])
+      pdf.rect(0, 0, pageWidth, 30, 'F')
+      
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('RELATÓRIO DIÁRIO', pageWidth / 2, 18, { align: 'center' })
+      
+      pdf.setFontSize(14)
+      pdf.text(relatorio.numero || 'N/A', pageWidth / 2, 26, { align: 'center' })
+      
+      yPosition = 40
+      
+      // Informações Gerais
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Informações da Obra', 20, yPosition)
+      yPosition += 10
+      
+      pdf.setFontSize(11)
+      pdf.setFont('helvetica', 'normal')
+      
+      // Cliente
+      pdf.text(`Cliente: ${relatorio.cliente_nome}`, 20, yPosition)
+      yPosition += 7
+      
+      // Obra
+      pdf.text(`Obra: ${relatorio.obra_nome}`, 20, yPosition)
+      yPosition += 7
+      
+      // Rua
+      pdf.text(`Rua: ${relatorio.rua_nome}`, 20, yPosition)
+      yPosition += 7
+      
+      // Equipe
+      const equipeBadge = relatorio.equipe_is_terceira ? ' (Terceira)' : ''
+      pdf.text(`Equipe: ${relatorio.equipe_nome || 'Não informada'}${equipeBadge}`, 20, yPosition)
+      yPosition += 7
+      
+      // Data e Horário
+      pdf.text(`Data: ${new Date(relatorio.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR')}`, 20, yPosition)
+      yPosition += 7
+      pdf.text(`Horário de Início: ${formatarHorario(relatorio.horario_inicio)}`, 20, yPosition)
+      yPosition += 10
+
+      // Métricas
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Métricas da Execução', 20, yPosition)
+      yPosition += 10
+      
+      pdf.setFontSize(11)
+      pdf.setFont('helvetica', 'normal')
+      
+      // Metragem
+      pdf.text(`Metragem Executada: ${relatorio.metragem_feita.toFixed(2)} m²`, 20, yPosition)
+      yPosition += 7
+      
+      // Toneladas
+      pdf.text(`Toneladas Aplicadas: ${relatorio.toneladas_aplicadas.toFixed(2)} ton`, 20, yPosition)
+      yPosition += 7
+      
+      // Espessura
+      pdf.text(`Espessura Calculada: ${relatorio.espessura_calculada.toFixed(2)} cm`, 20, yPosition)
+      yPosition += 7
+      
+      // Faixa
+      if (relatorio.faixa_utilizada) {
+        pdf.text(`Faixa Utilizada: ${faixaAsfaltoLabels[relatorio.faixa_utilizada]}`, 20, yPosition)
+        yPosition += 7
+      }
+      yPosition += 5
+
+      // Maquinários
+      if (relatorio.maquinarios && relatorio.maquinarios.length > 0) {
+        const maquinariosProprios = relatorio.maquinarios.filter(m => !m.is_terceiro)
+        const maquinariosTerceiros = relatorio.maquinarios.filter(m => m.is_terceiro)
+
+        pdf.setFontSize(16)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('Maquinários Utilizados', 20, yPosition)
+        yPosition += 10
+
+        pdf.setFontSize(11)
+        pdf.setFont('helvetica', 'normal')
+
+        if (maquinariosProprios.length > 0) {
+          pdf.setFont('helvetica', 'bold')
+          pdf.text('Maquinários Próprios:', 20, yPosition)
+          yPosition += 7
+          pdf.setFont('helvetica', 'normal')
+          maquinariosProprios.forEach(maq => {
+            pdf.text(`• ${maq.maquinario_nome}`, 25, yPosition)
+            yPosition += 6
+            if (yPosition > pageHeight - 30) {
+              pdf.addPage()
+              yPosition = 20
+            }
+          })
+        }
+
+        if (maquinariosTerceiros.length > 0) {
+          pdf.setFont('helvetica', 'bold')
+          pdf.text('Maquinários de Terceiros:', 20, yPosition)
+          yPosition += 7
+          pdf.setFont('helvetica', 'normal')
+          maquinariosTerceiros.forEach(maq => {
+            pdf.text(`• ${maq.maquinario_nome}`, 25, yPosition)
+            yPosition += 6
+            if (maq.parceiro_nome) {
+              pdf.text(`  Parceiro: ${maq.parceiro_nome}`, 25, yPosition)
+              yPosition += 6
+            }
+            if (yPosition > pageHeight - 30) {
+              pdf.addPage()
+              yPosition = 20
+            }
+          })
+        }
+      }
+
+      // Observações
+      if (relatorio.observacoes) {
+        yPosition += 5
+        pdf.setFontSize(16)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('Observações', 20, yPosition)
+        yPosition += 10
+
+        pdf.setFontSize(11)
+        pdf.setFont('helvetica', 'normal')
+        const observations = pdf.splitTextToSize(relatorio.observacoes, pageWidth - 40)
+        observations.forEach((line: string) => {
+          if (yPosition > pageHeight - 30) {
+            pdf.addPage()
+            yPosition = 20
+          }
+          pdf.text(line, 20, yPosition)
+          yPosition += 6
+        })
+      }
+
+      // Rodapé
+      const totalPages = pdf.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(9)
+        pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2])
+        pdf.text(
+          `WorldPav - Relatório Diário | Página ${i} de ${totalPages} | ${new Date().toLocaleDateString('pt-BR')}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        )
+      }
+
+      // Nome do arquivo
+      const fileName = `RelatorioDiario_${relatorio.numero}_${new Date().toISOString().split('T')[0]}.pdf`
+      
+      console.log('✅ PDF gerado com sucesso')
+      pdf.save(fileName)
+    } catch (error) {
+      console.error('❌ Erro ao exportar PDF:', error)
+      alert('Erro ao exportar PDF. Tente novamente.')
     }
   }
 
@@ -98,7 +284,7 @@ export function RelatorioDiarioDetails() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => window.print()}
+            onClick={handleExportPDF}
           >
             <FileDown className="h-4 w-4" />
             Exportar PDF

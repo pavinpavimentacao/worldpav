@@ -15,6 +15,13 @@ import {
 import { Layout } from '../../components/layout/Layout'
 import { CurrencyInput } from '../../components/ui/currency-input'
 import { supabase } from '../../lib/supabase'
+import { getOrCreateDefaultCompany } from '../../lib/company-utils'
+import { 
+  getContaPagarById, 
+  createContaPagar, 
+  updateContaPagar,
+  updateAnexoUrl 
+} from '../../lib/contas-pagar-api'
 import { formatCurrency } from '../../utils/format'
 import { toast } from '../../lib/toast'
 import type { ContaPagar, ContaPagarFormData, StatusContaPagar } from '../../types/contas-pagar'
@@ -28,6 +35,8 @@ export default function ContaPagarForm() {
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(isEditing)
   const [uploading, setUploading] = useState(false)
+  const [companyId, setCompanyId] = useState<string>('')
+  const [userId, setUserId] = useState<string>('')
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null)
   const [anexoExistenteUrl, setAnexoExistenteUrl] = useState<string | null>(null)
 
@@ -49,44 +58,80 @@ export default function ContaPagarForm() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Carregar company_id e user_id ao montar
   useEffect(() => {
-    if (isEditing && id) {
+    loadCompanyIdAndUserId()
+  }, [])
+
+  // Carregar conta se estiver editando
+  useEffect(() => {
+    if (isEditing && id && companyId) {
       carregarConta(id)
     }
-  }, [id, isEditing])
+  }, [id, isEditing, companyId])
+
+  const loadCompanyIdAndUserId = async () => {
+    try {
+      console.log('🏢 [ContaPagarForm] Carregando company ID e user ID...')
+      
+      // Carregar company_id
+      const id = await getOrCreateDefaultCompany()
+      setCompanyId(id)
+      console.log('✅ [ContaPagarForm] Company ID carregado:', id)
+      
+      // Carregar user_id
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.warn('⚠️  [ContaPagarForm] Usuário não autenticado')
+      } else {
+        setUserId(user.id)
+        console.log('✅ [ContaPagarForm] User ID carregado:', user.id)
+      }
+    } catch (error) {
+      console.error('❌ [ContaPagarForm] Erro ao carregar IDs:', error)
+      toast.error('Erro ao carregar dados do sistema')
+    }
+  }
 
   const carregarConta = async (contaId: string) => {
     try {
       setLoadingData(true)
-      const { data, error } = await supabase
-        .from('contas_pagar')
-        .select('*')
-        .eq('id', contaId)
-        .single()
+      console.log('🔍 [ContaPagarForm] Carregando conta:', contaId)
 
-      if (error) throw error
+      const conta = await getContaPagarById(contaId)
 
-      if (data) {
-        setFormData({
-          numero_nota: data.numero_nota || '',
-          valor: Number(data.valor) || 0,
-          data_emissao: data.data_emissao || '',
-          data_vencimento: data.data_vencimento || '',
-          fornecedor: data.fornecedor || '',
-          descricao: data.descricao || '',
-          categoria: data.categoria || '',
-          observacoes: data.observacoes || '',
-          anexo: null,
-          status: data.status || 'pendente'
-        })
-
-        if (data.anexo_url) {
-          setAnexoExistenteUrl(data.anexo_url)
-        }
+      if (!conta) {
+        toast.error('Conta não encontrada')
+        navigate('/contas-pagar')
+        return
       }
+
+      // Preencher formulário com dados da conta
+      setFormData({
+        numero_nota: conta.numero_nota || '',
+        valor: Number(conta.valor) || 0,
+        data_emissao: conta.data_emissao || '',
+        data_vencimento: conta.data_vencimento || '',
+        status: conta.status,
+        fornecedor: conta.fornecedor || '',
+        descricao: conta.descricao || '',
+        categoria: conta.categoria || '',
+        data_pagamento: conta.data_pagamento || '',
+        valor_pago: conta.valor_pago ? Number(conta.valor_pago) : 0,
+        forma_pagamento: conta.forma_pagamento || '',
+        observacoes: conta.observacoes || '',
+        anexo: null,
+      })
+
+      // Configurar anexo existente
+      if (conta.anexo_url) {
+        setAnexoExistenteUrl(conta.anexo_url)
+      }
+
+      console.log('✅ [ContaPagarForm] Conta carregada:', conta.numero_nota)
     } catch (error: any) {
-      console.error('Erro ao carregar conta:', error)
-      toast.error('Erro ao carregar dados da conta')
+      console.error('❌ [ContaPagarForm] Erro ao carregar conta:', error)
+      toast.error(error.message || 'Erro ao carregar dados da conta')
       navigate('/contas-pagar')
     } finally {
       setLoadingData(false)
@@ -244,66 +289,84 @@ export default function ContaPagarForm() {
       return
     }
 
+    if (!companyId) {
+      toast.error('Erro: Empresa não carregada. Por favor, recarregue a página.')
+      return
+    }
+
     try {
       setLoading(true)
+      console.log('💾 [ContaPagarForm] Salvando conta...')
       
       let anexoUrl = anexoExistenteUrl
 
       // Upload do anexo se houver arquivo novo
       if (formData.anexo && formData.anexo instanceof File) {
         setUploading(true)
+        console.log('📤 [ContaPagarForm] Fazendo upload do anexo...')
         anexoUrl = await uploadAnexo(formData.anexo)
         setUploading(false)
+        console.log('✅ [ContaPagarForm] Anexo enviado:', anexoUrl)
       }
 
-      const contaData = {
+      // Preparar dados do formulário
+      const formDataToSave: ContaPagarFormData = {
         numero_nota: formData.numero_nota.trim(),
         valor: formData.valor,
         data_emissao: formData.data_emissao,
         data_vencimento: formData.data_vencimento,
         status: formData.status,
-        fornecedor: formData.fornecedor?.trim() || null,
-        descricao: formData.descricao?.trim() || null,
-        categoria: formData.categoria || null,
-        data_pagamento: formData.status === 'Paga' ? (formData.data_pagamento || new Date().toISOString().split('T')[0]) : null,
-        valor_pago: formData.status === 'Paga' ? (formData.valor_pago || formData.valor) : null,
-        forma_pagamento: formData.status === 'Paga' ? (formData.forma_pagamento || null) : null,
-        observacoes: formData.observacoes?.trim() || null,
-        anexo_url: anexoUrl,
-        anexo_nome: formData.anexo?.name || null,
+        fornecedor: formData.fornecedor?.trim() || undefined,
+        descricao: formData.descricao?.trim() || undefined,
+        categoria: formData.categoria || undefined,
+        data_pagamento: formData.status === 'Paga' 
+          ? (formData.data_pagamento || new Date().toISOString().split('T')[0]) 
+          : undefined,
+        valor_pago: formData.status === 'Paga' 
+          ? (formData.valor_pago || formData.valor) 
+          : undefined,
+        forma_pagamento: formData.status === 'Paga' 
+          ? (formData.forma_pagamento || undefined) 
+          : undefined,
+        observacoes: formData.observacoes?.trim() || undefined,
+        anexo: null, // Não enviar arquivo aqui, será tratado separadamente
       }
+
+      let contaSalva: ContaPagar
 
       if (isEditing && id) {
         // Atualizar conta existente
-        const { error } = await supabase
-          .from('contas_pagar')
-          .update(contaData)
-          .eq('id', id)
-
-        if (error) throw error
-
+        console.log('✏️  [ContaPagarForm] Atualizando conta:', id)
+        contaSalva = await updateContaPagar(id, formDataToSave, userId)
+        
+        // Atualizar anexo se houver URL
+        if (anexoUrl && anexoUrl !== anexoExistenteUrl) {
+          await updateAnexoUrl(id, anexoUrl, formData.anexo?.name)
+        }
+        
         toast.success('Conta atualizada com sucesso!')
       } else {
         // Criar nova conta
-        const { data: novaConta, error } = await supabase
-          .from('contas_pagar')
-          .insert(contaData)
-          .select()
-          .single()
-
-        if (error) throw error
+        console.log('➕ [ContaPagarForm] Criando nova conta...')
+        contaSalva = await createContaPagar(formDataToSave, companyId, userId)
+        
+        // Atualizar anexo se houver URL
+        if (anexoUrl) {
+          await updateAnexoUrl(contaSalva.id, anexoUrl, formData.anexo?.name)
+        }
 
         // Se o status for "Paga", criar uma despesa no financeiro
         if (formData.status === 'Paga') {
-          await criarDespesaFinanceira(novaConta)
+          await criarDespesaFinanceira(contaSalva)
         }
 
         toast.success('Conta criada com sucesso!')
       }
 
+      console.log('✅ [ContaPagarForm] Conta salva com sucesso:', contaSalva.numero_nota)
       navigate('/contas-pagar')
     } catch (error: any) {
-      console.error('Erro ao salvar conta:', error)
+      console.error('❌ [ContaPagarForm] Erro ao salvar conta:', error)
       toast.error(error.message || 'Erro ao salvar conta')
     } finally {
       setLoading(false)

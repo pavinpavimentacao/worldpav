@@ -170,6 +170,7 @@ export interface UpdateNotaFiscalInput {
   desconto_inss?: number
   desconto_iss?: number
   outro_desconto?: number
+  status?: NotaFiscalStatus
   arquivo_nota_url?: string
   observacoes?: string
 }

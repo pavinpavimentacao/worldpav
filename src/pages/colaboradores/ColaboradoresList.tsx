@@ -28,6 +28,8 @@ import {
   type ColaboradorSimples,
   type ColaboradorFilters as ApiFilters
 } from '../../lib/colaboradoresApi';
+import { getEquipes as getEquipesFromApi } from '../../lib/equipesApi';
+import { getOrCreateDefaultCompany } from '../../lib/company-utils';
 import {
   Colaborador,
   TipoEquipe,
@@ -42,6 +44,7 @@ const ColaboradoresList: React.FC = () => {
   
   // State
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [equipesMap, setEquipesMap] = useState<Map<string, string>>(new Map()); // ✅ Mapa de equipe_id -> nome
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedColaborador, setSelectedColaborador] = useState<Colaborador | null>(null);
@@ -61,29 +64,36 @@ const ColaboradoresList: React.FC = () => {
     if (companyId) {
       loadColaboradores();
       loadStats();
+      loadEquipes(); // ✅ Carregar equipes
     }
   }, [companyId]);
 
+  const loadEquipes = async () => {
+    try {
+      const equipes = await getEquipesFromApi(companyId);
+      console.log('📋 [ColaboradoresList] Equipes retornadas da API:', equipes);
+      console.log('📋 [ColaboradoresList] IDs das equipes:', equipes.map(eq => eq.id));
+      const map = new Map<string, string>();
+      equipes.forEach(eq => {
+        map.set(eq.id, eq.name);
+      });
+      setEquipesMap(map);
+      console.log('✅ [ColaboradoresList] Equipes carregadas no map:', Array.from(map.entries()));
+    } catch (error) {
+      console.error('❌ [ColaboradoresList] Erro ao carregar equipes:', error);
+    }
+  };
+
   const loadUserCompany = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select('company_id')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-        if (userData?.company_id) {
-          setCompanyId(userData.company_id);
-        }
-      }
+      console.log('🔍 [ColaboradoresList] Carregando company ID...');
+      // ✅ Usar getOrCreateDefaultCompany em vez de consultar tabela users
+      const companyIdResult = await getOrCreateDefaultCompany();
+      console.log('✅ [ColaboradoresList] Company ID recebido:', companyIdResult);
+      setCompanyId(companyIdResult);
+      console.log('✅ [ColaboradoresList] Company ID definido no state');
     } catch (error) {
-      console.error('Erro ao carregar empresa do usuário:', error);
+      console.error('❌ [ColaboradoresList] Erro ao carregar empresa do usuário:', error);
       toast.error('Erro ao carregar dados do usuário');
     }
   };
@@ -98,6 +108,8 @@ const ColaboradoresList: React.FC = () => {
       };
       
       const data = await getColaboradores(companyId, filters);
+      console.log('📋 [ColaboradoresList] Colaboradores carregados:', data);
+      console.log('📋 [ColaboradoresList] Primeiro colaborador:', data[0]);
       
       // Converter para formato legado para manter compatibilidade
       const colaboradoresLegacy = data.map(toColaboradorLegacy);
@@ -381,14 +393,30 @@ const ColaboradoresList: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              colaborador.tipo_equipe === 'equipe_a'
+                              // Se tem equipe_id no mapa, usar cores neutras
+                              colaborador.equipe_id && equipesMap.has(colaborador.equipe_id)
+                                ? 'bg-blue-100 text-blue-800'
+                                : colaborador.tipo_equipe === 'equipe_a'
                                 ? 'bg-orange-100 text-orange-800'
                                 : colaborador.tipo_equipe === 'equipe_b'
                                 ? 'bg-red-100 text-red-800'
                                 : 'bg-purple-100 text-purple-800'
                             }`}
                           >
-                            {getTipoEquipeLabel(colaborador.tipo_equipe)}
+{(() => {
+                            // Tentar buscar nome da equipe pelo equipe_id
+                            if (colaborador.equipe_id && equipesMap.has(colaborador.equipe_id)) {
+                              const equipeNome = equipesMap.get(colaborador.equipe_id);
+                              console.log(`🔍 [Render] Colaborador ${colaborador.nome}: equipe_id=${colaborador.equipe_id}, nome=${equipeNome}`);
+                              console.log(`📋 [Render] Equipes map size:`, equipesMap.size);
+                              console.log(`📋 [Render] Equipes map entries:`, Array.from(equipesMap.entries()));
+                              return equipeNome;
+                            }
+                            // Fallback para tipo_equipe
+                            console.log(`🔍 [Render] Colaborador ${colaborador.nome}: usando tipo_equipe=${colaborador.tipo_equipe}`);
+                            console.log(`🔍 [Render] equipe_id: ${colaborador.equipe_id}, map has: ${colaborador.equipe_id ? equipesMap.has(colaborador.equipe_id) : 'undefined'}`);
+                            return getTipoEquipeLabel(colaborador.tipo_equipe);
+                          })()}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

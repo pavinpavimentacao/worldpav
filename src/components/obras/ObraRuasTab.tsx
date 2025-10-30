@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, CheckCircle, Clock, Circle, Trash2 } from 'lucide-react'
+import { Plus, CheckCircle, Clock, Circle, Trash2, Eye } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { AdicionarRuaModal } from './AdicionarRuaModal'
 import { FinalizarRuaModal } from './FinalizarRuaModal'
+import { ObraRuaDetailsModal } from './ObraRuaDetailsModal'
 import { useToast } from '../../lib/toast-hooks'
 import { 
   getRuasByObra,
@@ -23,7 +24,9 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
   const [loading, setLoading] = useState(true)
   const [modalAdicionarOpen, setModalAdicionarOpen] = useState(false)
   const [modalFinalizarOpen, setModalFinalizarOpen] = useState(false)
+  const [modalDetalhesOpen, setModalDetalhesOpen] = useState(false)
   const [ruaSelecionada, setRuaSelecionada] = useState<ObraRua | null>(null)
+  const [ruaParaDetalhes, setRuaParaDetalhes] = useState<ObraRua | null>(null)
   const [statusCounts, setStatusCounts] = useState({ pendente: 0, em_andamento: 0, finalizada: 0 })
   const { addToast } = useToast()
 
@@ -68,6 +71,8 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
         obra_id: obraId,
         name: data.nome,
         area: area,
+        metragem_planejada: data.metragem_planejada || null,
+        toneladas_utilizadas: data.toneladas_previstas || null,
         observations: data.observacoes || null,
         status: 'planejada'
       }
@@ -90,10 +95,25 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
     if (!ruaSelecionada) return
 
     try {
-      // Por enquanto, apenas atualiza o status para concluída
-      // TODO: Implementar createFaturamentoRua quando necessário
-      const { updateRuaStatus } = await import('../../lib/obrasRuasApi')
-      await updateRuaStatus(ruaSelecionada.id, 'concluida')
+      // Calcular espessura baseada na metragem e toneladas
+      const espessuraCalculada = data.toneladas_utilizadas / data.metragem_executada / 2.4 // Densidade do asfalto
+      
+      // Calcular valor total baseado na metragem executada e preço por m²
+      const valorTotal = data.metragem_executada * precoPorM2
+
+      // Atualizar rua com todos os dados de execução
+      const { updateRua } = await import('../../lib/obrasRuasApi')
+      await updateRua(ruaSelecionada.id, {
+        metragem_executada: data.metragem_executada,
+        toneladas_utilizadas: data.toneladas_utilizadas,
+        espessura_calculada: espessuraCalculada,
+        preco_por_m2: precoPorM2,
+        valor_total: valorTotal,
+        data_finalizacao: new Date().toISOString(),
+        status: 'concluida',
+        observations: data.observacoes || ruaSelecionada.observations
+      })
+      
       await loadRuas()
       
       addToast({ message: 'Rua finalizada com sucesso!', type: 'success' })
@@ -106,16 +126,32 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
 
 
   const handleDeletarRua = async (rua: ObraRua) => {
-    if (!confirm(`Tem certeza que deseja deletar a rua "${rua.name}"?`)) return
+    // Confirmação diferente para ruas finalizadas
+    const isRuaFinalizada = rua.status === 'concluida'
+    const message = isRuaFinalizada 
+      ? `⚠️ ATENÇÃO: Esta rua está FINALIZADA!\n\nTem certeza que deseja deletar a rua "${rua.name}"?\n\nEsta ação irá remover todos os dados de execução da rua.`
+      : `Tem certeza que deseja deletar a rua "${rua.name}"?`
+    
+    if (!confirm(message)) return
 
     try {
       await deleteRua(rua.id)
       await loadRuas()
-      addToast({ message: 'Rua deletada com sucesso', type: 'success' })
+      addToast({ 
+        message: isRuaFinalizada 
+          ? 'Rua finalizada deletada com sucesso!' 
+          : 'Rua deletada com sucesso', 
+        type: 'success' 
+      })
     } catch (error) {
       console.error('Erro ao deletar rua:', error)
       addToast({ message: 'Erro ao deletar rua', type: 'error' })
     }
+  }
+
+  const handleVerDetalhes = (rua: ObraRua) => {
+    setRuaParaDetalhes(rua)
+    setModalDetalhesOpen(true)
   }
 
   const getStatusIcon = (status: string) => {
@@ -226,6 +262,9 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
                   Metragem Planejada
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Metragem Executada
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Status
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -249,7 +288,12 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-600">
-                        {rua.area ? `${rua.area.toLocaleString('pt-BR')} m²` : '-'}
+                        {rua.metragem_planejada ? `${rua.metragem_planejada.toLocaleString('pt-BR')} m²` : '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className="text-sm text-gray-600">
+                        {rua.metragem_executada ? `${rua.metragem_executada.toLocaleString('pt-BR')} m²` : '-'}
                       </span>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -259,6 +303,13 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleVerDetalhes(rua)}
+                          className="p-1 text-blue-600 hover:text-blue-800"
+                          title="Ver detalhes da rua"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
                         {rua.status !== 'concluida' && (
                           <Button
                             variant="primary"
@@ -271,11 +322,15 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
                             Finalizar
                           </Button>
                         )}
-                        {rua.status === 'planejada' && (
+                        {(rua.status === 'planejada' || rua.status === 'concluida') && (
                           <button
                             onClick={() => handleDeletarRua(rua)}
-                            className="text-red-600 hover:text-red-800 p-1"
-                            title="Deletar rua"
+                            className={`p-1 ${
+                              rua.status === 'concluida' 
+                                ? 'text-red-700 hover:text-red-900' 
+                                : 'text-red-600 hover:text-red-800'
+                            }`}
+                            title={rua.status === 'concluida' ? 'Deletar rua finalizada' : 'Deletar rua'}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -306,6 +361,15 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
         onSubmit={handleFinalizarRua}
         ruaNome={ruaSelecionada?.name || ''}
         precoPorM2={precoPorM2}
+      />
+
+      <ObraRuaDetailsModal
+        isOpen={modalDetalhesOpen}
+        onClose={() => {
+          setModalDetalhesOpen(false)
+          setRuaParaDetalhes(null)
+        }}
+        rua={ruaParaDetalhes}
       />
     </div>
   )

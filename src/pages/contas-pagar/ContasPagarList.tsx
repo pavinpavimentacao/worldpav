@@ -18,74 +18,130 @@ import {
   FileDown
 } from 'lucide-react'
 import { Layout } from '../../components/layout/Layout'
-import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../utils/format'
 import { formatDateSafe } from '../../utils/date-utils'
 import { useToast } from '../../lib/toast-hooks'
-import type { ContaPagar, StatusContaPagar, ContaPagarEstatisticas } from '../../types/contas-pagar'
-import { STATUS_COLORS, calcularDiasParaVencimento, obterStatusVencimento } from '../../types/contas-pagar'
-import { contasPagarMock, estatisticasMock } from '../../mocks/contas-pagar-mock'
+import { getOrCreateDefaultCompany } from '../../lib/company-utils'
+import { 
+  getContasPagar, 
+  deleteContaPagar, 
+  getEstatisticas 
+} from '../../lib/contas-pagar-api'
+import type { ContaPagar, StatusContaPagar, ContaPagarEstatisticas, ContaPagarFiltros } from '../../types/contas-pagar'
+import { STATUS_COLORS, calcularDiasParaVencimento } from '../../types/contas-pagar'
 
 export default function ContasPagarList() {
   const navigate = useNavigate()
   const toast = useToast()
-  const [contas, setContas] = useState<ContaPagar[]>(contasPagarMock)
-  const [contasFiltradas, setContasFiltradas] = useState<ContaPagar[]>(contasPagarMock)
-  const [loading, setLoading] = useState(false)
+  const [contas, setContas] = useState<ContaPagar[]>([])
+  const [contasFiltradas, setContasFiltradas] = useState<ContaPagar[]>([])
+  const [loading, setLoading] = useState(true)
+  const [companyId, setCompanyId] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState('')
   const [filtroStatus, setFiltroStatus] = useState<StatusContaPagar | 'Todas'>('Todas')
-  const [estatisticas, setEstatisticas] = useState<ContaPagarEstatisticas>(estatisticasMock)
+  const [estatisticas, setEstatisticas] = useState<ContaPagarEstatisticas>({
+    total_contas: 0,
+    total_pendente: 0,
+    total_pago: 0,
+    total_atrasado: 0,
+    valor_total_pendente: 0,
+    valor_total_pago: 0,
+    valor_total_atrasado: 0,
+    valor_total_geral: 0,
+  })
 
+  // Carregar company_id ao montar
   useEffect(() => {
-    carregarContas()
+    loadCompanyId()
   }, [])
 
+  // Carregar dados quando companyId estiver disponível ou filtros mudarem
   useEffect(() => {
-    filtrarContas()
-  }, [searchTerm, filtroStatus, contas])
+    if (companyId) {
+      carregarContas()
+      carregarEstatisticas()
+    }
+  }, [companyId, searchTerm, filtroStatus])
+
+  const loadCompanyId = async () => {
+    try {
+      console.log('🏢 [ContasPagarList] Carregando company ID...')
+      const id = await getOrCreateDefaultCompany()
+      setCompanyId(id)
+      console.log('✅ [ContasPagarList] Company ID carregado:', id)
+    } catch (error) {
+      console.error('❌ [ContasPagarList] Erro ao carregar company ID:', error)
+      toast.error('Erro ao carregar empresa')
+    }
+  }
 
   const carregarContas = async () => {
+    if (!companyId) {
+      console.log('⏳ [ContasPagarList] Aguardando company ID...')
+      return
+    }
+
     try {
       setLoading(true)
+      console.log('🔍 [ContasPagarList] Carregando contas a pagar...')
+
+      // Preparar filtros
+      const filtros: ContaPagarFiltros = {}
       
-      // Simular carregamento com dados mock
-      await new Promise(resolve => setTimeout(resolve, 500))
+      if (filtroStatus !== 'Todas') {
+        filtros.status = [filtroStatus]
+      }
+
+      if (searchTerm.trim()) {
+        // A API fará busca em múltiplos campos (invoice_number, description, supplier, category)
+        filtros.numero_nota = searchTerm.trim()
+      }
+
+      // Buscar contas usando a API
+      const contasData = await getContasPagar(companyId, filtros)
       
-      setContas(contasPagarMock)
-      setEstatisticas(estatisticasMock)
+      setContas(contasData)
+      
+      // Aplicar filtro local apenas para busca textual (que já vem filtrado da API)
+      // Mas vamos fazer filtro local também para garantir (caso a API não suporte todos os filtros)
+      filtrarContasLocal(contasData)
+      
+      console.log(`✅ [ContasPagarList] ${contasData.length} conta(s) carregada(s)`)
     } catch (error: any) {
-      console.error('Erro ao carregar contas a pagar:', error)
-      toast.error('Erro ao carregar contas a pagar')
+      console.error('❌ [ContasPagarList] Erro ao carregar contas:', error)
+      toast.error(error.message || 'Erro ao carregar contas a pagar')
+      setContas([])
+      setContasFiltradas([])
     } finally {
       setLoading(false)
     }
   }
 
-  const calcularEstatisticas = (contas: ContaPagar[]) => {
-    const stats: ContaPagarEstatisticas = {
-      total_contas: contas.length,
-      total_pendente: contas.filter(c => c.status === 'Pendente').length,
-      total_pago: contas.filter(c => c.status === 'Paga').length,
-      total_atrasado: contas.filter(c => c.status === 'Atrasada').length,
-      valor_total_pendente: contas.filter(c => c.status === 'Pendente').reduce((acc, c) => acc + Number(c.valor), 0),
-      valor_total_pago: contas.filter(c => c.status === 'Paga').reduce((acc, c) => acc + Number(c.valor_pago || c.valor), 0),
-      valor_total_atrasado: contas.filter(c => c.status === 'Atrasada').reduce((acc, c) => acc + Number(c.valor), 0),
-      valor_total_geral: contas.reduce((acc, c) => acc + Number(c.valor), 0),
+  const carregarEstatisticas = async () => {
+    if (!companyId) return
+
+    try {
+      console.log('📊 [ContasPagarList] Carregando estatísticas...')
+      const stats = await getEstatisticas(companyId)
+      setEstatisticas(stats)
+      console.log('✅ [ContasPagarList] Estatísticas carregadas:', stats)
+    } catch (error: any) {
+      console.error('❌ [ContasPagarList] Erro ao carregar estatísticas:', error)
+      // Não mostrar toast para estatísticas (não é crítico)
     }
-    setEstatisticas(stats)
   }
 
-  const filtrarContas = () => {
-    let resultado = [...contas]
+  const filtrarContasLocal = (contasParaFiltrar: ContaPagar[]) => {
+    let resultado = [...contasParaFiltrar]
 
-    // Filtro por status
+    // Filtro por status (se ainda não foi aplicado pela API)
     if (filtroStatus !== 'Todas') {
       resultado = resultado.filter(conta => conta.status === filtroStatus)
     }
 
-    // Filtro por busca
-    if (searchTerm) {
-      const termo = searchTerm.toLowerCase()
+    // Filtro por busca textual (buscas mais complexas podem precisar de filtro local)
+    if (searchTerm.trim()) {
+      const termo = searchTerm.toLowerCase().trim()
       resultado = resultado.filter(conta => 
         conta.numero_nota?.toLowerCase().includes(termo) ||
         conta.fornecedor?.toLowerCase().includes(termo) ||
@@ -97,22 +153,27 @@ export default function ContasPagarList() {
     setContasFiltradas(resultado)
   }
 
+  // Função removida - agora os filtros são aplicados diretamente na API
+
   const handleExcluir = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta conta?')) return
+    if (!confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
+      return
+    }
 
     try {
-      const { error } = await supabase
-        .from('contas_pagar')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
+      console.log('🗑️  [ContasPagarList] Excluindo conta:', id)
+      await deleteContaPagar(id)
+      
       toast.success('Conta excluída com sucesso!')
-      carregarContas()
+      
+      // Recarregar dados
+      await carregarContas()
+      await carregarEstatisticas()
+      
+      console.log('✅ [ContasPagarList] Conta excluída e dados recarregados')
     } catch (error: any) {
-      console.error('Erro ao excluir conta:', error)
-      toast.error('Erro ao excluir conta')
+      console.error('❌ [ContasPagarList] Erro ao excluir conta:', error)
+      toast.error(error.message || 'Erro ao excluir conta')
     }
   }
 

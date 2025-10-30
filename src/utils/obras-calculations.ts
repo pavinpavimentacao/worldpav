@@ -150,10 +150,10 @@ export function formatarToneladas(toneladas: number, decimais: number = 1): stri
  * Formata valores de espessura para exibição
  * 
  * @param espessura - Espessura em cm
- * @param decimais - Número de casas decimais (padrão: 1)
- * @returns String formatada (ex: "3,5 cm")
+ * @param decimais - Número de casas decimais (padrão: 2)
+ * @returns String formatada (ex: "4,35 cm")
  */
-export function formatarEspessura(espessura: number, decimais: number = 1): string {
+export function formatarEspessura(espessura: number, decimais: number = 2): string {
   return `${espessura.toLocaleString('pt-BR', { 
     minimumFractionDigits: decimais,
     maximumFractionDigits: decimais 

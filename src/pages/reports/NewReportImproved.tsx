@@ -8,6 +8,7 @@ import { Button } from "../../components/shared/Button"
 import { Select } from "../../components/shared/Select"
 import { DatePicker } from '../../components/ui/date-picker'
 import { getAllObrasWithProgress } from '../../types/obras'
+import { supabase } from '../../lib/supabase'
 import { 
   ArrowLeft, 
   Plus, 
@@ -36,26 +37,31 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const mockBombas = [
-  { id: '1', prefix: 'WP-001', model: 'Vibroacabadora CAT AP1055F', status: 'active' },
-  { id: '2', prefix: 'WP-002', model: 'Vibroacabadora Dynapac CA2500', status: 'active' },
-  { id: '3', prefix: 'WP-003', model: 'Vibroacabadora Volvo ABG 7820', status: 'maintenance' },
-  { id: '4', prefix: 'PAV-001', model: 'Vibroacabadora Pavin P-200', status: 'active' }
-]
+// Interfaces para dados reais
+interface Colaborador {
+  id: string
+  name: string
+  position: string
+}
 
-// Mock data para colaboradores
-const mockColaboradores = [
-  { id: '1', nome: 'João Silva', funcao: 'Motorista' },
-  { id: '2', nome: 'Maria Santos', funcao: 'Auxiliar' },
-  { id: '3', nome: 'Pedro Costa', funcao: 'Auxiliar' },
-  { id: '4', nome: 'Ana Oliveira', funcao: 'Motorista' },
-  { id: '5', nome: 'Carlos Lima', funcao: 'Auxiliar' }
-]
+interface Maquinario {
+  id: string
+  prefix: string
+  model?: string
+  brand?: string
+  name: string
+  status: string
+}
 
 export default function NewReportImproved() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const obraIdFromUrl = searchParams.get('obra_id')
+
+  // Estados para dados reais
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([])
+  const [maquinarios, setMaquinarios] = useState<Maquinario[]>([])
+  const [loadingData, setLoadingData] = useState(true)
 
   const {
     handleSubmit,
@@ -82,6 +88,74 @@ export default function NewReportImproved() {
 
   const obraSelecionada = watch('obra_id')
   const volumeRealizado = watch('volume_realizado')
+
+  // Carregar dados reais do banco
+  useEffect(() => {
+    async function loadRealData() {
+      try {
+        setLoadingData(true)
+        console.log('🔍 Carregando dados reais do banco...')
+
+        // Buscar colaboradores
+        const { data: colaboradoresData, error: colaboradoresError } = await supabase
+          .from('colaboradores')
+          .select('id, name, position')
+          .eq('status', 'ativo')
+          .order('name')
+
+        if (colaboradoresError) {
+          console.error('❌ Erro ao buscar colaboradores:', colaboradoresError)
+        } else {
+          console.log('✅ Colaboradores carregados:', colaboradoresData?.length || 0)
+          setColaboradores(colaboradoresData || [])
+        }
+
+        // Buscar maquinários (tentar tabela maquinarios)
+        const { data: maquinariosData, error: maquinariosError } = await supabase
+          .from('maquinarios')
+          .select('id, name, model, brand')
+          .eq('status', 'ativo')
+          .order('name')
+
+        if (maquinariosError) {
+          console.error('❌ Erro ao buscar maquinários:', maquinariosError)
+          
+          // Fallback: tentar tabela pumps
+          const { data: pumpsData, error: pumpsError } = await supabase
+            .from('pumps')
+            .select('id, prefix, model, brand')
+            .eq('status', 'ativo')
+            .order('prefix')
+
+          if (pumpsError) {
+            console.error('❌ Erro ao buscar pumps:', pumpsError)
+          } else {
+            console.log('✅ Pumps carregados:', pumpsData?.length || 0)
+            setMaquinarios(
+              pumpsData?.map(p => ({
+                id: p.id,
+                prefix: p.prefix || '',
+                model: p.model,
+                brand: p.brand,
+                name: p.prefix,
+                status: 'ativo'
+              })) || []
+            )
+          }
+        } else {
+          console.log('✅ Maquinários carregados:', maquinariosData?.length || 0)
+          setMaquinarios(maquinariosData || [])
+        }
+
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados:', error)
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadRealData()
+  }, [])
 
   // Obter obras disponíveis
   const obras = getAllObrasWithProgress().filter(o => o.status === 'em_andamento')
@@ -138,6 +212,11 @@ export default function NewReportImproved() {
             <p className="mt-1 text-sm text-gray-500">
               Registre um novo relatório de aplicação de massa asfáltica.
             </p>
+            {loadingData && (
+              <p className="mt-2 text-sm text-blue-600">
+                🔄 Carregando dados do banco de dados...
+              </p>
+            )}
           </div>
           <div className="mt-4 flex md:ml-4 md:mt-0">
             <Button variant="outline" onClick={() => navigate(-1)}>
@@ -269,14 +348,15 @@ export default function NewReportImproved() {
                       label="Bomba Espargidora *"
                       value={field.value || ''}
                       onChange={field.onChange}
-                      placeholder="Selecione uma bomba"
+                      placeholder={loadingData ? "Carregando..." : "Selecione uma bomba"}
+                      disabled={loadingData}
                       options={[
                         { value: '', label: 'Selecione uma bomba' },
-                        ...mockBombas
-                          .filter(bomba => bomba.status === 'active')
+                        ...maquinarios
+                          .filter(bomba => bomba.status === 'ativo')
                           .map(bomba => ({
                             value: bomba.id,
-                            label: `${bomba.prefix} - ${bomba.model}`
+                            label: `${bomba.prefix || bomba.name}${bomba.model ? ` - ${bomba.model}` : ''}`
                           }))
                       ]}
                       error={errors.bomba_id?.message}
@@ -295,14 +375,15 @@ export default function NewReportImproved() {
                       label="Motorista *"
                       value={field.value || ''}
                       onChange={field.onChange}
-                      placeholder="Selecione o motorista"
+                      placeholder={loadingData ? "Carregando..." : "Selecione o motorista"}
+                      disabled={loadingData}
                       options={[
                         { value: '', label: 'Selecione o motorista' },
-                        ...mockColaboradores
-                          .filter(col => col.funcao === 'Motorista')
+                        ...colaboradores
+                          .filter(col => col.position?.toLowerCase().includes('motorista') || col.position?.toLowerCase().includes('motor'))
                           .map(col => ({
                             value: col.id,
-                            label: col.nome
+                            label: col.name
                           }))
                       ]}
                       error={errors.motorista?.message}
@@ -321,14 +402,15 @@ export default function NewReportImproved() {
                       label="Auxiliar 1 *"
                       value={field.value || ''}
                       onChange={field.onChange}
-                      placeholder="Selecione o auxiliar"
+                      placeholder={loadingData ? "Carregando..." : "Selecione o auxiliar"}
+                      disabled={loadingData}
                       options={[
                         { value: '', label: 'Selecione o auxiliar' },
-                        ...mockColaboradores
-                          .filter(col => col.funcao === 'Auxiliar')
+                        ...colaboradores
+                          .filter(col => col.position?.toLowerCase().includes('auxiliar') || col.position?.toLowerCase().includes('assistente'))
                           .map(col => ({
                             value: col.id,
-                            label: col.nome
+                            label: col.name
                           }))
                       ]}
                       error={errors.auxiliar1?.message}
@@ -347,14 +429,15 @@ export default function NewReportImproved() {
                       label="Auxiliar 2 (Opcional)"
                       value={field.value || ''}
                       onChange={field.onChange}
-                      placeholder="Selecione o auxiliar"
+                      placeholder={loadingData ? "Carregando..." : "Selecione o auxiliar"}
+                      disabled={loadingData}
                       options={[
                         { value: '', label: 'Não selecionar' },
-                        ...mockColaboradores
-                          .filter(col => col.funcao === 'Auxiliar')
+                        ...colaboradores
+                          .filter(col => col.position?.toLowerCase().includes('auxiliar') || col.position?.toLowerCase().includes('assistente'))
                           .map(col => ({
                             value: col.id,
-                            label: col.nome
+                            label: col.name
                           }))
                       ]}
                     />

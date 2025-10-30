@@ -53,10 +53,10 @@ const navigation = [
 // Navegação secundária para tabs adicionais
 const secondaryNavigation = [
   { 
-    name: 'Maquinários', 
+    name: 'Equipamentos', 
     href: '/maquinarios', 
     icon: Settings,
-    mobileLabel: 'Maquinários'
+    mobileLabel: 'Equipamentos'
   },
   { 
     name: 'Relatórios', 
@@ -69,7 +69,7 @@ const secondaryNavigation = [
 // Navegação adicional para menu de usuário
 const userNavigation = [
   { 
-    name: 'Maquinários', 
+    name: 'Equipamentos', 
     href: '/maquinarios', 
     icon: Settings
   },

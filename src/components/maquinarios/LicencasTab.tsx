@@ -57,7 +57,7 @@ export const LicencasTab: React.FC<LicencasTabProps> = ({
   const [arquivoLicenca, setArquivoLicenca] = useState<File | null>(null);
   const [arquivoLicencaUrl, setArquivoLicencaUrl] = useState('');
 
-  const isEspargidor = maquinarioTipo.toLowerCase().includes('espargidor');
+  const isEspargidor = maquinarioTipo?.toLowerCase().includes('espargidor') || false;
 
   useEffect(() => {
     carregarLicencas();

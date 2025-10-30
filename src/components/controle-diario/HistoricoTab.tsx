@@ -3,18 +3,35 @@
  * Consulta de registros passados de relações diárias
  */
 
-import React, { useState, useMemo } from 'react';
-import { Calendar, Users, Search, Eye, X } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Calendar, Users, Search, Eye, X, Loader2 } from 'lucide-react';
 import { Button } from "../shared/Button";
 import { Input } from '../ui/input';
-import { listarRelacoesDiarias } from '../../mocks/controle-diario-mock';
+import { listarRelacoesDiarias } from '../../lib/controle-diario-api';
 import { RelacaoDiariaCompleta, getStatusPresencaInfo } from '../../types/controle-diario';
 import { formatDateBR } from '../../utils/date-format';
 
 export const HistoricoTab: React.FC = () => {
-  const [relacoes] = useState<RelacaoDiariaCompleta[]>(listarRelacoesDiarias());
+  const [relacoes, setRelacoes] = useState<RelacaoDiariaCompleta[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [relacaoSelecionada, setRelacaoSelecionada] = useState<RelacaoDiariaCompleta | null>(null);
+
+  useEffect(() => {
+    async function loadRelacoes() {
+      try {
+        setLoading(true);
+        const data = await listarRelacoesDiarias();
+        setRelacoes(data);
+      } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadRelacoes();
+  }, []);
 
   // Filtros
   const [filtroData, setFiltroData] = useState('');
@@ -36,6 +53,17 @@ export const HistoricoTab: React.FC = () => {
     setRelacaoSelecionada(relacao);
     setShowDetalhesModal(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Carregando histórico...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,10 +127,10 @@ export const HistoricoTab: React.FC = () => {
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
                     <h3 className="font-semibold text-gray-900 text-lg">
-                      {relacao.equipe_nome || 'Equipe não identificada'}
+                      Relação Diária
                     </h3>
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                      {relacao.equipe_tipo === 'propria' ? 'Própria' : 'Terceirizada'}
+                      {relacao.equipe_id ? 'Com Equipe' : 'Sem Equipe'}
                     </span>
                   </div>
 
@@ -167,7 +195,7 @@ export const HistoricoTab: React.FC = () => {
                   Detalhes da Relação Diária
                 </h3>
                 <p className="text-sm text-gray-600">
-                  {relacaoSelecionada.equipe_nome} - {formatDateBR(relacaoSelecionada.data)}
+                  {formatDateBR(relacaoSelecionada.data)}
                 </p>
               </div>
               <button onClick={() => setShowDetalhesModal(false)}>
