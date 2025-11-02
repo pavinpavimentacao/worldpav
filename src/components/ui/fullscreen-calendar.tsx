@@ -26,7 +26,7 @@ import {
 import { cn } from '../../lib/utils'
 import { Button } from "./button"
 import { Separator } from "./separator"
-import { useMediaQuery } from '../hooks/use-media-query"
+import { useMediaQuery } from '../../hooks/use-media-query'
 
 interface Event {
   id: number
