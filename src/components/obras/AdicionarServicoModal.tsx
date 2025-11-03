@@ -7,7 +7,6 @@ import { createServicoObra } from '../../lib/obrasServicosApi'
 import { getServicosCatalogo } from '../../lib/servicosCatalogoApi'
 import { useToast } from '../../lib/toast-hooks'
 import { CurrencyInput } from '../ui/currency-input'
-import { NumberInput } from '../ui/number-input-fixed'
 import { X } from 'lucide-react'
 
 interface AdicionarServicoModalProps {
@@ -25,7 +24,6 @@ export function AdicionarServicoModal({ obraId, onClose, onSuccess }: AdicionarS
   const [servicoId, setServicoId] = useState<string>('')
   const [servicoNome, setServicoNome] = useState<string>('')
   const [unidade, setUnidade] = useState<string>('m2')
-  const [quantidade, setQuantidade] = useState<number>(1)
   const [precoUnitario, setPrecoUnitario] = useState<number>(0)
   const [observacoes, setObservacoes] = useState<string>('')
 
@@ -61,13 +59,10 @@ export function AdicionarServicoModal({ obraId, onClose, onSuccess }: AdicionarS
     }
   }, [servicoId, servicosCatalogo])
 
-  // Calcular valor total
-  const valorTotal = quantidade * precoUnitario
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!servicoId || !servicoNome || quantidade <= 0 || precoUnitario <= 0) {
+    if (!servicoId || !servicoNome || precoUnitario <= 0) {
       addToast({ message: 'Preencha todos os campos obrigatórios', type: 'error' })
       return
     }
@@ -79,9 +74,9 @@ export function AdicionarServicoModal({ obraId, onClose, onSuccess }: AdicionarS
         obra_id: obraId,
         servico_id: servicoId,
         servico_nome: servicoNome,
-        quantidade,
+        quantidade: 0, // Quantidade será registrada nas medições
         preco_unitario: precoUnitario,
-        valor_total: valorTotal,
+        valor_total: 0, // Será calculado dinamicamente pelas medições
         unidade,
         observacoes
       })
@@ -152,21 +147,6 @@ export function AdicionarServicoModal({ obraId, onClose, onSuccess }: AdicionarS
                   />
                 </div>
                 
-                {/* Quantidade */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Quantidade *
-                  </label>
-                  <NumberInput
-                    value={quantidade}
-                    onChange={setQuantidade}
-                    placeholder="0,00"
-                    min={0.01}
-                    decimals={2}
-                    required
-                  />
-                </div>
-                
                 {/* Preço Unitário */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -177,24 +157,15 @@ export function AdicionarServicoModal({ obraId, onClose, onSuccess }: AdicionarS
                     onChange={setPrecoUnitario}
                     placeholder="R$ 0,00"
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Preço por {unidade.toUpperCase()} executado
+                  </p>
                 </div>
                 
-                {/* Valor Total (calculado) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Valor Total
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="input bg-gray-50 cursor-not-allowed"
-                      value={`R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                      readOnly
-                      disabled
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Calculado automaticamente: Quantidade × Preço Unitário
+                {/* Info sobre medições */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Importante:</strong> A quantidade executada e o valor total serão calculados quando você registrar as medições deste serviço.
                   </p>
                 </div>
                 

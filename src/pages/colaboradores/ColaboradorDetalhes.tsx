@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, User, Shield, Award, AlertTriangle, FileText, Save, Calendar, DollarSign } from 'lucide-react';
+import { ArrowLeft, User, Shield, Award, AlertTriangle, FileText, Save, Calendar, DollarSign, Clock } from 'lucide-react';
 import { Layout } from "../../components/layout/Layout";
 import { Button } from "../../components/shared/Button";
 import { InformacoesPessoaisTab } from '../../components/colaboradores/InformacoesPessoaisTab';
@@ -10,11 +10,12 @@ import { MultasTab } from '../../components/colaboradores/MultasTab';
 import { ArquivosTab } from '../../components/colaboradores/ArquivosTab';
 import { ControleDiarioTab } from '../../components/colaboradores/ControleDiarioTab';
 import { DiariasTab } from '../../components/colaboradores/DiariasTab';
+import { HorasExtrasTab } from '../../components/colaboradores/HorasExtrasTab';
 import { ColaboradorExpandido } from '../../types/colaboradores';
 import { toast } from '../../lib/toast-hooks';
 import { getColaboradorById, updateColaborador, toColaboradorLegacy, type ColaboradorSimples } from '../../lib/colaboradoresApi';
 
-type TabType = 'informacoes' | 'documentacao' | 'certificados' | 'multas' | 'arquivos' | 'controle-diario' | 'diarias';
+type TabType = 'informacoes' | 'documentacao' | 'certificados' | 'multas' | 'arquivos' | 'controle-diario' | 'diarias' | 'horas-extras';
 
 interface Tab {
   id: TabType;
@@ -30,6 +31,7 @@ const TABS: Tab[] = [
   { id: 'arquivos', label: 'Arquivos', icon: <FileText className="h-4 w-4" /> },
   { id: 'controle-diario', label: 'Controle Diário', icon: <Calendar className="h-4 w-4" /> },
   { id: 'diarias', label: 'Diárias', icon: <DollarSign className="h-4 w-4" /> },
+  { id: 'horas-extras', label: 'Horas Extras', icon: <Clock className="h-4 w-4" /> },
 ];
 
 export default function ColaboradorDetalhes() {
@@ -183,7 +185,7 @@ export default function ColaboradorDetalhes() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Header com Breadcrumb */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -291,6 +293,14 @@ export default function ColaboradorDetalhes() {
               <DiariasTab 
                 colaboradorId={colaborador.id} 
                 colaboradorNome={colaborador.nome}
+              />
+            )}
+
+            {activeTab === 'horas-extras' && (
+              <HorasExtrasTab 
+                colaboradorId={colaborador.id} 
+                colaboradorNome={colaborador.nome}
+                salarioFixo={colaborador.salario_fixo || 0}
               />
             )}
           </div>

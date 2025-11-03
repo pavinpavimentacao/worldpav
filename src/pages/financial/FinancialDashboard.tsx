@@ -7,18 +7,21 @@ import { DatePicker } from '../../components/ui/date-picker'
 import { Input } from '../../components/ui/input'
 import { ResumoGeralTab } from '../../components/financial/ResumoGeralTab'
 import { ReceitasTab } from '../../components/financial/ReceitasTab'
+import { RecebimentosTab } from '../../components/financial/RecebimentosTab'
 import { DespesasTab } from '../../components/financial/DespesasTab'
 
 // ⚙️ DADOS REAIS
 const USE_MOCK = false
 
-type TabType = 'resumo' | 'receitas' | 'despesas'
+type TabType = 'resumo' | 'receitas' | 'recebimentos' | 'despesas'
 
 interface ResumoFinanceiro {
   totalReceitas: number
   totalDespesas: number
   lucroLiquido: number
   saldoAtual: number
+  totalRecebido?: number
+  aReceber?: number
 }
 
 export function FinancialDashboard() {
@@ -74,13 +77,19 @@ export function FinancialDashboard() {
           saldoAtual: 50800.00
         })
       } else {
-        const { getFinancialConsolidado } = await import('../../lib/financialConsolidadoApi')
-        const data = await getFinancialConsolidado(mesAno)
+        const { getFinancialConsolidado, getRecebimentosKPIs } = await import('../../lib/financialConsolidadoApi')
+        const [data, recebimentosKPIs] = await Promise.all([
+          getFinancialConsolidado(mesAno),
+          getRecebimentosKPIs(mesAno)
+        ])
+        
         setResumo({
           totalReceitas: data.totalReceitas,
           totalDespesas: data.totalDespesas,
           lucroLiquido: data.lucroLiquido,
           saldoAtual: data.saldoAtual,
+          totalRecebido: recebimentosKPIs.totalRecebido,
+          aReceber: data.totalReceitas - recebimentosKPIs.totalRecebido
         })
       }
     } catch (error) {
@@ -260,7 +269,7 @@ export function FinancialDashboard() {
         )}
 
         {/* Cards KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* Total Receitas */}
           <div className="bg-white p-4 rounded-lg border border-gray-200">
             <div className="flex items-center gap-3">
@@ -320,6 +329,36 @@ export function FinancialDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Total Recebido */}
+          <div className="bg-white p-4 rounded-lg border border-emerald-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Total Recebido</p>
+                <p className="text-xl font-bold text-emerald-600">
+                  R$ {(resumo?.totalRecebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* A Receber */}
+          <div className="bg-white p-4 rounded-lg border border-orange-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">A Receber</p>
+                <p className="text-xl font-bold text-orange-600">
+                  R$ {(resumo?.aReceber || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Sistema de Abas */}
@@ -345,7 +384,17 @@ export function FinancialDashboard() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                Receitas
+                Receitas (Executado)
+              </button>
+              <button
+                onClick={() => setActiveTab('recebimentos')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'recebimentos'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Recebimentos (Pago)
               </button>
               <button
                 onClick={() => setActiveTab('despesas')}
@@ -368,6 +417,10 @@ export function FinancialDashboard() {
 
             {activeTab === 'receitas' && (
               <ReceitasTab mesAno={mesAno} />
+            )}
+
+            {activeTab === 'recebimentos' && (
+              <RecebimentosTab mesAno={mesAno} />
             )}
 
             {activeTab === 'despesas' && (

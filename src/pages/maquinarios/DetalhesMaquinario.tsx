@@ -6,6 +6,7 @@ import { PhotoModal } from "../../components/modals/PhotoModal"
 import { DieselTab } from '../../components/maquinarios/DieselTab'
 import { SeguroTab } from '../../components/maquinarios/SeguroTab'
 import { LicencasTab } from '../../components/maquinarios/LicencasTab'
+import { GuardasMaquinarioTab } from '../../components/maquinarios/GuardasMaquinarioTab'
 import { MaquinariosAPI } from '../../lib/maquinariosApi'
 import type { Maquinario } from '../../types/maquinarios'
 import { getStatusColor, getStatusLabel } from '../../types/maquinarios'
@@ -29,10 +30,11 @@ import {
   Shield,
   FileText,
   FileCheck,
-  Loader2
+  Loader2,
+  UserCheck
 } from 'lucide-react'
 
-type TabType = 'informacoes' | 'obras' | 'diesel' | 'seguro' | 'licencas' | 'cola';
+type TabType = 'informacoes' | 'obras' | 'diesel' | 'seguro' | 'licencas' | 'cola' | 'guardas';
 
 interface Tab {
   id: TabType;
@@ -90,7 +92,8 @@ const DetalhesMaquinario = () => {
     { id: 'diesel', label: 'Diesel', icon: <Fuel className="h-4 w-4" /> },
     { id: 'seguro', label: 'Seguro', icon: <Shield className="h-4 w-4" /> },
     { id: 'licencas', label: 'Licenças', icon: <FileText className="h-4 w-4" /> },
-    { id: 'cola', label: 'Cola', icon: <Droplets className="h-4 w-4" /> }
+    { id: 'cola', label: 'Cola', icon: <Droplets className="h-4 w-4" /> },
+    { id: 'guardas', label: 'Diárias de Guarda', icon: <UserCheck className="h-4 w-4" /> }
   ]
 
   // Carregar dados do maquinário
@@ -191,7 +194,7 @@ const DetalhesMaquinario = () => {
 
   return (
     <Layout>
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className="p-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -392,6 +395,15 @@ const DetalhesMaquinario = () => {
                 maquinarioId={maquinario.id} 
                 maquinarioNome={maquinario.name}
                 maquinarioTipo={maquinario.type || ''}
+              />
+            </div>
+          )}
+
+          {activeTab === 'guardas' && (
+            <div className="p-6">
+              <GuardasMaquinarioTab 
+                maquinarioId={maquinario.id} 
+                maquinarioNome={maquinario.name}
               />
             </div>
           )}

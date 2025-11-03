@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import { X, Upload, FileText, Trash2 } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Input } from '../ui/input'
@@ -7,6 +7,7 @@ import { useToast } from '../../lib/toast-hooks'
 import { createNotaFiscal } from '../../lib/obrasNotasFiscaisApi'
 import { uploadToSupabaseStorage } from '../../utils/file-upload-utils'
 import { calcularValorLiquido, validarDescontos } from '../../utils/notas-fiscais-utils'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
 import type { CreateNotaFiscalInput } from '../../types/obras-financeiro'
 
 interface AdicionarNotaFiscalModalProps {
@@ -25,6 +26,7 @@ export function AdicionarNotaFiscalModal({
   const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [formData, setFormData] = useState({
     numero_nota: '',
@@ -54,8 +56,7 @@ export function AdicionarNotaFiscalModal({
     }))
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFile = async (file: File) => {
     if (!file) return;
 
     // Validar tipo de arquivo
@@ -124,6 +125,26 @@ export function AdicionarNotaFiscalModal({
       setUploadingFile(false);
     }
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFile(file)
+    }
+  }
+
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
+    if (file) {
+      handleFile(file)
+    }
+  }, [])
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled: loading || uploadingFile,
+    multiple: false
+  })
 
   const handleRemoverArquivo = () => {
     setArquivo(null);
@@ -421,26 +442,32 @@ export function AdicionarNotaFiscalModal({
                 </p>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-400 transition-colors bg-gray-50">
+              <div 
+                className={`border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer ${
+                  isDragging 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-300 hover:border-blue-400 bg-gray-50'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  fileInputRef.current?.click()
+                }}
+                {...dragHandlers}
+              >
                 <input
+                  ref={fileInputRef}
                   type="file"
                   onChange={handleFileChange}
                   accept="image/jpeg,image/jpg,image/png,application/pdf"
-                  className="w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-md file:border-0
-                    file:text-sm file:font-medium
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100
-                    cursor-pointer"
+                  className="hidden"
                   disabled={loading || uploadingFile}
                 />
-                <div className="mt-3 text-center">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">
-                    Clique para selecionar ou arraste aqui
+                <div className="text-center pointer-events-none">
+                  <Upload className={`h-12 w-12 mx-auto mb-3 ${isDragging ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <p className="text-base font-medium text-gray-700 mb-1">
+                    {isDragging ? 'Solte o arquivo aqui' : 'Clique para selecionar ou arraste aqui'}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500">
                     JPG, PNG ou PDF até 5MB
                   </p>
                 </div>

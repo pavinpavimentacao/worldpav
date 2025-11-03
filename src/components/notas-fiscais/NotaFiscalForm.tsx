@@ -88,7 +88,7 @@ export const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({
     const filePath = `notas-fiscais/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('attachments')
+      .from('obras-notas-fiscais')
       .upload(filePath, file);
 
     if (uploadError) {
@@ -96,7 +96,7 @@ export const NotaFiscalForm: React.FC<NotaFiscalFormProps> = ({
     }
 
     const { data: { publicUrl } } = supabase.storage
-      .from('attachments')
+      .from('obras-notas-fiscais')
       .getPublicUrl(filePath);
 
     return publicUrl;

@@ -168,7 +168,7 @@ const ParceiroDetails = () => {
 
   return (
     <Layout>
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
         <div className="flex items-center justify-between">

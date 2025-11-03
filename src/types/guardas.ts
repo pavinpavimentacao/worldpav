@@ -13,9 +13,9 @@ export interface EmpresaGuarda {
   telefone: string;
   documento: string; // CPF ou CNPJ
   tipo_documento: 'CPF' | 'CNPJ';
-  ativo: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface CreateEmpresaGuardaInput {
@@ -33,17 +33,17 @@ export interface Guarda {
   id: string;
   nome: string;
   telefone: string;
-  empresa_id: string;
+  company_id: string;
   empresa_nome?: string; // Join
-  ativo: boolean;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface CreateGuardaInput {
   nome: string;
   telefone: string;
-  empresa_id: string;
+  empresa_id: string; // Input mantém empresa_id para compatibilidade
 }
 
 // ============================================
@@ -56,13 +56,20 @@ export interface DiariaGuarda {
   id: string;
   guarda_id: string;
   guarda_nome?: string; // Join
-  empresa_id: string;
+  company_id: string;
   empresa_nome?: string; // Join
+  
+  // Vinculação com obra e rua
+  obra_id?: string | null;
+  obra_nome?: string; // Join
+  rua_id?: string | null;
+  rua_nome?: string | null; // Nome da rua (join ou manual)
+  
+  // Dados da diária
   solicitante: string; // Nome de quem solicitou
   valor_diaria: number;
   data_diaria: string; // YYYY-MM-DD
   turno: TurnoGuarda;
-  rua: string;
   foto_maquinario_url?: string;
   observacoes?: string;
   created_at: string;
@@ -73,8 +80,10 @@ export interface DiariaGuarda {
 export interface DiariaMaquinario {
   id: string;
   diaria_id: string;
-  maquinario_id: string;
+  maquinario_id: string; // UUID do maquinário
   maquinario_nome?: string; // Join
+  maquinario_tipo?: string; // Join
+  maquinario_placa?: string; // Join
   created_at: string;
 }
 
@@ -89,8 +98,13 @@ export interface CreateDiariaGuardaInput {
   valor_diaria: number;
   data_diaria: string;
   turno: TurnoGuarda;
-  rua: string;
-  maquinarios: string[]; // IDs dos maquinários
+  
+  // Obra e rua (opcional mas recomendado)
+  obra_id?: string;
+  rua_id?: string;
+  rua_nome?: string; // Se não tiver rua_id, permite digitar manualmente
+  
+  maquinarios: string[]; // UUIDs dos maquinários
   foto_maquinario?: File;
   observacoes?: string;
 }

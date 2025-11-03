@@ -3,21 +3,24 @@
  * Lista e cadastro de guardas vinculados a empresas
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, User, Phone, Building2, X } from 'lucide-react';
 import { Button } from "../shared/Button";
 import { Input } from '../ui/input';
 import { toast } from '../../lib/toast-hooks';
 import {
-  mockGuardas,
-  mockEmpresasGuarda,
-  adicionarGuarda,
-} from '../../mocks/guardas-mock';
+  listarGuardas,
+  criarGuarda,
+  listarEmpresasGuarda,
+} from '../../lib/guardasApi';
+import type { Guarda, EmpresaGuarda } from '../../types/guardas';
 
 export const GuardasTab: React.FC = () => {
-  const [guardas, setGuardas] = useState(mockGuardas);
+  const [guardas, setGuardas] = useState<Guarda[]>([]);
+  const [empresas, setEmpresas] = useState<EmpresaGuarda[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Form fields
@@ -25,7 +28,29 @@ export const GuardasTab: React.FC = () => {
   const [telefone, setTelefone] = useState('');
   const [empresaId, setEmpresaId] = useState('');
 
-  const empresasAtivas = mockEmpresasGuarda.filter((e) => e.ativo);
+  // Carregar dados ao montar
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    setIsLoading(true);
+    try {
+      const [guardasData, empresasData] = await Promise.all([
+        listarGuardas(),
+        listarEmpresasGuarda(),
+      ]);
+      setGuardas(guardasData);
+      setEmpresas(empresasData);
+    } catch (error: any) {
+      console.error('Erro ao carregar dados:', error);
+      toast.error(error.message || 'Erro ao carregar dados');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const empresasAtivas = empresas.filter((e) => !e.deleted_at);
 
   const handleOpenModal = () => {
     setNome('');
@@ -45,9 +70,7 @@ export const GuardasTab: React.FC = () => {
     }
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      const novoGuarda = adicionarGuarda({
+      const novoGuarda = await criarGuarda({
         nome: nome.trim(),
         telefone: telefone.trim(),
         empresa_id: empresaId,
@@ -57,6 +80,7 @@ export const GuardasTab: React.FC = () => {
       toast.success('Guarda cadastrado com sucesso!');
       setShowModal(false);
     } catch (error: any) {
+      console.error('Erro ao cadastrar guarda:', error);
       toast.error(error.message || 'Erro ao cadastrar guarda');
     } finally {
       setIsSubmitting(false);
@@ -64,7 +88,7 @@ export const GuardasTab: React.FC = () => {
   };
 
   const guardasFiltrados = guardas
-    .filter((g) => g.ativo)
+    .filter((g) => !g.deleted_at)
     .filter((g) =>
       searchTerm
         ? g.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,9 +120,18 @@ export const GuardasTab: React.FC = () => {
         onChange={(e) => setSearchTerm(e.target.value)}
       />
 
+      {/* Loading */}
+      {isLoading && (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="text-gray-600 mt-3">Carregando guardas...</p>
+        </div>
+      )}
+
       {/* Lista de Guardas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {guardasFiltrados.map((guarda) => (
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {guardasFiltrados.map((guarda) => (
           <div
             key={guarda.id}
             className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -122,9 +155,10 @@ export const GuardasTab: React.FC = () => {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
-      {guardasFiltrados.length === 0 && (
+      {!isLoading && guardasFiltrados.length === 0 && (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <User className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-600">

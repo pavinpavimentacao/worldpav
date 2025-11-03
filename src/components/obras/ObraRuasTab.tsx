@@ -12,14 +12,17 @@ import {
   ObraRua,
   ObraRuaInsertData
 } from '../../lib/obrasRuasApi'
+import { updateObraStatus } from '../../lib/obrasApi'
 
 
 interface ObraRuasTabProps {
   obraId: string
   precoPorM2: number
+  obraStatus?: string
+  onObraStatusChange?: () => void
 }
 
-export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
+export function ObraRuasTab({ obraId, precoPorM2, obraStatus, onObraStatusChange }: ObraRuasTabProps) {
   const [ruas, setRuas] = useState<ObraRua[]>([])
   const [loading, setLoading] = useState(true)
   const [modalAdicionarOpen, setModalAdicionarOpen] = useState(false)
@@ -78,6 +81,14 @@ export function ObraRuasTab({ obraId, precoPorM2 }: ObraRuasTabProps) {
       }
 
       await createRua(ruaData)
+      
+      // Se a obra está em planejamento, mudar para andamento
+      if (obraStatus === 'planejamento') {
+        await updateObraStatus(obraId, 'andamento')
+        console.log('✅ Status da obra atualizado de "Planejamento" para "Em andamento"')
+        onObraStatusChange?.()
+      }
+      
       await loadRuas()
       
       addToast({ message: 'Rua adicionada com sucesso!', type: 'success' })

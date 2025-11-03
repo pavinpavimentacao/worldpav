@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react'
-import { Camera, X, Upload, Image as ImageIcon } from 'lucide-react'
+import React, { useRef, useCallback } from 'react'
+import { Camera, X, Upload } from 'lucide-react'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
 
 interface PhotoUploadProps {
   value?: string | null
@@ -14,10 +15,9 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   className = '',
   disabled = false
 }) => {
-  const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = useCallback((file: File) => {
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -26,7 +26,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       }
       reader.readAsDataURL(file)
     }
-  }
+  }, [onChange])
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -35,25 +35,18 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
     }
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    
-    const file = e.dataTransfer.files[0]
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
     if (file) {
       handleFileSelect(file)
     }
-  }
+  }, [handleFileSelect])
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled,
+    multiple: false
+  })
 
   const handleRemovePhoto = () => {
     onChange(null, null)
@@ -78,16 +71,14 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       <div
         className={`
           relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-          ${isDragOver 
+          ${isDragging 
             ? 'border-primary-400 bg-primary-50' 
             : 'border-gray-300 hover:border-gray-400'
           }
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           ${value ? 'border-solid border-primary-300 bg-primary-25' : ''}
         `}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        {...dragHandlers}
         onClick={handleClick}
       >
         <input

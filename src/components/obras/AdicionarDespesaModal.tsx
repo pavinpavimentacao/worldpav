@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { X, AlertCircle, Upload, FileText, Trash2, Eye } from 'lucide-react'
 import { Button } from "../shared/Button"
 import { Select } from "../shared/Select"
@@ -6,6 +6,8 @@ import { DatePicker } from '../ui/date-picker'
 import { CurrencyInput } from '../ui/currency-input'
 import type { DespesaCategoria } from '../../types/obras-financeiro'
 import { toast } from '../../lib/toast-hooks'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
+import { supabase } from '../../lib/supabase'
 
 interface AdicionarDespesaModalProps {
   isOpen: boolean
@@ -40,6 +42,45 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
   // Estados para upload de nota fiscal
   const [arquivoNota, setArquivoNota] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Drag & Drop handler - DEVE estar ANTES do return early
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
+    if (!file) return
+
+    // Validar tipo de arquivo
+    const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
+    if (!tiposPermitidos.includes(file.type)) {
+      toast.error('Apenas imagens (JPG, PNG) ou PDF são permitidos')
+      return
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 5MB')
+      return
+    }
+
+    setArquivoNota(file)
+
+    // Criar preview se for imagem
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    } else {
+      setPreviewUrl(null)
+    }
+  }, [])
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled: isSubmitting,
+    multiple: false
+  })
 
   if (!isOpen) return null
 
@@ -65,14 +106,32 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
     setIsSubmitting(true)
 
     try {
-      // Simular upload da nota fiscal
+      // Upload real da nota fiscal para o Supabase Storage
       let urlNota: string | undefined = undefined;
       
       if (arquivoNota) {
-        // Simular delay de upload
-        await new Promise(resolve => setTimeout(resolve, 500));
-        urlNota = `https://exemplo.com/notas/${categoria}-${Date.now()}-${arquivoNota.name}`;
-        toast.success('Nota fiscal enviada com sucesso!');
+        console.log('📤 Iniciando upload do comprovante para Supabase Storage...')
+        
+        const fileExt = arquivoNota.name.split('.').pop()
+        const fileName = `despesa-${categoria}-${Date.now()}.${fileExt}`
+        const filePath = `obras-despesas/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('obras-comprovantes')
+          .upload(filePath, arquivoNota)
+
+        if (uploadError) {
+          console.error('Erro no upload:', uploadError)
+          throw new Error(`Erro ao enviar comprovante: ${uploadError.message}`)
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('obras-comprovantes')
+          .getPublicUrl(filePath)
+
+        urlNota = publicUrl
+        console.log('✅ Comprovante enviado:', urlNota)
+        toast.success('Comprovante enviado com sucesso!')
       }
 
       await onSubmit({
@@ -308,24 +367,30 @@ export function AdicionarDespesaModal({ isOpen, onClose, onSubmit }: AdicionarDe
                 </p>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-400 transition-colors bg-gray-50">
+              <div 
+                className={`border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer ${
+                  isDragging 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-300 bg-gray-50 hover:border-blue-400'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (!isSubmitting) fileInputRef.current?.click()
+                }}
+                {...dragHandlers}
+              >
                 <input
+                  ref={fileInputRef}
                   type="file"
                   onChange={handleFileChange}
                   accept="image/jpeg,image/jpg,image/png,application/pdf"
-                  className="w-full text-sm text-gray-500
-                    file:mr-4 file:py-2 file:px-4
-                    file:rounded-md file:border-0
-                    file:text-sm file:font-medium
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100
-                    cursor-pointer"
+                  className="hidden"
                   disabled={isSubmitting}
                 />
-                <div className="mt-3 text-center">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <div className="text-center pointer-events-none">
+                  <Upload className={`h-8 w-8 mx-auto mb-2 ${isDragging ? 'text-blue-600' : 'text-gray-400'}`} />
                   <p className="text-sm text-gray-600">
-                    Clique para selecionar ou arraste aqui
+                    {isDragging ? 'Solte o arquivo aqui' : 'Clique para selecionar ou arraste aqui'}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
                     JPG, PNG ou PDF até 5MB

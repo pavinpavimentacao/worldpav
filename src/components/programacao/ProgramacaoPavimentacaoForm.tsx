@@ -297,7 +297,7 @@ export function ProgramacaoPavimentacaoForm({
   // Estados de loading e error
   if (loading) {
     return (
-      <div className="w-full max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <Card className="border-2 shadow-lg">
           <CardContent className="p-8">
             <div className="flex items-center justify-center space-x-4">
@@ -312,7 +312,7 @@ export function ProgramacaoPavimentacaoForm({
 
   if (error) {
     return (
-      <div className="w-full max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         <Card className="border-2 border-red-200 shadow-lg">
           <CardContent className="p-8">
             <div className="text-center space-y-4">
@@ -338,7 +338,7 @@ export function ProgramacaoPavimentacaoForm({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="w-full max-w-7xl mx-auto space-y-6"
+      className="w-full space-y-6"
     >
       <Card className="border-2 shadow-lg">
         <CardHeader className="space-y-2 pb-6">

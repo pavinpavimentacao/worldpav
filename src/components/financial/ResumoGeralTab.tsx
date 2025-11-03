@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, Building2 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Building2, ChevronDown, ChevronUp, Eye } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { getObrasComResumoFinanceiro, getSerieReceitasDespesas, getDespesasPorDiaECategoria } from '../../lib/financialConsolidadoApi'
+import { 
+  getObrasComResumoFinanceiro, 
+  getSerieReceitasDespesas, 
+  getDespesasPorDiaECategoria,
+  getObrasDetalhesFinanceiros,
+  type ObraDetalhesFinanceiros
+} from '../../lib/financialConsolidadoApi'
 
 // ⚙️ DADOS REAIS
 const USE_MOCK = false
@@ -43,9 +49,11 @@ const CORES_PIZZA = [
 
 export function ResumoGeralTab({ mesAno }: ResumoGeralTabProps) {
   const [obras, setObras] = useState<ObraResumo[]>([])
+  const [obrasDetalhadas, setObrasDetalhadas] = useState<ObraDetalhesFinanceiros[]>([])
   const [dadosLinha, setDadosLinha] = useState<DadosGraficoLinha[]>([])
   const [dadosPizza, setDadosPizza] = useState<DadosGraficoPizza[]>([])
   const [loading, setLoading] = useState(true)
+  const [obraExpandida, setObraExpandida] = useState<string | null>(null)
 
   useEffect(() => {
     loadObrasResumo()
@@ -58,7 +66,7 @@ export function ResumoGeralTab({ mesAno }: ResumoGeralTabProps) {
       if (USE_MOCK) {
         await new Promise(resolve => setTimeout(resolve, 300))
         
-        // Dados mockados - Obras
+        // Dados mockados - Obras (resumo)
         setObras([
           {
             id: '1',
@@ -75,6 +83,93 @@ export function ResumoGeralTab({ mesAno }: ResumoGeralTabProps) {
             totalFaturado: 30000.00,
             totalDespesas: 6950.00,
             lucro: 23050.00
+          }
+        ])
+
+        // Dados mockados - Obras Detalhadas
+        setObrasDetalhadas([
+          {
+            id: '1',
+            nome: 'Pavimentação Rua das Flores - Osasco',
+            status: 'em_andamento',
+            totalFaturado: 36250.00,
+            totalDespesas: 8500.00,
+            lucro: 27750.00,
+            faturamentos: [
+              {
+                id: 'fat1',
+                rua_nome: 'Rua das Flores - Trecho 1',
+                valor_total: 18500.00,
+                data_finalizacao: '2025-01-15',
+                data_pagamento: '2025-01-20',
+                status: 'pago'
+              },
+              {
+                id: 'fat2',
+                rua_nome: 'Rua das Flores - Trecho 2',
+                valor_total: 17750.00,
+                data_finalizacao: '2025-01-22',
+                data_pagamento: '2025-01-25',
+                status: 'pago'
+              }
+            ],
+            despesas: [
+              {
+                id: 'desp1',
+                categoria: 'diesel',
+                descricao: 'Abastecimento Vibroacabadora',
+                valor: 1200.00,
+                data_despesa: '2025-01-10'
+              },
+              {
+                id: 'desp2',
+                categoria: 'materiais',
+                descricao: 'Asfalto CBUQ - 12 toneladas',
+                valor: 6800.00,
+                data_despesa: '2025-01-12'
+              },
+              {
+                id: 'desp3',
+                categoria: 'manutencao',
+                descricao: 'Manutenção preventiva rolo compactador',
+                valor: 500.00,
+                data_despesa: '2025-01-18'
+              }
+            ]
+          },
+          {
+            id: '2',
+            nome: 'Avenida Central - Barueri',
+            status: 'em_andamento',
+            totalFaturado: 30000.00,
+            totalDespesas: 6950.00,
+            lucro: 23050.00,
+            faturamentos: [
+              {
+                id: 'fat3',
+                rua_nome: 'Avenida Central - Completa',
+                valor_total: 30000.00,
+                data_finalizacao: '2025-01-25',
+                data_pagamento: '2025-01-28',
+                status: 'pago'
+              }
+            ],
+            despesas: [
+              {
+                id: 'desp4',
+                categoria: 'diesel',
+                descricao: 'Abastecimento maquinários',
+                valor: 1850.00,
+                data_despesa: '2025-01-20'
+              },
+              {
+                id: 'desp5',
+                categoria: 'materiais',
+                descricao: 'Asfalto CBUQ - 10 toneladas',
+                valor: 5100.00,
+                data_despesa: '2025-01-22'
+              }
+            ]
           }
         ])
 
@@ -100,9 +195,13 @@ export function ResumoGeralTab({ mesAno }: ResumoGeralTabProps) {
           { nome: 'Outros', valor: 320, cor: CORES_PIZZA[4] },
         ])
       } else {
-        // Obras e cards
+        // Obras resumidas para cards
         const obrasResumo = await getObrasComResumoFinanceiro(mesAno)
         setObras(obrasResumo as any)
+
+        // Obras detalhadas com faturamentos e despesas
+        const obrasCompletas = await getObrasDetalhesFinanceiros(mesAno)
+        setObrasDetalhadas(obrasCompletas)
 
         // Gráfico linha Receitas x Despesas
         const serie = await getSerieReceitasDespesas(mesAno)
@@ -255,60 +354,152 @@ export function ResumoGeralTab({ mesAno }: ResumoGeralTabProps) {
         </div>
       </div>
 
-      {/* Lista de Obras com Lucro Individual */}
+      {/* Lista de Obras com Detalhes Financeiros */}
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Desempenho por Obra
         </h3>
 
-        {obras.length === 0 ? (
+        {obrasDetalhadas.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
             <p className="text-gray-500">Nenhuma obra com movimentação financeira neste período</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {obras.map(obra => {
+            {obrasDetalhadas.map(obra => {
               const lucroPositivo = obra.lucro >= 0
               const margemLucro = obra.totalFaturado > 0 
                 ? ((obra.lucro / obra.totalFaturado) * 100).toFixed(1) 
                 : '0'
+              const isExpanded = obraExpandida === obra.id
 
               return (
                 <div 
                   key={obra.id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                  className="bg-white rounded-lg border border-gray-200 overflow-hidden"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900">{obra.nome}</h4>
-                      <div className="flex items-center gap-4 mt-2 text-sm">
-                        <span className="text-green-600">
-                          Receita: R$ {obra.totalFaturado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                        <span className="text-red-600">
-                          Despesas: R$ {obra.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className={`flex items-center gap-2 ${lucroPositivo ? 'text-blue-600' : 'text-red-600'}`}>
-                        {lucroPositivo ? (
-                          <TrendingUp className="h-5 w-5" />
-                        ) : (
-                          <TrendingDown className="h-5 w-5" />
-                        )}
-                        <div>
-                          <p className="text-lg font-bold">
-                            R$ {Math.abs(obra.lucro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                          <p className="text-xs">
-                            Margem: {margemLucro}%
-                          </p>
+                  {/* Cabeçalho da Obra - Clicável */}
+                  <div 
+                    className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => setObraExpandida(isExpanded ? null : obra.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <Building2 className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{obra.nome}</h4>
+                            <div className="flex items-center gap-4 mt-1 text-sm">
+                              <span className="text-green-600">
+                                Receita: R$ {obra.totalFaturado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-red-600">
+                                Despesas: R$ {obra.totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-gray-500 text-xs">
+                                {obra.faturamentos.length} faturamento(s) • {obra.despesas.length} despesa(s)
+                              </span>
+                            </div>
+                          </div>
                         </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className={`flex items-center gap-2 ${lucroPositivo ? 'text-blue-600' : 'text-red-600'}`}>
+                            {lucroPositivo ? (
+                              <TrendingUp className="h-5 w-5" />
+                            ) : (
+                              <TrendingDown className="h-5 w-5" />
+                            )}
+                            <div>
+                              <p className="text-lg font-bold">
+                                R$ {Math.abs(obra.lucro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-xs">
+                                Margem: {margemLucro}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-gray-400" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Detalhes Expandidos */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 bg-gray-50 p-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* Faturamentos */}
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            Faturamentos ({obra.faturamentos.length})
+                          </h5>
+                          {obra.faturamentos.length === 0 ? (
+                            <p className="text-sm text-gray-500 italic">Nenhum faturamento neste período</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {obra.faturamentos.map(fat => (
+                                <div 
+                                  key={fat.id} 
+                                  className="bg-white rounded-lg p-3 border border-gray-200 text-sm"
+                                >
+                                  <div className="flex justify-between items-start mb-1">
+                                    <p className="font-medium text-gray-900">{fat.rua_nome}</p>
+                                    <p className="font-bold text-green-600">
+                                      R$ {fat.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                  </div>
+                                  <div className="flex justify-between text-xs text-gray-500">
+                                    <span>Feito em: {new Date(fat.data_finalizacao).toLocaleDateString('pt-BR')}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Despesas */}
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                            <TrendingDown className="h-4 w-4 text-red-600" />
+                            Despesas ({obra.despesas.length})
+                          </h5>
+                          {obra.despesas.length === 0 ? (
+                            <p className="text-sm text-gray-500 italic">Nenhuma despesa neste período</p>
+                          ) : (
+                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                              {obra.despesas.map(desp => (
+                                <div 
+                                  key={desp.id} 
+                                  className="bg-white rounded-lg p-3 border border-gray-200 text-sm"
+                                >
+                                  <div className="flex justify-between items-start mb-1">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-900">{desp.descricao}</p>
+                                      <p className="text-xs text-gray-500 capitalize">{desp.categoria.replace('_', ' ')}</p>
+                                    </div>
+                                    <p className="font-bold text-red-600 ml-2">
+                                      R$ {desp.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </p>
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(desp.data_despesa).toLocaleDateString('pt-BR')}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}

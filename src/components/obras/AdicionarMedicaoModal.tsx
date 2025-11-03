@@ -6,7 +6,8 @@ import { Select } from "../shared/Select"
 import { useToast } from '../../lib/toast-hooks'
 import { createMedicao } from '../../lib/obrasMedicoesApi'
 import { getNotasFiscaisByObra } from '../../lib/obrasNotasFiscaisApi'
-import { formatFileSize, uploadToSupabaseStorage } from '../../utils/file-upload-utils'
+import { uploadToSupabaseStorage } from '../../utils/file-upload-utils'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
 import type { CreateMedicaoInput, ObraNotaFiscal } from '../../types/obras-financeiro'
 
 interface AdicionarMedicaoModalProps {
@@ -25,7 +26,6 @@ export function AdicionarMedicaoModal({
   const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
   const [notasFiscais, setNotasFiscais] = useState<ObraNotaFiscal[]>([])
   const [loadingNotas, setLoadingNotas] = useState(false)
   
@@ -55,32 +55,6 @@ export function AdicionarMedicaoModal({
       console.error('Erro ao carregar notas fiscais:', error)
     } finally {
       setLoadingNotas(false)
-    }
-  }
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0])
-    }
-  }, [])
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0])
     }
   }
 
@@ -147,6 +121,25 @@ export function AdicionarMedicaoModal({
       setPreviewUrl(null);
     } finally {
       setUploadingFile(false);
+    }
+  }
+
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
+    if (file) {
+      handleFile(file)
+    }
+  }, [])
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled: loading || uploadingFile,
+    multiple: false
+  })
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0])
     }
   }
 
@@ -358,7 +351,12 @@ export function AdicionarMedicaoModal({
                 </p>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-green-400 transition-colors bg-gray-50">
+              <div 
+                className={`border-2 border-dashed rounded-lg p-6 transition-colors bg-gray-50 ${
+                  isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-green-400'
+                }`}
+                {...dragHandlers}
+              >
                 <input
                   type="file"
                   onChange={handleFileInput}
@@ -373,7 +371,7 @@ export function AdicionarMedicaoModal({
                   disabled={loading || uploadingFile}
                 />
                 <div className="mt-3 text-center">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <Upload className={`h-8 w-8 mx-auto mb-2 ${isDragging ? 'text-green-600' : 'text-gray-400'}`} />
                   <p className="text-sm text-gray-600">
                     Clique para selecionar ou arraste aqui
                   </p>

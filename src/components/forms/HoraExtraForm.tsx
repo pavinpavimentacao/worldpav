@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { DatePicker } from '../ui/date-picker'
+
 // Tipos e funções para hora extra
 interface CreateHoraExtraData {
   colaborador_id: string;
@@ -40,8 +42,6 @@ const calcularValorHoraExtra = (salarioFixo: number, tipoDia: string, horasExtra
   
   return valorHoraNormal * multiplicador * horasExtras;
 };
-import { DatePicker } from './ui/date-picker'
-// Ícones substituídos por emojis
 
 interface HoraExtraFormProps {
   colaboradorId: string
@@ -54,8 +54,9 @@ export default function HoraExtraForm({ colaboradorId, salarioFixo, onSave, onCa
   const [formData, setFormData] = useState<CreateHoraExtraData>({
     colaborador_id: colaboradorId,
     data: '',
-    horas: 0,
-    tipo_dia: 'segunda-sexta'
+    horas_extras: 0,
+    tipo_dia: 'normal',
+    valor_hora_extra: 0
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -65,8 +66,8 @@ export default function HoraExtraForm({ colaboradorId, salarioFixo, onSave, onCa
   }
 
   const calcularValor = () => {
-    const horas = parseFloat(formData.horas.toString()) || 0
-    return calcularValorHoraExtra(salarioFixo, horas, formData.tipo_dia)
+    const horas = parseFloat(formData.horas_extras.toString()) || 0
+    return calcularValorHoraExtra(salarioFixo, formData.tipo_dia, horas)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,12 +77,14 @@ export default function HoraExtraForm({ colaboradorId, salarioFixo, onSave, onCa
 
     try {
       const valorCalculado = calcularValor()
-      const horasNumericas = parseFloat(formData.horas.toString()) || 0
+      const horasNumericas = parseFloat(formData.horas_extras.toString()) || 0
       
       const { error } = await supabase
         .from('colaboradores_horas_extras')
         .insert({
-          ...formData,
+          colaborador_id: formData.colaborador_id,
+          data: formData.data,
+          tipo_dia: formData.tipo_dia,
           horas: horasNumericas,
           valor_calculado: valorCalculado
         })
@@ -97,7 +100,7 @@ export default function HoraExtraForm({ colaboradorId, salarioFixo, onSave, onCa
 
   const validateForm = () => {
     if (!formData.data) return 'Data é obrigatória'
-    if (formData.horas <= 0) return 'Horas devem ser maior que zero'
+    if (formData.horas_extras <= 0) return 'Horas devem ser maior que zero'
     return null
   }
 
@@ -144,8 +147,8 @@ export default function HoraExtraForm({ colaboradorId, salarioFixo, onSave, onCa
               type="number"
               step="0.5"
               min="0.5"
-              value={formData.horas}
-              onChange={(e) => handleInputChange('horas', parseFloat(e.target.value) || 0)}
+              value={formData.horas_extras}
+              onChange={(e) => handleInputChange('horas_extras', parseFloat(e.target.value) || 0)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
@@ -186,10 +189,14 @@ export default function HoraExtraForm({ colaboradorId, salarioFixo, onSave, onCa
                 <span className="font-medium">R$ {(salarioFixo / 220).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Valor Hora Extra (+50%):</span>
+                <span className="text-gray-600">Multiplicador:</span>
                 <span className="font-medium">
-                  R$ {((salarioFixo / 220) * 1.5).toFixed(2)}
+                  {formData.tipo_dia === 'normal' || formData.tipo_dia === 'sabado' ? '1.5x' : '2.0x'}
                 </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Horas:</span>
+                <span className="font-medium">{formData.horas_extras}h</span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="text-gray-900 font-medium">Total:</span>

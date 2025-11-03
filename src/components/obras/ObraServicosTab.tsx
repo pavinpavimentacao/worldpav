@@ -9,7 +9,9 @@ import {
 } from 'lucide-react'
 import { Button } from '../shared/Button'
 import { ServicoObra } from '../../types/servicos'
-import { getServicosObra, deleteServicoObra } from '../../lib/obrasServicosApi'
+import { getServicosObra, deleteServicoObra, updateServicoObra } from '../../lib/obrasServicosApi'
+import { getRuasByObra } from '../../lib/obrasRuasApi'
+import { ObraRua } from '../../types/rua'
 import { useToast } from '../../lib/toast-hooks'
 import { EditarServicoModal } from './EditarServicoModal'
 import { AdicionarServicoModal } from './AdicionarServicoModal'
@@ -21,6 +23,7 @@ interface ObraServicosTabProps {
 export function ObraServicosTab({ obraId }: ObraServicosTabProps) {
   const { addToast } = useToast()
   const [servicos, setServicos] = useState<ServicoObra[]>([])
+  const [ruas, setRuas] = useState<ObraRua[]>([])
   const [loading, setLoading] = useState(true)
   const [modalAdicionarAberto, setModalAdicionarAberto] = useState(false)
   const [modalEditarAberto, setModalEditarAberto] = useState(false)
@@ -28,22 +31,63 @@ export function ObraServicosTab({ obraId }: ObraServicosTabProps) {
   const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Carregar serviços da obra
+  // Carregar serviços e ruas da obra
   useEffect(() => {
-    carregarServicos()
+    carregarDados()
   }, [obraId])
 
-  async function carregarServicos() {
+  async function carregarDados() {
     try {
       setLoading(true)
-      const data = await getServicosObra(obraId)
-      setServicos(data)
+      // Buscar serviços e ruas em paralelo
+      const [servicosData, ruasData] = await Promise.all([
+        getServicosObra(obraId),
+        getRuasByObra(obraId)
+      ])
+      
+      setServicos(servicosData)
+      setRuas(ruasData)
+      
+      // Recalcular quantidades dos serviços baseado nas ruas finalizadas
+      await atualizarQuantidadesServicos(servicosData, ruasData)
     } catch (error) {
-      console.error('Erro ao carregar serviços:', error)
-      addToast({ message: 'Erro ao carregar serviços', type: 'error' })
+      console.error('Erro ao carregar dados:', error)
+      addToast({ message: 'Erro ao carregar dados', type: 'error' })
     } finally {
       setLoading(false)
     }
+  }
+
+  // Calcular quantidade total de ruas finalizadas
+  async function atualizarQuantidadesServicos(servicos: ServicoObra[], ruas: ObraRua[]) {
+    // Somar metragem de todas as ruas finalizadas (status = 'concluida')
+    const metragemTotal = ruas
+      .filter(rua => rua.status === 'concluida' && rua.metragem_executada)
+      .reduce((total, rua) => total + (rua.metragem_executada || 0), 0)
+
+    console.log('📏 Metragem total das ruas finalizadas:', metragemTotal)
+
+    // Atualizar cada serviço com a quantidade real
+    for (const servico of servicos) {
+      const novoValorTotal = metragemTotal * servico.preco_unitario
+      
+      // Se a quantidade ou valor mudou, atualizar no banco
+      if (servico.quantidade !== metragemTotal || servico.valor_total !== novoValorTotal) {
+        try {
+          await updateServicoObra(servico.id, {
+            quantidade: metragemTotal,
+            valor_total: novoValorTotal
+          })
+          console.log(`✅ Serviço ${servico.servico_nome} atualizado: ${metragemTotal} m² = R$ ${novoValorTotal}`)
+        } catch (error) {
+          console.error(`Erro ao atualizar serviço ${servico.servico_nome}:`, error)
+        }
+      }
+    }
+    
+    // Recarregar serviços para mostrar valores atualizados
+    const servicosAtualizados = await getServicosObra(obraId)
+    setServicos(servicosAtualizados)
   }
 
   // Abrir modal para editar serviço
@@ -204,6 +248,7 @@ export function ObraServicosTab({ obraId }: ObraServicosTabProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditarServico(servico)}
+                          title="Editar Serviço"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -211,6 +256,7 @@ export function ObraServicosTab({ obraId }: ObraServicosTabProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => setConfirmandoExclusao(servico.id)}
+                          title="Excluir Serviço"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -251,7 +297,7 @@ export function ObraServicosTab({ obraId }: ObraServicosTabProps) {
           obraId={obraId}
           onClose={() => setModalAdicionarAberto(false)}
           onSuccess={() => {
-            carregarServicos()
+            carregarDados()
             setModalAdicionarAberto(false)
           }}
         />
@@ -265,7 +311,7 @@ export function ObraServicosTab({ obraId }: ObraServicosTabProps) {
             setServicoParaEditar(null)
           }}
           onSuccess={() => {
-            carregarServicos()
+            carregarDados()
             setModalEditarAberto(false)
             setServicoParaEditar(null)
           }}

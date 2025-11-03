@@ -2,6 +2,11 @@ import { Calendar, DollarSign, TrendingDown, Ruler, Weight } from 'lucide-react'
 import { KpiCard } from '../cards/KpiCard'
 import { ProximaProgramacaoCard } from './ProximaProgramacaoCard'
 import { ProgramacaoListItem } from './ProgramacaoListItem'
+import { MaiorRuaDiaCard } from './MaiorRuaDiaCard'
+import { UltimasDiariasCard } from './UltimasDiariasCard'
+import { TopRuasCard } from './TopRuasCard'
+import { MaquinariosCard } from './MaquinariosCard'
+import { AlertasCard } from './AlertasCard'
 import type { DashboardData } from '../../types/dashboard-pavimentacao'
 
 interface DashboardDesktopProps {
@@ -25,7 +30,7 @@ export function DashboardDesktop({ data, loading }: DashboardDesktopProps) {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Dashboard de Pavimentação</h1>
@@ -61,7 +66,7 @@ export function DashboardDesktop({ data, loading }: DashboardDesktopProps) {
         <KpiCard
           title="Faturamento Mês"
           value={loading ? 'R$ 0,00' : formatCurrency(data.kpis.faturamento_mes)}
-          subtitle="obras pagas"
+          subtitle="ruas executadas"
           loading={loading}
           icon={<DollarSign className="w-8 h-8 text-green-600" />}
           className="bg-green-50 border-green-200"
@@ -158,6 +163,21 @@ export function DashboardDesktop({ data, loading }: DashboardDesktopProps) {
           )}
         </div>
       </div>
+
+      {/* 🏆 Destaque do Dia - Maior Rua Executada */}
+      <MaiorRuaDiaCard data={data.maior_rua_dia} loading={loading} />
+
+      {/* Grid com Últimas Diárias e Maquinários */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <UltimasDiariasCard diarias={data.ultimas_diarias} loading={loading} />
+        <MaquinariosCard maquinarios={data.maquinarios_mais_usados} loading={loading} />
+      </div>
+
+      {/* Top 5 Ruas por Faturamento - Card Completo */}
+      <TopRuasCard ruas={data.top_ruas_faturamento} loading={loading} />
+
+      {/* Alertas */}
+      <AlertasCard alertas={data.alertas} loading={loading} />
     </div>
   )
 }

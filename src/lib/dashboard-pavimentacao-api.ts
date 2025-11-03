@@ -1,6 +1,16 @@
 import { supabase } from './supabase'
 import { format, addDays, startOfMonth, endOfMonth } from 'date-fns'
-import type { DashboardKPIs, ProgramacaoItem, ProximaProgramacao, DashboardData } from '../types/dashboard-pavimentacao'
+import type { 
+  DashboardKPIs, 
+  ProgramacaoItem, 
+  ProximaProgramacao, 
+  DashboardData,
+  MaiorRuaDia,
+  DiariaRecente,
+  RuaFaturamento,
+  MaquinarioUso,
+  Alerta
+} from '../types/dashboard-pavimentacao'
 
 // 🎭 MODO MOCK DESATIVADO - USANDO BANCO DE DADOS REAL
 const USE_MOCK = false
@@ -9,28 +19,31 @@ const USE_MOCK = false
 const TIMEZONE = 'America/Sao_Paulo'
 
 /**
- * Converte uma data para o timezone de São Paulo
+ * Converte uma data UTC para o timezone de São Paulo
+ * São Paulo = UTC-3 (ou UTC-2 no horário de verão, mas usando UTC-3 fixo)
  */
 function toSaoPauloTime(date: Date): Date {
-  // São Paulo está UTC-3 (ou UTC-2 no horário de verão)
-  // Para simplificar, vamos usar UTC-3 (offset de -180 minutos)
-  const offset = -180 // minutos
-  return new Date(date.getTime() + (offset * 60 * 1000))
+  // Para converter DE UTC PARA São Paulo, precisamos SUBTRAIR 3 horas
+  // Mas como Date já está em UTC no servidor, apenas retornamos
+  // A conversão real será feita ao formatar a data
+  return date
 }
 
 /**
  * Converte uma data/hora local de São Paulo para UTC
+ * Para armazenar no banco (que usa UTC)
  */
 function fromSaoPauloTime(dateStr: string, timeStr: string): Date {
   // Criar data no timezone de São Paulo
   const [year, month, day] = dateStr.split('-').map(Number)
   const [hour, minute] = timeStr.split(':').map(Number)
   
-  // Criar data local (assumindo que é São Paulo)
+  // Criar data local (assumindo que já estamos em São Paulo)
   const localDate = new Date(year, month - 1, day, hour, minute, 0)
   
-  // Converter para UTC (adicionar 3 horas)
-  return new Date(localDate.getTime() + (3 * 60 * 60 * 1000))
+  // Se estamos em São Paulo e queremos UTC, ADICIONAR 3 horas
+  // Mas como new Date() já cria em horário local, retornamos direto
+  return localDate
 }
 
 /**
@@ -48,18 +61,42 @@ export class DashboardPavimentacaoApi {
     }
 
     try {
-      const [kpis, proximaProgramacao, programacoesHoje, programacoesAmanha] = await Promise.all([
+      const hoje = format(new Date(), 'yyyy-MM-dd')
+      const mesInicio = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+      const mesFim = format(endOfMonth(new Date()), 'yyyy-MM-dd')
+
+      const [
+        kpis, 
+        proximaProgramacao, 
+        programacoesHoje, 
+        programacoesAmanha,
+        maiorRuaDia,
+        ultimasDiarias,
+        topRuasFaturamento,
+        maquinariosMaisUsados,
+        alertas
+      ] = await Promise.all([
         this.getKPIs(),
         this.getProximaProgramacao(),
         this.getProgramacaoHoje(),
-        this.getProgramacaoAmanha()
+        this.getProgramacaoAmanha(),
+        this.getMaiorRuaDia(hoje),
+        this.getUltimasDiarias(5),
+        this.getTopRuasFaturamento(mesInicio, mesFim, 5),
+        this.getMaquinariosMaisUsados(mesInicio, mesFim, 5),
+        this.getAlertas()
       ])
 
       return {
         kpis,
         proxima_programacao: proximaProgramacao,
         programacoes_hoje: programacoesHoje,
-        programacoes_amanha: programacoesAmanha
+        programacoes_amanha: programacoesAmanha,
+        maior_rua_dia: maiorRuaDia,
+        ultimas_diarias: ultimasDiarias,
+        top_ruas_faturamento: topRuasFaturamento,
+        maquinarios_mais_usados: maquinariosMaisUsados,
+        alertas: alertas
       }
     } catch (error) {
       console.error('Erro ao buscar dados do dashboard:', error)
@@ -273,15 +310,13 @@ export class DashboardPavimentacaoApi {
    * Buscar todos os KPIs do dashboard
    */
   static async getKPIs(): Promise<DashboardKPIs> {
-    // Usar timezone de São Paulo
+    // Usar horário local (já está em São Paulo no browser)
     const agora = new Date()
-    const hojeSaoPaulo = toSaoPauloTime(agora)
-    const amanhaSaoPaulo = toSaoPauloTime(addDays(agora, 1))
     
-    const today = format(hojeSaoPaulo, 'yyyy-MM-dd')
-    const tomorrow = format(amanhaSaoPaulo, 'yyyy-MM-dd')
-    const mesInicio = format(startOfMonth(new Date()), 'yyyy-MM-dd')
-    const mesFim = format(endOfMonth(new Date()), 'yyyy-MM-dd')
+    const today = format(agora, 'yyyy-MM-dd')
+    const tomorrow = format(addDays(agora, 1), 'yyyy-MM-dd')
+    const mesInicio = format(startOfMonth(agora), 'yyyy-MM-dd')
+    const mesFim = format(endOfMonth(agora), 'yyyy-MM-dd')
 
     try {
       const [
@@ -337,9 +372,7 @@ export class DashboardPavimentacaoApi {
    * Buscar programações de hoje
    */
   static async getProgramacaoHoje(): Promise<ProgramacaoItem[]> {
-    const agora = new Date()
-    const hojeSaoPaulo = toSaoPauloTime(agora)
-    const today = format(hojeSaoPaulo, 'yyyy-MM-dd')
+    const today = format(new Date(), 'yyyy-MM-dd')
     return this.getProgramacoesDia(today)
   }
 
@@ -347,9 +380,7 @@ export class DashboardPavimentacaoApi {
    * Buscar programações de amanhã
    */
   static async getProgramacaoAmanha(): Promise<ProgramacaoItem[]> {
-    const agora = new Date()
-    const amanhaSaoPaulo = toSaoPauloTime(addDays(agora, 1))
-    const tomorrow = format(amanhaSaoPaulo, 'yyyy-MM-dd')
+    const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
     return this.getProgramacoesDia(tomorrow)
   }
 
@@ -446,11 +477,10 @@ export class DashboardPavimentacaoApi {
    */
   static async getProximaProgramacao(): Promise<ProximaProgramacao | null> {
     try {
-      // Usar timezone de São Paulo
+      // Usar horário local do browser (São Paulo)
       const agora = new Date()
-      const hojeSaoPaulo = toSaoPauloTime(agora)
-      const hojeStr = format(hojeSaoPaulo, 'yyyy-MM-dd')
-      const horaAtual = hojeSaoPaulo.getHours() * 60 + hojeSaoPaulo.getMinutes()
+      const hojeStr = format(agora, 'yyyy-MM-dd')
+      const horaAtual = agora.getHours() * 60 + agora.getMinutes()
 
       // Buscar programações de hoje e amanhã
       const { data: programacoes, error } = await supabase
@@ -491,10 +521,11 @@ export class DashboardPavimentacaoApi {
 
       if (!proximaProg) return null
 
-      // Calcular tempo restante usando timezone de São Paulo
-      const dataProgramacaoUTC = fromSaoPauloTime(proximaProg.date, proximaProg.horario_inicio)
+      // Calcular tempo restante
+      const [hora, minuto] = proximaProg.horario_inicio.split(':').map(Number)
+      const dataProgramacao = new Date(proximaProg.date + 'T' + proximaProg.horario_inicio + ':00')
       
-      const diffMs = dataProgramacaoUTC.getTime() - agora.getTime()
+      const diffMs = dataProgramacao.getTime() - agora.getTime()
       const diffMinutos = Math.floor(diffMs / (1000 * 60))
       
       let tempoRestante = ''
@@ -581,20 +612,22 @@ export class DashboardPavimentacaoApi {
   }
 
   /**
-   * Buscar faturamento do mês (obras pagas)
+   * Buscar faturamento do mês (RUAS EXECUTADAS - não apenas pagas)
+   * Agora busca o valor de ruas finalizadas, independente de pagamento
    */
   private static async getFaturamentoMes(mesInicio: string, mesFim: string): Promise<number> {
     try {
       const { data, error } = await supabase
-        .from('obras_financeiro_faturamentos')
-        .select('valor_total')
-        .eq('status', 'pago')
-        .gte('data_finalizacao', mesInicio)
-        .lte('data_finalizacao', mesFim)
+        .from('obras_ruas')
+        .select('valor_total, created_at')
+        .eq('status', 'concluida')
+        .gte('created_at', mesInicio)
+        .lte('created_at', mesFim)
 
       if (error) throw error
 
       const total = (data || []).reduce((sum, item) => sum + (Number(item.valor_total) || 0), 0)
+      console.log(`💰 Faturamento executado do mês: R$ ${total} (${data?.length || 0} ruas finalizadas)`)
       return total
     } catch (error) {
       console.error('Erro ao buscar faturamento do mês:', error)
@@ -624,19 +657,21 @@ export class DashboardPavimentacaoApi {
   }
 
   /**
-   * Buscar metragem pavimentada do mês
+   * Buscar metragem pavimentada do mês (RUAS FINALIZADAS)
    */
   private static async getMetragemMes(mesInicio: string, mesFim: string): Promise<number> {
     try {
       const { data, error } = await supabase
-        .from('obras_financeiro_faturamentos')
-        .select('metragem_executada')
-        .gte('data_finalizacao', mesInicio)
-        .lte('data_finalizacao', mesFim)
+        .from('obras_ruas')
+        .select('metragem_executada, created_at')
+        .eq('status', 'concluida')
+        .gte('created_at', mesInicio)
+        .lte('created_at', mesFim)
 
       if (error) throw error
 
       const total = (data || []).reduce((sum, item) => sum + (Number(item.metragem_executada) || 0), 0)
+      console.log(`📏 Metragem do mês: ${total} m² (${data?.length || 0} ruas finalizadas)`)
       return total
     } catch (error) {
       console.error('Erro ao buscar metragem do mês:', error)
@@ -645,23 +680,469 @@ export class DashboardPavimentacaoApi {
   }
 
   /**
-   * Buscar toneladas aplicadas do mês
+   * Buscar toneladas aplicadas do mês (RUAS FINALIZADAS)
    */
   private static async getToneladasMes(mesInicio: string, mesFim: string): Promise<number> {
     try {
       const { data, error } = await supabase
-        .from('obras_financeiro_faturamentos')
-        .select('toneladas_utilizadas')
-        .gte('data_finalizacao', mesInicio)
-        .lte('data_finalizacao', mesFim)
+        .from('obras_ruas')
+        .select('toneladas_utilizadas, created_at')
+        .eq('status', 'concluida')
+        .gte('created_at', mesInicio)
+        .lte('created_at', mesFim)
 
       if (error) throw error
 
       const total = (data || []).reduce((sum, item) => sum + (Number(item.toneladas_utilizadas) || 0), 0)
+      console.log(`⚖️ Toneladas do mês: ${total} ton (${data?.length || 0} ruas finalizadas)`)
       return total
     } catch (error) {
       console.error('Erro ao buscar toneladas do mês:', error)
       return 0
+    }
+  }
+
+  /**
+   * 🏆 Buscar maior rua executada do dia (a partir dos relatórios diários)
+   */
+  static async getMaiorRuaDia(data: string): Promise<MaiorRuaDia | null> {
+    try {
+      const { data: relatorios, error } = await supabase
+        .from('relatorios_diarios')
+        .select(`
+          metragem_feita,
+          toneladas_aplicadas,
+          data_inicio,
+          rua:obras_ruas(name, valor_total),
+          obra:obras(name)
+        `)
+        .eq('data_inicio', data)
+        .order('metragem_feita', { ascending: false })
+        .limit(1)
+
+      if (error) throw error
+      if (!relatorios || relatorios.length === 0) return null
+
+      const relatorio = relatorios[0]
+      
+      return {
+        rua_nome: relatorio.rua?.name || 'Rua sem nome',
+        obra_nome: relatorio.obra?.name || 'Obra não informada',
+        metragem: relatorio.metragem_feita || 0,
+        toneladas: relatorio.toneladas_aplicadas || 0,
+        valor: relatorio.rua?.valor_total || 0,
+        data_conclusao: relatorio.data_inicio || data
+      }
+    } catch (error) {
+      console.error('Erro ao buscar maior rua do dia:', error)
+      return null
+    }
+  }
+
+  /**
+   * 💼 Buscar últimas diárias de guardas
+   */
+  static async getUltimasDiarias(limite: number = 5): Promise<DiariaRecente[]> {
+    try {
+      const { data: diarias, error } = await supabase
+        .from('diarias_guarda_seguranca')
+        .select(`
+          data_diaria,
+          valor_diaria,
+          guarda:guardas_seguranca(nome, empresa:empresas_guarda(nome))
+        `)
+        .order('data_diaria', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limite)
+
+      if (error) throw error
+
+      return (diarias || []).map((d: any) => ({
+        colaborador_nome: d.guarda?.nome || 'Guarda não informado',
+        equipe_nome: d.guarda?.empresa?.nome || 'Empresa não informada',
+        data: d.data_diaria,
+        valor: d.valor_diaria || 0,
+        tem_hora_extra: false
+      }))
+    } catch (error) {
+      console.error('Erro ao buscar últimas diárias de guardas:', error)
+      return []
+    }
+  }
+
+  /**
+   * 📊 Buscar top 5 ruas por faturamento
+   */
+  static async getTopRuasFaturamento(mesInicio: string, mesFim: string, limite: number = 5): Promise<RuaFaturamento[]> {
+    try {
+      const { data: ruas, error } = await supabase
+        .from('obras_ruas')
+        .select(`
+          name,
+          metragem_executada,
+          valor_total,
+          data_finalizacao,
+          obra:obras(name, client:clients(name))
+        `)
+        .eq('status', 'concluida')
+        .gte('data_finalizacao', mesInicio)
+        .lte('data_finalizacao', mesFim)
+        .order('valor_total', { ascending: false })
+        .limit(limite)
+
+      if (error) throw error
+
+      return (ruas || []).map((r: any) => ({
+        rua_nome: r.name || 'Rua sem nome',
+        obra_nome: r.obra?.name || 'Obra não informada',
+        cliente_nome: r.obra?.client?.name || 'Cliente não informado',
+        valor_total: r.valor_total || 0,
+        metragem: r.metragem_executada || 0,
+        valor_por_m2: r.metragem_executada > 0 ? (r.valor_total / r.metragem_executada) : 0,
+        data_conclusao: r.data_finalizacao || ''
+      }))
+    } catch (error) {
+      console.error('Erro ao buscar top ruas por faturamento:', error)
+      return []
+    }
+  }
+
+  /**
+   * 🚛 Buscar maquinários mais utilizados do mês (a partir dos relatórios diários)
+   */
+  static async getMaquinariosMaisUsados(mesInicio: string, mesFim: string, limite: number = 5): Promise<MaquinarioUso[]> {
+    try {
+      // Buscar todos os maquinários
+      const { data: maquinarios, error } = await supabase
+        .from('maquinarios')
+        .select('id, name, type')
+
+      if (error) throw error
+
+      // Para cada maquinário, contar usos nos relatórios diários
+      const maquinariosComUso = await Promise.all(
+        (maquinarios || []).map(async (maq) => {
+          // Buscar relatórios que incluem este maquinário via tabela de vinculação
+          const { data: vinculos, error: errorVinculos } = await supabase
+            .from('relatorios_diarios_maquinarios')
+            .select(`
+              relatorio:relatorios_diarios(data_inicio, obra_id)
+            `)
+            .eq('maquinario_id', maq.id)
+
+          if (errorVinculos) {
+            console.error('Erro ao buscar vínculos:', errorVinculos)
+            return null
+          }
+
+          // Filtrar por data e contar dias/obras únicos
+          const relatoriosNoMes = (vinculos || [])
+            .filter((v: any) => {
+              const dataRelatorio = v.relatorio?.data_inicio
+              return dataRelatorio >= mesInicio && dataRelatorio <= mesFim
+            })
+
+          const diasUnicos = new Set(relatoriosNoMes.map((v: any) => v.relatorio?.data_inicio))
+          const obrasUnicas = new Set(relatoriosNoMes.map((v: any) => v.relatorio?.obra_id).filter(Boolean))
+
+          return {
+            maquinario_nome: maq.name,
+            tipo: maq.type || 'Não especificado',
+            dias_uso_mes: diasUnicos.size,
+            obras_utilizadas: obrasUnicas.size
+          }
+        })
+      )
+
+      // Filtrar nulls e ordenar por dias de uso
+      return maquinariosComUso
+        .filter((m): m is MaquinarioUso => m !== null && m.dias_uso_mes > 0)
+        .sort((a, b) => b.dias_uso_mes - a.dias_uso_mes)
+        .slice(0, limite)
+
+    } catch (error) {
+      console.error('Erro ao buscar maquinários mais usados:', error)
+      return []
+    }
+  }
+
+  /**
+   * 🚨 Buscar alertas e pendências
+   */
+  static async getAlertas(): Promise<Alerta[]> {
+    try {
+      const hoje = format(new Date(), 'yyyy-MM-dd')
+      const proximos30Dias = format(addDays(new Date(), 30), 'yyyy-MM-dd')
+
+      const alertas: Alerta[] = []
+
+      // 1. Manutenções VENCIDAS (alta urgência)
+      try {
+        const { data: manutencoesVencidas } = await supabase
+          .from('maquinarios')
+          .select('name, data_proxima_manutencao')
+          .lt('data_proxima_manutencao', hoje)
+          .neq('status', 'inativo')
+
+        if (manutencoesVencidas && manutencoesVencidas.length > 0) {
+          alertas.push({
+            tipo: 'manutencao',
+            mensagem: 'Manutenções VENCIDAS',
+            urgencia: 'alta',
+            quantidade: manutencoesVencidas.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar manutenções vencidas:', err)
+      }
+
+      // 1.1 Manutenções próximas (30 dias)
+      try {
+        const { data: manutencoesProximas } = await supabase
+          .from('maquinarios')
+          .select('name, data_proxima_manutencao')
+          .gte('data_proxima_manutencao', hoje)
+          .lte('data_proxima_manutencao', proximos30Dias)
+          .neq('status', 'inativo')
+
+        if (manutencoesProximas && manutencoesProximas.length > 0) {
+          alertas.push({
+            tipo: 'manutencao',
+            mensagem: 'Manutenções vencem em 30 dias',
+            urgencia: 'media',
+            quantidade: manutencoesProximas.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar manutenções próximas:', err)
+      }
+
+      // 2. Contas atrasadas (status pendente OU atrasado)
+      try {
+        const { data: contasAtrasadas } = await supabase
+          .from('contas_pagar')
+          .select('amount, status')
+          .in('status', ['pendente', 'pago', 'atrasado', 'cancelado'])
+          .lt('due_date', hoje)
+          .neq('status', 'pago')
+          .neq('status', 'cancelado')
+
+        if (contasAtrasadas && contasAtrasadas.length > 0) {
+          alertas.push({
+            tipo: 'conta',
+            mensagem: 'Contas atrasadas',
+            urgencia: 'alta',
+            quantidade: contasAtrasadas.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar contas atrasadas:', err)
+      }
+
+      // 3. Contas pendentes a vencer em 7 dias
+      try {
+        const { data: contasVencer } = await supabase
+          .from('contas_pagar')
+          .select('amount, status')
+          .eq('status', 'pendente')
+          .gte('due_date', hoje)
+          .lte('due_date', format(addDays(new Date(), 7), 'yyyy-MM-dd'))
+
+        if (contasVencer && contasVencer.length > 0) {
+          alertas.push({
+            tipo: 'conta',
+            mensagem: 'Contas vencem em 7 dias',
+            urgencia: 'media',
+            quantidade: contasVencer.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar contas a vencer:', err)
+      }
+
+      // 4. Todas as contas pendentes (não pagas)
+      try {
+        const { data: todasPendentes } = await supabase
+          .from('contas_pagar')
+          .select('amount, status')
+          .in('status', ['pendente', 'atrasado'])
+
+        // Só adicionar se não houver alertas específicos de vencimento
+        if (todasPendentes && todasPendentes.length > 0 && alertas.filter(a => a.tipo === 'conta').length === 0) {
+          alertas.push({
+            tipo: 'conta',
+            mensagem: 'Contas pendentes',
+            urgencia: 'media',
+            quantidade: todasPendentes.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar todas as pendentes:', err)
+      }
+
+      // 5. Licenças VENCIDAS de maquinários (alta urgência)
+      try {
+        const { data: licencasVencidas } = await supabase
+          .from('maquinarios_licencas')
+          .select('tipo, validade')
+          .lt('validade', hoje)
+
+        if (licencasVencidas && licencasVencidas.length > 0) {
+          alertas.push({
+            tipo: 'licenca',
+            mensagem: 'Licenças VENCIDAS',
+            urgencia: 'alta',
+            quantidade: licencasVencidas.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar licenças vencidas:', err)
+      }
+
+      // 6. Licenças próximas do vencimento (30 dias)
+      try {
+        const { data: licencasProximas } = await supabase
+          .from('maquinarios_licencas')
+          .select('tipo, validade')
+          .gte('validade', hoje)
+          .lte('validade', proximos30Dias)
+
+        if (licencasProximas && licencasProximas.length > 0) {
+          alertas.push({
+            tipo: 'licenca',
+            mensagem: 'Licenças vencem em 30 dias',
+            urgencia: 'media',
+            quantidade: licencasProximas.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar licenças próximas:', err)
+      }
+
+      // 7. Seguros VENCIDOS (alta urgência)
+      try {
+        const { data: segurosVencidos } = await supabase
+          .from('maquinarios_seguros')
+          .select('maquinario_id, validade')
+          .lt('validade', hoje)
+
+        if (segurosVencidos && segurosVencidos.length > 0) {
+          alertas.push({
+            tipo: 'documento',
+            mensagem: 'Seguros VENCIDOS',
+            urgencia: 'alta',
+            quantidade: segurosVencidos.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar seguros vencidos:', err)
+      }
+
+      // 8. Seguros próximos do vencimento (30 dias)
+      try {
+        const { data: segurosProximos } = await supabase
+          .from('maquinarios_seguros')
+          .select('maquinario_id, validade')
+          .gte('validade', hoje)
+          .lte('validade', proximos30Dias)
+
+        if (segurosProximos && segurosProximos.length > 0) {
+          alertas.push({
+            tipo: 'documento',
+            mensagem: 'Seguros vencem em 30 dias',
+            urgencia: 'media',
+            quantidade: segurosProximos.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar seguros próximos:', err)
+      }
+
+      // 9. Certificados de colaboradores VENCIDOS
+      try {
+        const { data: certificadosVencidos } = await supabase
+          .from('colaboradores_certificados')
+          .select('colaborador_id, validade, tipo')
+          .lt('validade', hoje)
+
+        if (certificadosVencidos && certificadosVencidos.length > 0) {
+          alertas.push({
+            tipo: 'documento',
+            mensagem: 'Certificados VENCIDOS',
+            urgencia: 'alta',
+            quantidade: certificadosVencidos.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar certificados vencidos:', err)
+      }
+
+      // 10. Certificados próximos do vencimento (30 dias)
+      try {
+        const { data: certificadosProximos } = await supabase
+          .from('colaboradores_certificados')
+          .select('colaborador_id, validade, tipo')
+          .gte('validade', hoje)
+          .lte('validade', proximos30Dias)
+
+        if (certificadosProximos && certificadosProximos.length > 0) {
+          alertas.push({
+            tipo: 'documento',
+            mensagem: 'Certificados vencem em 30 dias',
+            urgencia: 'media',
+            quantidade: certificadosProximos.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar certificados próximos:', err)
+      }
+
+      // 11. Documentos pessoais VENCIDOS (RG, CNH, etc)
+      try {
+        const { data: documentosVencidos } = await supabase
+          .from('colaboradores_documentos')
+          .select('colaborador_id, document_type, expiry_date')
+          .not('expiry_date', 'is', null)
+          .lt('expiry_date', hoje)
+
+        if (documentosVencidos && documentosVencidos.length > 0) {
+          alertas.push({
+            tipo: 'documento',
+            mensagem: 'Documentos pessoais VENCIDOS',
+            urgencia: 'alta',
+            quantidade: documentosVencidos.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar documentos vencidos:', err)
+      }
+
+      // 12. Documentos pessoais próximos do vencimento (30 dias)
+      try {
+        const { data: documentosProximos } = await supabase
+          .from('colaboradores_documentos')
+          .select('colaborador_id, document_type, expiry_date')
+          .not('expiry_date', 'is', null)
+          .gte('expiry_date', hoje)
+          .lte('expiry_date', proximos30Dias)
+
+        if (documentosProximos && documentosProximos.length > 0) {
+          alertas.push({
+            tipo: 'documento',
+            mensagem: 'Documentos pessoais vencem em 30 dias',
+            urgencia: 'media',
+            quantidade: documentosProximos.length
+          })
+        }
+      } catch (err) {
+        console.warn('Aviso ao buscar documentos próximos:', err)
+      }
+
+      console.log(`🚨 Alertas encontrados: ${alertas.length}`, alertas)
+      return alertas
+    } catch (error) {
+      console.error('Erro ao buscar alertas:', error)
+      return []
     }
   }
 }

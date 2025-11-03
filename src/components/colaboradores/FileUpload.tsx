@@ -1,6 +1,7 @@
-import React, { useState, useRef, DragEvent } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, File, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from "../shared/Button";
+import { useDragAndDrop } from '../../hooks/useDragAndDrop';
 import {
   validarTipoArquivo,
   validarTamanhoArquivo,
@@ -36,34 +37,19 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   helpText = 'PDF, PNG, JPG ou ZIP até 10MB',
 }) => {
   const [arquivos, setArquivos] = useState<ArquivoSelecionado[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!disabled) {
-      setIsDragging(true);
-    }
-  };
-
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (disabled) return;
-
-    const droppedFiles = Array.from(e.dataTransfer.files);
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const droppedFiles = Array.from(files);
     processarArquivos(droppedFiles);
-  };
+  }, []);
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled,
+    multiple
+  });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -210,10 +196,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
             : 'border-gray-300 hover:border-gray-400 bg-white cursor-pointer'
         }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={() => !disabled && inputRef.current?.click()}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!disabled) inputRef.current?.click()
+        }}
+        {...dragHandlers}
       >
         <input
           ref={inputRef}
@@ -225,7 +212,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           disabled={disabled}
         />
 
-        <div className="flex flex-col items-center space-y-3">
+        <div className="flex flex-col items-center space-y-3 pointer-events-none">
           <div
             className={`p-3 rounded-full ${
               isDragging ? 'bg-blue-100' : 'bg-gray-100'

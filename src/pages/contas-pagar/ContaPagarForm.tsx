@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { 
   FileText, 
@@ -26,6 +26,7 @@ import { formatCurrency } from '../../utils/format'
 import { toast } from '../../lib/toast'
 import type { ContaPagar, ContaPagarFormData, StatusContaPagar } from '../../types/contas-pagar'
 import { CATEGORIAS_CONTA_PAGAR, FORMAS_PAGAMENTO, validarDatas } from '../../types/contas-pagar'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
 
 export default function ContaPagarForm() {
   const navigate = useNavigate()
@@ -39,6 +40,7 @@ export default function ContaPagarForm() {
   const [userId, setUserId] = useState<string>('')
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null)
   const [anexoExistenteUrl, setAnexoExistenteUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState<ContaPagarFormData>({
     numero_nota: '',
@@ -221,6 +223,34 @@ export default function ContaPagarForm() {
     setFormData(prev => ({ ...prev, anexo: null }))
   }
 
+  // Drag & Drop handler
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
+    if (file) {
+      // Validar tamanho (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('O arquivo deve ter no máximo 10MB')
+        return
+      }
+
+      // Validar tipo
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('Apenas arquivos PDF, JPG ou PNG são permitidos')
+        return
+      }
+
+      setArquivoSelecionado(file)
+      setFormData(prev => ({ ...prev, anexo: file }))
+    }
+  }, [])
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled: loading || uploading,
+    multiple: false
+  })
+
   const validarFormulario = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -263,7 +293,7 @@ export default function ContaPagarForm() {
       const filePath = `contas-pagar/${fileName}`
 
       const { error: uploadError } = await supabase.storage
-        .from('attachments')
+        .from('obras-comprovantes')
         .upload(filePath, file)
 
       if (uploadError) {
@@ -271,7 +301,7 @@ export default function ContaPagarForm() {
       }
 
       const { data: { publicUrl } } = supabase.storage
-        .from('attachments')
+        .from('obras-comprovantes')
         .getPublicUrl(filePath)
 
       return publicUrl
@@ -681,37 +711,51 @@ export default function ContaPagarForm() {
             )}
 
             {/* Upload Area */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors">
+            <div 
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                isDragging
+                  ? 'border-primary-500 bg-primary-50'
+                  : 'border-gray-300 hover:border-primary-400'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!loading && !uploading) fileInputRef.current?.click()
+              }}
+              {...dragHandlers}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+                disabled={loading || uploading}
+              />
               {arquivoSelecionado ? (
-                <div className="space-y-3">
+                <div className="space-y-3 pointer-events-none">
                   <div className="flex items-center justify-center gap-2 text-green-600">
                     <FileCheck className="h-6 w-6" />
                     <span className="text-sm font-medium">{arquivoSelecionado.name}</span>
                   </div>
                   <button
                     type="button"
-                    onClick={handleRemoverAnexo}
-                    className="text-sm text-red-600 hover:text-red-700 underline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRemoverAnexo()
+                    }}
+                    className="text-sm text-red-600 hover:text-red-700 underline pointer-events-auto"
                   >
                     Remover arquivo
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <Upload className="h-10 w-10 text-gray-400 mx-auto" />
+                <div className="space-y-2 pointer-events-none">
+                  <Upload className={`h-10 w-10 mx-auto ${isDragging ? 'text-primary-600' : 'text-gray-400'}`} />
                   <div>
-                    <label className="cursor-pointer">
-                      <span className="text-primary-600 hover:text-primary-700 font-medium">
-                        Clique para fazer upload
-                      </span>
-                      <span className="text-gray-500"> ou arraste o arquivo</span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={handleFileChange}
-                      />
-                    </label>
+                    <p className="text-primary-600 hover:text-primary-700 font-medium">
+                      Clique para fazer upload
+                    </p>
+                    <p className="text-gray-500">ou arraste o arquivo</p>
                   </div>
                   <p className="text-xs text-gray-500">
                     PDF, JPG ou PNG até 10MB

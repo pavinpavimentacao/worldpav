@@ -7,6 +7,7 @@ import { useToast } from '../../lib/toast-hooks'
 import { updateNotaFiscal } from '../../lib/obrasNotasFiscaisApi'
 import { uploadToSupabaseStorage, validatePDF } from '../../utils/file-upload-utils'
 import { calcularValorLiquido, validarDescontos } from '../../utils/notas-fiscais-utils'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
 import type { ObraNotaFiscal, UpdateNotaFiscalInput } from '../../types/obras-financeiro'
 
 interface EditarNotaFiscalModalProps {
@@ -25,7 +26,6 @@ export function EditarNotaFiscalModal({
   const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
   
   const [formData, setFormData] = useState({
     numero_nota: '',
@@ -64,32 +64,6 @@ export function EditarNotaFiscalModal({
     Number(formData.desconto_iss) || 0,
     Number(formData.outro_desconto) || 0
   )
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0])
-    }
-  }, [nota])
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0])
-    }
-  }
 
   const handleFile = async (file: File) => {
     if (!nota) return
@@ -130,6 +104,25 @@ export function EditarNotaFiscalModal({
         type: 'success',
         message: 'Arquivo enviado com sucesso'
       })
+    }
+  }
+
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
+    if (file) {
+      handleFile(file)
+    }
+  }, [nota])
+
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled: loading || uploadingFile,
+    multiple: false
+  })
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0])
     }
   }
 
@@ -385,13 +378,10 @@ export function EditarNotaFiscalModal({
               Arquivo da Nota Fiscal (PDF)
             </label>
             <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center ${
-                dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
               }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
+              {...dragHandlers}
             >
               {uploadingFile ? (
                 <div className="flex flex-col items-center">

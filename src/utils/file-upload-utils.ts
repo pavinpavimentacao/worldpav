@@ -186,3 +186,91 @@ export function sanitizeFileName(fileName: string): string {
     .toLowerCase()
 }
 
+/**
+ * Valida se o arquivo é uma imagem (para fotos de guardas)
+ */
+export function validateImage(file: File): { valido: boolean; mensagem?: string } {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  const maxSize = 5 * 1024 * 1024 // 5MB
+  
+  if (!allowedTypes.includes(file.type)) {
+    return {
+      valido: false,
+      mensagem: 'O arquivo deve ser uma imagem (JPG, PNG ou WebP)'
+    }
+  }
+  
+  if (file.size > maxSize) {
+    return {
+      valido: false,
+      mensagem: 'A imagem não pode ter mais de 5MB'
+    }
+  }
+  
+  return { valido: true }
+}
+
+/**
+ * Faz upload de foto de guarda para o Supabase Storage
+ */
+export async function uploadFotoGuarda(
+  file: File,
+  diariaId: string
+): Promise<{ url: string | null; error: string | null }> {
+  try {
+    // Valida a imagem
+    const validation = validateImage(file)
+    if (!validation.valido) {
+      return {
+        url: null,
+        error: validation.mensagem || 'Imagem inválida'
+      }
+    }
+
+    // Nome do bucket
+    const bucket = 'guardas-fotos'
+    
+    // Gera um nome único para o arquivo
+    const fileExt = file.name.split('.').pop()
+    const timestamp = Date.now()
+    const randomId = Math.random().toString(36).substring(2, 8)
+    const fileName = `diarias/${diariaId}_${timestamp}_${randomId}.${fileExt}`
+    
+    console.log('📤 Fazendo upload da foto:', { bucket, fileName, size: file.size })
+    
+    // Faz o upload
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+    
+    if (error) {
+      console.error('❌ Erro ao fazer upload:', error)
+      return {
+        url: null,
+        error: error.message
+      }
+    }
+    
+    // Obtém a URL pública do arquivo
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName)
+    
+    console.log('✅ Upload concluído:', urlData.publicUrl)
+    
+    return {
+      url: urlData.publicUrl,
+      error: null
+    }
+  } catch (error) {
+    console.error('❌ Erro ao fazer upload:', error)
+    return {
+      url: null,
+      error: error instanceof Error ? error.message : 'Erro desconhecido ao fazer upload'
+    }
+  }
+}
+

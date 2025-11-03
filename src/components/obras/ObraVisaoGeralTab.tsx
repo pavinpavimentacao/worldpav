@@ -7,8 +7,7 @@ import {
   FileText
 } from 'lucide-react'
 import { Obra } from '../../lib/obrasApi'
-import { calcularValorTotalServicos } from '../../lib/obrasServicosApi'
-import { getFaturamentoBrutoTotal } from '../../lib/obrasNotasFiscaisApi'
+import { getServicosObra } from '../../lib/obrasServicosApi'
 
 interface ObraVisaoGeralTabProps {
   obraId: string
@@ -22,19 +21,29 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
   useEffect(() => {
     async function carregarDadosFinanceiros() {
       try {
-        // Buscar o valor total dos serviços com base no volume previsto
-        const valorServicos = await calcularValorTotalServicos(obraId)
-        setFaturamentoPrevisto(valorServicos)
+        // Buscar serviços da obra
+        const servicos = await getServicosObra(obraId)
         
-        // Se a obra está concluída, usar o valor executado salvo no banco
+        // Faturamento Previsto = volume_planejamento da obra × Preço dos serviços
+        const volumePlanejamento = obra.volume_planejamento || 0
+        const precoTotalServicos = servicos.reduce((total, servico) => 
+          total + servico.preco_unitario, 0
+        )
+        const previstoCalculado = volumePlanejamento * precoTotalServicos
+        setFaturamentoPrevisto(previstoCalculado)
+        console.log('📋 Faturamento Previsto:', { volumePlanejamento, precoTotalServicos, total: previstoCalculado })
+        
+        // Valor Executado = Soma dos serviços (metragem_executada × preço_unitário)
         if (obra.status === 'concluida' && obra.executed_value) {
           setValorExecutado(obra.executed_value)
-          console.log('🏁 Obra concluída - Usando valor executado salvo:', obra.executed_value)
+          console.log('🏁 Obra concluída - Valor congelado:', obra.executed_value)
         } else {
-          // Se não está concluída, calcular dinamicamente
-          const faturamentoBruto = await getFaturamentoBrutoTotal(obraId)
-          setValorExecutado(faturamentoBruto)
-          console.log('🔄 Obra em andamento - Calculando valor executado:', faturamentoBruto)
+          // Somar valor_total de todos os serviços (já calculados com ruas finalizadas)
+          const valorExecutadoReal = servicos.reduce((total, servico) => 
+            total + (servico.valor_total || 0), 0
+          )
+          setValorExecutado(valorExecutadoReal)
+          console.log('🔄 Valor Executado (soma dos serviços):', valorExecutadoReal)
         }
       } catch (error) {
         console.error('Erro ao carregar dados financeiros:', error)
@@ -42,7 +51,7 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
     }
     
     carregarDadosFinanceiros()
-  }, [obraId, obra.status, obra.executed_value])
+  }, [obraId, obra.status, obra.executed_value, obra.volume_planejamento])
   
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { 
@@ -130,7 +139,7 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
           <div className="text-sm text-gray-500">
             {obra.status === 'concluida' 
               ? 'Valor final executado (congelado)' 
-              : 'Notas fiscais + pagamentos diretos'
+              : 'Metragem executada × preço dos serviços'
             }
           </div>
         </div>

@@ -53,23 +53,29 @@ async function getObraDadosReais(obraId: string) {
       getRuasByObra(obraId)
     ])
 
+    // Filtrar apenas ruas finalizadas (executadas)
+    const ruasFinalizadas = ruas.filter(rua => rua.status === 'concluida' || rua.status === 'finalizada')
+    
     console.log(`🔍 Dados da obra ${obraId}:`, {
       faturamentos: faturamentos.length,
-      ruas: ruas.length
+      totalRuas: ruas.length,
+      ruasFinalizadas: ruasFinalizadas.length
     })
-
-    // Calcular metragem executada (priorizar faturamentos, fallback para ruas)
-    const metragemFeita = faturamentos.length > 0 
-      ? faturamentos.reduce((total, fat) => total + (fat.metragem_executada || 0), 0)
-      : ruas.reduce((total, rua) => total + (rua.metragem_executada || 0), 0)
     
-    // Calcular metragem planejada (soma das ruas - usar area se metragem_planejada for null)
-    const metragemPlanejada = ruas.reduce((total, rua) => total + (rua.metragem_planejada || rua.area || 0), 0)
+    // Calcular metragem executada (apenas ruas finalizadas)
+    const metragemFeita = ruasFinalizadas.reduce((total, rua) => 
+      total + (rua.metragem_executada || 0), 0
+    )
     
-    // Calcular toneladas aplicadas (priorizar faturamentos, fallback para ruas)
-    const toneladasAplicadas = faturamentos.length > 0
-      ? faturamentos.reduce((total, fat) => total + (fat.toneladas_aplicadas || 0), 0)
-      : ruas.reduce((total, rua) => total + (rua.toneladas_utilizadas || 0), 0)
+    // Calcular metragem planejada (soma de todas as ruas)
+    const metragemPlanejada = ruas.reduce((total, rua) => 
+      total + (rua.metragem_planejada || rua.area || 0), 0
+    )
+    
+    // Calcular toneladas aplicadas (apenas ruas finalizadas)
+    const toneladasAplicadas = ruasFinalizadas.reduce((total, rua) => 
+      total + (rua.toneladas_utilizadas || 0), 0
+    )
     
     // Calcular toneladas planejadas (converter area m² para toneladas)
     const toneladasPlanejadas = ruas.reduce((total, rua) => {
@@ -77,35 +83,33 @@ async function getObraDadosReais(obraId: string) {
       return total + (area / 10) // 1000 m² = 100 toneladas (fator 10)
     }, 0)
     
-    // Calcular espessura média (priorizar faturamentos, fallback para ruas)
+    // Calcular espessura média (apenas ruas finalizadas)
     let espessuraMedia = 0
-    if (faturamentos.length > 0) {
-      espessuraMedia = faturamentos.reduce((total, fat) => total + (fat.espessura_calculada || 0), 0) / faturamentos.length
-    } else {
-      // Usar espessura já calculada das ruas ou calcular se não existir
-      const ruasComEspessura = ruas.filter(rua => rua.espessura_calculada || (rua.metragem_executada && rua.toneladas_utilizadas))
-      if (ruasComEspessura.length > 0) {
-        const totalEspessura = ruasComEspessura.reduce((total, rua) => {
-          if (rua.espessura_calculada) {
-            return total + rua.espessura_calculada
-          } else {
-            // Calcular espessura se não existir
-            const espessura = rua.toneladas_utilizadas / rua.metragem_executada / 2.4 // Densidade do asfalto
-            return total + espessura
-          }
-        }, 0)
-        espessuraMedia = totalEspessura / ruasComEspessura.length
-      }
+    const ruasComEspessura = ruasFinalizadas.filter(rua => 
+      rua.espessura_calculada || (rua.metragem_executada && rua.toneladas_utilizadas)
+    )
+    
+    if (ruasComEspessura.length > 0) {
+      const totalEspessura = ruasComEspessura.reduce((total, rua) => {
+        if (rua.espessura_calculada) {
+          return total + rua.espessura_calculada
+        } else {
+          // Calcular espessura se não existir
+          const espessura = rua.toneladas_utilizadas / rua.metragem_executada / 2.4 // Densidade do asfalto
+          return total + espessura
+        }
+      }, 0)
+      espessuraMedia = totalEspessura / ruasComEspessura.length
     }
     
     // Contar ruas (ruas finalizadas vs total)
-    const ruasFeitas = ruas.filter(rua => rua.status === 'concluida' || rua.status === 'finalizada').length
+    const ruasFeitas = ruasFinalizadas.length
     const totalRuas = ruas.length
     
-    // Calcular faturamento bruto (priorizar faturamentos, fallback para ruas)
-    const faturamentoBruto = faturamentos.length > 0
-      ? faturamentos.reduce((total, fat) => total + (fat.valor_total || 0), 0)
-      : ruas.reduce((total, rua) => total + (rua.valor_total || 0), 0)
+    // Calcular faturamento bruto (apenas ruas finalizadas)
+    const faturamentoBruto = ruasFinalizadas.reduce((total, rua) => 
+      total + (rua.valor_total || 0), 0
+    )
 
     const dados = {
       metragemFeita,

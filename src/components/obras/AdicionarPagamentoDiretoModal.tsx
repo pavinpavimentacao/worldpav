@@ -6,6 +6,7 @@ import { CurrencyInput } from '../ui/currency-input'
 import { useToast } from '../../lib/toast-hooks'
 import { createPagamentoDireto } from '../../lib/obrasPagamentosDiretosApi'
 import { uploadToSupabaseStorage, validatePDF } from '../../utils/file-upload-utils'
+import { useDragAndDrop } from '../../hooks/useDragAndDrop'
 import type { CreatePagamentoDiretoInput, FormaPagamento } from '../../types/obras-pagamentos'
 
 interface AdicionarPagamentoDiretoModalProps {
@@ -32,7 +33,6 @@ export function AdicionarPagamentoDiretoModal({
   const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
   
   const [formData, setFormData] = useState({
     descricao: '',
@@ -45,25 +45,18 @@ export function AdicionarPagamentoDiretoModal({
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [arquivoUrl, setArquivoUrl] = useState<string>('')
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
+  const handleDropFiles = useCallback((files: FileList | File[]) => {
+    const file = files[0] as File
+    if (file) {
+      handleFile(file)
     }
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0])
-    }
-  }, [])
+  const { isDragging, dragHandlers } = useDragAndDrop({
+    onDrop: handleDropFiles,
+    disabled: loading || uploadingFile,
+    multiple: false
+  })
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -72,30 +65,43 @@ export function AdicionarPagamentoDiretoModal({
   }
 
   const handleFile = async (file: File) => {
-    if (!validatePDF(file)) {
+    const validation = validatePDF(file)
+    
+    if (!validation.valido) {
       addToast({
         type: 'error',
         title: 'Arquivo inválido',
-        message: 'Por favor, selecione um arquivo PDF válido (máximo 10MB)'
+        message: validation.mensagem || 'Por favor, selecione um arquivo PDF válido (máximo 10MB)'
       })
       return
     }
 
     setUploadingFile(true)
     try {
-      const url = await uploadToSupabaseStorage(file, 'obras-pagamentos-diretos')
-      setArquivo(file)
-      setArquivoUrl(url)
-      addToast({
-        type: 'success',
-        title: 'Arquivo enviado',
-        message: 'Comprovante enviado com sucesso'
-      })
+      const { url, error } = await uploadToSupabaseStorage(
+        file, 
+        'obras-comprovantes',
+        obraId
+      )
+      
+      if (error) {
+        throw new Error(error)
+      }
+      
+      if (url) {
+        setArquivo(file)
+        setArquivoUrl(url)
+        addToast({
+          type: 'success',
+          title: 'Arquivo enviado',
+          message: 'Comprovante enviado com sucesso'
+        })
+      }
     } catch (error) {
       addToast({
         type: 'error',
         title: 'Erro no upload',
-        message: 'Erro ao enviar comprovante'
+        message: error instanceof Error ? error.message : 'Erro ao enviar comprovante'
       })
     } finally {
       setUploadingFile(false)
@@ -263,13 +269,10 @@ export function AdicionarPagamentoDiretoModal({
               Comprovante de Pagamento (PDF)
             </label>
             <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center ${
-                dragActive ? 'border-green-500 bg-green-50' : 'border-gray-300'
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300'
               }`}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
+              {...dragHandlers}
             >
               {uploadingFile ? (
                 <div className="flex flex-col items-center">

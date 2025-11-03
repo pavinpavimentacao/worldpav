@@ -3,15 +3,15 @@
  * Lista e cadastro de empresas que fornecem guardas
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Building2, Phone, FileText, Edit, Trash2, X } from 'lucide-react';
 import { Button } from "../shared/Button";
 import { Input } from '../ui/input';
 import { toast } from '../../lib/toast-hooks';
 import {
-  mockEmpresasGuarda,
-  adicionarEmpresaGuarda,
-} from '../../mocks/guardas-mock';
+  listarEmpresasGuarda,
+  criarEmpresaGuarda,
+} from '../../lib/guardasApi';
 import {
   formatarDocumento,
   validarCPF,
@@ -20,15 +20,34 @@ import {
 } from '../../types/guardas';
 
 export const EmpresasGuardaTab: React.FC = () => {
-  const [empresas, setEmpresas] = useState(mockEmpresasGuarda);
+  const [empresas, setEmpresas] = useState<EmpresaGuarda[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Form fields
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
   const [documento, setDocumento] = useState('');
   const [tipoDocumento, setTipoDocumento] = useState<'CPF' | 'CNPJ'>('CNPJ');
+
+  // Carregar empresas ao montar o componente
+  useEffect(() => {
+    carregarEmpresas();
+  }, []);
+
+  const carregarEmpresas = async () => {
+    setIsLoading(true);
+    try {
+      const dados = await listarEmpresasGuarda();
+      setEmpresas(dados);
+    } catch (error: any) {
+      console.error('Erro ao carregar empresas:', error);
+      toast.error(error.message || 'Erro ao carregar empresas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOpenModal = () => {
     limparFormulario();
@@ -78,10 +97,7 @@ export const EmpresasGuardaTab: React.FC = () => {
     }
 
     try {
-      // Simular delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      const novaEmpresa = adicionarEmpresaGuarda({
+      const novaEmpresa = await criarEmpresaGuarda({
         nome: nome.trim(),
         telefone: telefone.trim(),
         documento: documentoLimpo,
@@ -93,6 +109,7 @@ export const EmpresasGuardaTab: React.FC = () => {
       setShowModal(false);
       limparFormulario();
     } catch (error: any) {
+      console.error('Erro ao cadastrar empresa:', error);
       toast.error(error.message || 'Erro ao cadastrar empresa');
     } finally {
       setIsSubmitting(false);
@@ -120,9 +137,18 @@ export const EmpresasGuardaTab: React.FC = () => {
         </Button>
       </div>
 
+      {/* Loading */}
+      {isLoading && (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="text-gray-600 mt-3">Carregando empresas...</p>
+        </div>
+      )}
+
       {/* Lista de Empresas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {empresas.filter((e) => e.ativo).map((empresa) => (
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {empresas.filter((e) => !e.deleted_at).map((empresa) => (
           <div
             key={empresa.id}
             className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -159,9 +185,10 @@ export const EmpresasGuardaTab: React.FC = () => {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
-      {empresas.filter((e) => e.ativo).length === 0 && (
+      {!isLoading && empresas.filter((e) => !e.deleted_at).length === 0 && (
         <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
           <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-600 mb-2">Nenhuma empresa cadastrada</p>

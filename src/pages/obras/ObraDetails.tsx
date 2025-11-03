@@ -9,8 +9,7 @@ import { NotasMedicoesTab } from '../../components/obras/NotasMedicoesTab'
 import { ObraVisaoGeralTab } from '../../components/obras/ObraVisaoGeralTab'
 import { ObraServicosTab } from '../../components/obras/ObraServicosTab'
 import { getObraById, Obra } from '../../lib/obrasApi'
-import { calcularValorTotalServicos, calcularPrecoPorM2, calcularValorExecutadoPorMetragem } from '../../lib/obrasServicosApi'
-import { getFaturamentoBrutoTotal } from '../../lib/obrasNotasFiscaisApi'
+import { calcularPrecoPorM2, getServicosObra } from '../../lib/obrasServicosApi'
 import { useToast } from '../../lib/toast-hooks'
 
 type TabType = 'visao-geral' | 'ruas' | 'financeiro' | 'notas-medicoes' | 'servicos'
@@ -26,47 +25,59 @@ const ObraDetails = () => {
   const [valorExecutado, setValorExecutado] = useState<number>(0)
   const [precoPorM2Calculado, setPrecoPorM2Calculado] = useState<number>(0)
 
-  // Carregar dados da obra
-  useEffect(() => {
-    async function loadObra() {
-      if (!id) return
+  // Função para carregar dados da obra
+  const loadObra = async () => {
+    if (!id) return
 
-      try {
-        setLoading(true)
-        const obraData = await getObraById(id)
-        
-        if (!obraData) {
-          addToast({ message: 'Obra não encontrada', type: 'error' })
-          navigate('/obras')
-          return
-        }
-
-        setObra(obraData)
-        
-        // Carregar o valor total dos serviços
-        const valorServicos = await calcularValorTotalServicos(id)
-        setFaturamentoPrevisto(valorServicos)
-        
-        // Carregar o preço por m² calculado dos serviços
-        const precoPorM2 = await calcularPrecoPorM2(id)
-        setPrecoPorM2Calculado(precoPorM2)
-        
-        // Carregar o valor executado (preço por m² × metragem executada)
-        const valorExecutadoCalculado = await calcularValorExecutadoPorMetragem(id)
-        setValorExecutado(valorExecutadoCalculado)
-      } catch (error) {
-        console.error('Erro ao carregar obra:', error)
-        addToast({ message: 'Erro ao carregar obra', type: 'error' })
+    try {
+      setLoading(true)
+      const obraData = await getObraById(id)
+      
+      if (!obraData) {
+        addToast({ message: 'Obra não encontrada', type: 'error' })
         navigate('/obras')
-      } finally {
-        setLoading(false)
+        return
       }
-    }
 
+      setObra(obraData)
+      
+      // Buscar serviços da obra
+      const servicos = await getServicosObra(id)
+      
+      // Faturamento Previsto = volume_planejamento da obra × Preço dos serviços
+      const volumePlanejamento = obraData.volume_planejamento || 0
+      const precoTotalServicos = servicos.reduce((total, servico) => 
+        total + servico.preco_unitario, 0
+      )
+      const previstoCalculado = volumePlanejamento * precoTotalServicos
+      setFaturamentoPrevisto(previstoCalculado)
+      console.log('📋 Faturamento Previsto:', { volumePlanejamento, precoTotalServicos, total: previstoCalculado })
+      
+      // Carregar o preço por m² calculado dos serviços
+      const precoPorM2 = await calcularPrecoPorM2(id)
+      setPrecoPorM2Calculado(precoPorM2)
+      
+      // Valor Executado = Soma dos serviços (metragem_executada × preço_unitário)
+      const valorExecutadoCalculado = servicos.reduce((total, servico) => 
+        total + (servico.valor_total || 0), 0
+      )
+      setValorExecutado(valorExecutadoCalculado)
+      console.log('💰 Valor Executado (soma serviços):', valorExecutadoCalculado)
+    } catch (error) {
+      console.error('Erro ao carregar obra:', error)
+      addToast({ message: 'Erro ao carregar obra', type: 'error' })
+      navigate('/obras')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Carregar dados da obra ao montar
+  useEffect(() => {
     if (id) {
       loadObra()
     }
-  }, [id, addToast, navigate])
+  }, [id])
 
   if (loading || !obra) {
     return (
@@ -387,7 +398,9 @@ const ObraDetails = () => {
             {activeTab === 'ruas' && (
               <ObraRuasTab 
                 obraId={id || ''} 
-                precoPorM2={precoPorM2Calculado || 25} 
+                precoPorM2={precoPorM2Calculado || 25}
+                obraStatus={obra?.status}
+                onObraStatusChange={loadObra}
               />
             )}
 

@@ -437,8 +437,13 @@ export const DocumentacaoPessoalTab: React.FC<DocumentacaoPessoalTabProps> = ({
           <FileUpload
             onUpload={async (files) => {
               if (files.length > 0) {
-                cnhData.arquivo_url = URL.createObjectURL(files[0]);
-                setCnhData({...cnhData});
+                const file = files[0]
+                const blobUrl = URL.createObjectURL(file)
+                console.log('📤 CNH selecionada:', { nome: file.name, tamanho: file.size, tipo: file.type })
+                setCnhData((prev) => ({
+                  ...prev,
+                  arquivo_url: blobUrl
+                }))
               }
             }}
             multiple={false}

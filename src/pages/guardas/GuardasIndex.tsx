@@ -3,7 +3,7 @@
  * Gerenciamento de empresas, guardas e diárias
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Shield, Building2, Users, FileText, Plus, Search, Calendar, DollarSign } from 'lucide-react';
 import { Layout } from "../../components/layout/Layout";
 import { Button } from "../../components/shared/Button";
@@ -11,21 +11,52 @@ import { Input } from '../../components/ui/input';
 import { EmpresasGuardaTab } from '../../components/guardas/EmpresasGuardaTab';
 import { GuardasTab } from '../../components/guardas/GuardasTab';
 import { DiariasGuardaTab } from '../../components/guardas/DiariasGuardaTab';
-import { getEstatisticasGuardas, mockDiariasGuarda } from '../../mocks/guardas-mock';
+import { obterEstatisticasGuardas, listarDiarias } from '../../lib/guardasApi';
+import type { DiariaGuardaCompleta } from '../../types/guardas';
 
 type TabType = 'empresas' | 'guardas' | 'diarias';
 
 const GuardasIndex: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('diarias');
+  const [todasDiarias, setTodasDiarias] = useState<DiariaGuardaCompleta[]>([]);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [stats, setStats] = useState({
+    totalEmpresas: 0,
+    totalGuardas: 0,
+    totalDiarias: 0,
+    valorTotal: 0,
+    valorMedio: 0,
+  });
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTurno, setSelectedTurno] = useState('');
+
+  // Carregar dados ao montar
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    setIsLoadingStats(true);
+    try {
+      const [estatisticas, diarias] = await Promise.all([
+        obterEstatisticasGuardas(),
+        listarDiarias(),
+      ]);
+      setStats(estatisticas);
+      setTodasDiarias(diarias);
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
   
   // Filtrar diárias
   const diariasFiltradas = useMemo(() => {
-    return mockDiariasGuarda.filter((diaria) => {
+    return todasDiarias.filter((diaria) => {
       const matchSearch =
         searchTerm === '' ||
         diaria.guarda_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -39,39 +70,38 @@ const GuardasIndex: React.FC = () => {
 
       return matchSearch && matchDate && matchTurno;
     });
-  }, [searchTerm, selectedDate, selectedTurno]);
+  }, [todasDiarias, searchTerm, selectedDate, selectedTurno]);
 
   // Estatísticas filtradas
-  const stats = useMemo(() => {
-    const baseStats = getEstatisticasGuardas();
-    const valorTotalFiltrado = diariasFiltradas.reduce((acc, d) => acc + d.valor_diaria, 0);
+  const statsExibidos = useMemo(() => {
+    const valorTotalFiltrado = diariasFiltradas.reduce((acc, d) => acc + (d.valor_diaria || 0), 0);
     
     return {
-      ...baseStats,
+      ...stats,
       totalDiarias: diariasFiltradas.length,
       valorTotal: valorTotalFiltrado,
       valorMedio: diariasFiltradas.length > 0 ? valorTotalFiltrado / diariasFiltradas.length : 0,
     };
-  }, [diariasFiltradas]);
+  }, [stats, diariasFiltradas]);
 
   const tabs = [
     {
       id: 'diarias' as TabType,
       label: 'Diárias',
       icon: FileText,
-      count: stats.totalDiarias,
+      count: statsExibidos.totalDiarias,
     },
     {
       id: 'guardas' as TabType,
       label: 'Guardas',
       icon: Users,
-      count: stats.totalGuardas,
+      count: statsExibidos.totalGuardas,
     },
     {
       id: 'empresas' as TabType,
       label: 'Empresas',
       icon: Building2,
-      count: stats.totalEmpresas,
+      count: statsExibidos.totalEmpresas,
     },
   ];
 
@@ -101,7 +131,7 @@ const GuardasIndex: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 font-medium">Total de Diárias</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalDiarias}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statsExibidos.totalDiarias}</p>
                 </div>
               </div>
             </div>
@@ -114,7 +144,7 @@ const GuardasIndex: React.FC = () => {
                 <div>
                   <p className="text-sm text-gray-600 font-medium">Valor Total</p>
                   <p className="text-xl font-bold text-gray-900">
-                    R$ {stats.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {statsExibidos.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -127,7 +157,7 @@ const GuardasIndex: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 font-medium">Guardas Ativos</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalGuardas}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statsExibidos.totalGuardas}</p>
                 </div>
               </div>
             </div>
@@ -139,7 +169,7 @@ const GuardasIndex: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 font-medium">Empresas</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalEmpresas}</p>
+                  <p className="text-2xl font-bold text-gray-900">{statsExibidos.totalEmpresas}</p>
                 </div>
               </div>
             </div>
@@ -283,7 +313,7 @@ const GuardasIndex: React.FC = () => {
                 diariasFiltradas={diariasFiltradas}
                 onDiariasChange={() => {
                   // Recarregar estatísticas quando diárias mudarem
-                  window.location.reload();
+                  carregarDados();
                 }}
               />
             )}

@@ -45,6 +45,25 @@ export async function getMedicaoById(id: string): Promise<ObraMedicao | null> {
  * Cria uma nova medição
  */
 export async function createMedicao(input: CreateMedicaoInput): Promise<ObraMedicao> {
+  // Buscar o número da próxima medição para esta obra
+  const { data: existingMedicoes, error: countError } = await supabase
+    .from('obras_medicoes')
+    .select('measurement_number')
+    .eq('obra_id', input.obra_id)
+    .order('measurement_number', { ascending: false })
+    .limit(1)
+  
+  if (countError) {
+    console.error('Erro ao contar medições:', countError)
+  }
+  
+  // Próximo número de medição (ou 1 se for a primeira)
+  const proximoNumero = existingMedicoes && existingMedicoes.length > 0 
+    ? (existingMedicoes[0].measurement_number || 0) + 1 
+    : 1
+  
+  console.log(`📊 Criando medição #${proximoNumero} para obra ${input.obra_id}`)
+  
   const { data, error } = await supabase
     .from('obras_medicoes')
     .insert({
@@ -52,15 +71,21 @@ export async function createMedicao(input: CreateMedicaoInput): Promise<ObraMedi
       nota_fiscal_id: input.nota_fiscal_id,
       descricao: input.descricao,
       arquivo_medicao_url: input.arquivo_medicao_url,
-      data_medicao: input.data_medicao
+      data_medicao: input.data_medicao,
+      measurement_number: proximoNumero,
+      measurement_date: input.data_medicao,
+      measured_value: 0, // Será preenchido depois
+      status: 'pendente'
     })
     .select()
     .single()
   
   if (error) {
     console.error('Erro ao criar medição:', error)
-    throw new Error('Erro ao criar medição')
+    throw new Error(`Erro ao criar medição: ${error.message}`)
   }
+  
+  console.log('✅ Medição criada com sucesso:', data)
   
   return data
 }

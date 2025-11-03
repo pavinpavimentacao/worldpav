@@ -214,7 +214,7 @@ const ColaboradoresListMock: React.FC = () => {
 
   return (
     <Layout>
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="md:flex md:items-center md:justify-between">
           <div className="min-w-0 flex-1">
