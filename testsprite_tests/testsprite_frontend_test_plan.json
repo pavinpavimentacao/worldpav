@@ -1,0 +1,649 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Login with Valid Credentials",
+    "description": "Verify that users can log in successfully using valid credentials and receive a valid JWT token.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Input valid username/email and password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that login is successful and JWT token is received."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Login with Invalid Credentials",
+    "description": "Ensure that login fails when using incorrect username/email or password.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Input invalid username/email and/or password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that login fails and an appropriate error message is shown."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Create New Project",
+    "description": "Verify that a project manager can create a new project with client linkage, timeline, segments, and financial details.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the 'New Project' page."
+      },
+      {
+        "type": "action",
+        "description": "Fill in all required project fields including client selection, timelines, segments, and budgets."
+      },
+      {
+        "type": "action",
+        "description": "Submit the project creation form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the project is created, saved in the database, and visible in the project list."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Edit Existing Project",
+    "description": "Verify the ability to update details of an existing project including schedule, segments, and financial info.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to an existing project details page."
+      },
+      {
+        "type": "action",
+        "description": "Edit the project’s timeline, segments, and financial details."
+      },
+      {
+        "type": "action",
+        "description": "Save the changes."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the updates are persisted and reflected correctly in the project summary."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Delete a Project",
+    "description": "Verify that a project manager can delete an existing project and that it is removed from the system.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to an existing project details page."
+      },
+      {
+        "type": "action",
+        "description": "Perform the delete action and confirm the deletion."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the project no longer appears in the project list and associated data is cleared."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Schedule Teams and Machinery Using Drag-and-Drop Calendar",
+    "description": "Verify coordinators can assign teams and machinery to projects using the interactive calendar with drag-and-drop functionality.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the Pavement Scheduling calendar."
+      },
+      {
+        "type": "action",
+        "description": "Drag a team or machinery item onto a calendar date/time slot."
+      },
+      {
+        "type": "action",
+        "description": "Modify schedule by dragging to another slot."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the schedule updates correctly and persists in the system."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Daily Work Report Submission with Photo Upload",
+    "description": "Verify field teams can submit daily progress reports including photo evidence, materials used, equipment status, and weather conditions.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the daily reports submission page."
+      },
+      {
+        "type": "action",
+        "description": "Fill in work progress details, materials used, equipment info, weather data."
+      },
+      {
+        "type": "action",
+        "description": "Upload photo evidence."
+      },
+      {
+        "type": "action",
+        "description": "Submit the daily report."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the report is saved and displayed in daily reports list."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Attendance and Overtime Calculation",
+    "description": "Verify the system calculates daily attendance and automatic overtime for collaborators and generates accurate payroll reports.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the Daily Work Control attendance page."
+      },
+      {
+        "type": "action",
+        "description": "Input attendance time and extra hours for collaborators."
+      },
+      {
+        "type": "action",
+        "description": "Save the attendance records."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify overtime is correctly calculated and reports reflect the correct values."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Manage Machinery Registration, Insurance, and Maintenance",
+    "description": "Verify complete CRUD operations for machinery items including registration, insurance details, licenses, fuel consumption, and maintenance records.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to machinery management page."
+      },
+      {
+        "type": "action",
+        "description": "Create a new machinery record with all required data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify machinery appears in the list with correct details."
+      },
+      {
+        "type": "action",
+        "description": "Edit the machinery data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify updates are saved and reflected."
+      },
+      {
+        "type": "action",
+        "description": "Delete the machinery record."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the record is removed from the system."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Client Profile Creation and Project History Verification",
+    "description": "Verify that clients can be created with full profile information and their associated project histories are accurately displayed.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to client management module."
+      },
+      {
+        "type": "action",
+        "description": "Create a new client with all necessary profile details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the client profile is saved and displayed."
+      },
+      {
+        "type": "action",
+        "description": "Associate projects with the client."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that client’s project history is correctly shown."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Accounts Payable Invoice Management and Alerts",
+    "description": "Verify full accounts payable flows including invoice creation, payment processing, due date tracking, and automatic alert generation.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to Accounts Payable module."
+      },
+      {
+        "type": "action",
+        "description": "Create a new invoice with payment and due date details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify invoice is stored and listed correctly."
+      },
+      {
+        "type": "action",
+        "description": "Mark invoice as paid."
+      },
+      {
+        "type": "assertion",
+        "description": "Check payment status updates and related KPIs."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify automatic alerts trigger near invoice due dates."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Real-Time Dashboard KPIs and Alert Accuracy",
+    "description": "Verify that the executive dashboard displays real-time KPIs, productivity charts, and alerts reflecting current data from multiple modules.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the Executive Dashboard."
+      },
+      {
+        "type": "assertion",
+        "description": "Validate KPIs and graphs correspond to recent project and financial data."
+      },
+      {
+        "type": "assertion",
+        "description": "Trigger an alert condition (e.g., delayed project) and verify alert appears in real-time."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Role-Based Access Control Enforcement",
+    "description": "Verify that system roles (project manager, coordinator, finance personnel) have access only to permitted modules and actions, enforced via RLS and authorization.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a project manager and attempt to perform coordinator-only operations."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access is denied to coordinator-only actions."
+      },
+      {
+        "type": "action",
+        "description": "Log in as finance personnel and try to access project management pages."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify access is restricted as per role."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Offline Mode Data Access and Sync",
+    "description": "Verify PWA offline capabilities allowing read access to cached data and queuing changes to sync automatically once connection is restored.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Go offline and navigate through cached pages such as project lists and dashboards."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify data is accessible and consistent without network."
+      },
+      {
+        "type": "action",
+        "description": "Perform data changes offline such as adding notes or reports."
+      },
+      {
+        "type": "action",
+        "description": "Reconnect to network and verify queued changes sync correctly."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify no data loss or conflicts occur after sync."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Service Catalog CRUD Operations",
+    "description": "Validate creation, update, listing, and deletion of paving services including pricing and unit control.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to service catalog."
+      },
+      {
+        "type": "action",
+        "description": "Add a new service with price and unit."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm new service is listed correctly."
+      },
+      {
+        "type": "action",
+        "description": "Update the service details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify updates are saved and displayed."
+      },
+      {
+        "type": "action",
+        "description": "Delete the service."
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm the service is removed from the catalog."
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Export Reports to Excel and PDF",
+    "description": "Verify users can export custom and standard reports in Excel and PDF formats with proper formatting and data accuracy.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to report generation page."
+      },
+      {
+        "type": "action",
+        "description": "Generate a report with specified parameters."
+      },
+      {
+        "type": "action",
+        "description": "Export the report to Excel."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the Excel file downloads and contains correct data."
+      },
+      {
+        "type": "action",
+        "description": "Export the same report to PDF."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the PDF file downloads and formatting is correct."
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Collaborator Status and Document Management",
+    "description": "Verify collaborator CRUD including uploading documentation, status changes, team assignments, and vacation tracking.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create a new collaborator with necessary personal and contract info."
+      },
+      {
+        "type": "action",
+        "description": "Upload related documents such as ID and contracts."
+      },
+      {
+        "type": "action",
+        "description": "Set collaborator status and assign to a team."
+      },
+      {
+        "type": "action",
+        "description": "Update vacation and absence records."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all data is saved and visible in collaborator detail view."
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Supplier Pricing and Payment Tracking",
+    "description": "Validate supplier management features including pricing tables, receiving RR2C loads, and tracking payments for suppliers.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create or edit a supplier with contact and contract details."
+      },
+      {
+        "type": "action",
+        "description": "Manage pricing tables and update costs for materials."
+      },
+      {
+        "type": "action",
+        "description": "Record RR2C loads received."
+      },
+      {
+        "type": "action",
+        "description": "Track and update payments made to suppliers."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify correct association between loads, pricing, and payment statuses."
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Security: JWT Token Expiry and Refresh",
+    "description": "Verify that JWT tokens expire as expected and the refresh token mechanism allows session continuation without manual login.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in and obtain a JWT token."
+      },
+      {
+        "type": "action",
+        "description": "Simulate token expiry."
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure access is denied after expiry."
+      },
+      {
+        "type": "action",
+        "description": "Use refresh token to obtain a new JWT."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that a new token is received and session continues without re-login."
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "Performance: Load Time under 3 Seconds on 4G",
+    "description": "Verify that critical pages such as Dashboard, Project List and Scheduling load completely within 3 seconds on simulated 4G networks.",
+    "category": "performance",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Using network throttling, simulate 4G condition."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to Dashboard page."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify full page load time is under 3 seconds."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to Project Management page."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify full page load time is under 3 seconds."
+      },
+      {
+        "type": "action",
+        "description": "Navigate to Pavement Scheduling calendar."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify full page load time is under 3 seconds."
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Error Handling: Invalid Data Entry in Forms",
+    "description": "Verify appropriate validation error messages are displayed when submitting invalid or incomplete data in forms throughout the system.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open any form (e.g. new project, new client, new report)."
+      },
+      {
+        "type": "action",
+        "description": "Submit the form leaving required fields empty or entering invalid data formats."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify validation errors are shown and submission is blocked."
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Push Notifications for Alerts",
+    "description": "Verify that push notifications are sent and displayed correctly for system alerts such as upcoming due invoices, project delays, and new messages.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Configure browser to accept push notifications."
+      },
+      {
+        "type": "action",
+        "description": "Trigger a system alert like an invoice due date within notification timeframe."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the push notification is received and shown while user is active/inactive on the app."
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "User Notes with Markdown and Advanced Filtering",
+    "description": "Verify users can create, edit, and delete notes with markdown formatting, and filter/search notes based on categories and keywords.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the notes section."
+      },
+      {
+        "type": "action",
+        "description": "Create a new note with markdown content."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify note is saved and renders markdown correctly."
+      },
+      {
+        "type": "action",
+        "description": "Apply filters or search terms."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify results match filters/search."
+      },
+      {
+        "type": "action",
+        "description": "Delete a note."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify note is removed from the list."
+      }
+    ]
+  }
+]

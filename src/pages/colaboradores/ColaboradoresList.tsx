@@ -4,7 +4,6 @@ import { Layout } from "../../components/layout/Layout";
 import { Button } from "../../components/shared/Button";
 import { Input } from '../../components/ui/input';
 import { Select } from "../../components/shared/Select";
-import { ColaboradorForm } from "../../components/forms/ColaboradorForm";
 import {
   Plus,
   Search,
@@ -45,9 +44,8 @@ const ColaboradoresList: React.FC = () => {
   // State
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [equipesMap, setEquipesMap] = useState<Map<string, string>>(new Map()); // ✅ Mapa de equipe_id -> nome
+  const [equipesList, setEquipesList] = useState<Array<{ id: string; name: string }>>([]); // ✅ Lista de equipes
   const [isLoading, setIsLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedColaborador, setSelectedColaborador] = useState<Colaborador | null>(null);
   const [companyId, setCompanyId] = useState<string>('');
 
   // Filtros
@@ -78,6 +76,7 @@ const ColaboradoresList: React.FC = () => {
         map.set(eq.id, eq.name);
       });
       setEquipesMap(map);
+      setEquipesList(equipes); // ✅ Armazenar lista de equipes para renderização
       console.log('✅ [ColaboradoresList] Equipes carregadas no map:', Array.from(map.entries()));
     } catch (error) {
       console.error('❌ [ColaboradoresList] Erro ao carregar equipes:', error);
@@ -123,8 +122,7 @@ const ColaboradoresList: React.FC = () => {
   };
 
   const handleEdit = (colaborador: Colaborador) => {
-    setSelectedColaborador(colaborador);
-    setShowForm(true);
+    navigate(`/colaboradores/${colaborador.id}`);
   };
 
   const handleDelete = async (id: string) => {
@@ -140,16 +138,6 @@ const ColaboradoresList: React.FC = () => {
       console.error('Erro ao excluir colaborador:', error);
       toast.error(error.message || 'Erro ao excluir colaborador');
     }
-  };
-
-  const handleFormClose = () => {
-    setShowForm(false);
-    setSelectedColaborador(null);
-  };
-
-  const handleFormSuccess = () => {
-    handleFormClose();
-    loadColaboradores();
   };
 
   // Filtros aplicados
@@ -207,10 +195,31 @@ const ColaboradoresList: React.FC = () => {
 
   // Estatísticas para exibição
   const totalColaboradores = stats.total;
-  const equipeA = stats.massa; // Equipe de massa = equipe A
-  const equipeB = 0; // Não temos equipe B no novo sistema
-  const equipeAdministrativa = stats.administrativa;
   const registrados = stats.ativos; // Assumindo que ativos = registrados
+
+  // ✅ Calcular estatísticas por equipe real
+  const equipesStats = useMemo(() => {
+    const statsMap = new Map<string, number>();
+    
+    // Inicializar com 0 para todas as equipes
+    equipesList.forEach(equipe => {
+      statsMap.set(equipe.id, 0);
+    });
+    
+    // Contar colaboradores por equipe
+    colaboradores.forEach(colab => {
+      if (colab.equipe_id) {
+        const current = statsMap.get(colab.equipe_id) || 0;
+        statsMap.set(colab.equipe_id, current + 1);
+      }
+    });
+    
+    return Array.from(equipesList).map(equipe => ({
+      id: equipe.id,
+      nome: equipe.name,
+      total: statsMap.get(equipe.id) || 0
+    }));
+  }, [colaboradores, equipesList]);
 
   return (
     <Layout>
@@ -226,7 +235,7 @@ const ColaboradoresList: React.FC = () => {
             </p>
           </div>
           <div className="mt-4 flex md:ml-4 md:mt-0">
-            <Button onClick={() => setShowForm(true)}>
+            <Button onClick={() => navigate('/colaboradores/new')}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Colaborador
             </Button>
@@ -234,7 +243,8 @@ const ColaboradoresList: React.FC = () => {
         </div>
 
         {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-auto" style={{ gridTemplateColumns: `repeat(${Math.min(equipesStats.length + 2, 5)}, minmax(0, 1fr))` }}>
+          {/* Card Total */}
           <div className="card flex items-center p-4">
             <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
               <Users className="h-6 w-6 text-blue-600" />
@@ -245,36 +255,32 @@ const ColaboradoresList: React.FC = () => {
             </div>
           </div>
 
-          <div className="card flex items-center p-4">
-            <div className="flex-shrink-0 bg-orange-100 rounded-md p-3">
-              <HardHat className="h-6 w-6 text-orange-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Equipe A</p>
-              <p className="text-xl font-semibold text-gray-900">{equipeA}</p>
-            </div>
-          </div>
+          {/* Cards dinâmicos por equipe */}
+          {equipesStats.map((equipe, index) => {
+            // Cores alternadas para as equipes
+            const colors = [
+              { bg: 'bg-orange-100', text: 'text-orange-600' },
+              { bg: 'bg-purple-100', text: 'text-purple-600' },
+              { bg: 'bg-red-100', text: 'text-red-600' },
+              { bg: 'bg-indigo-100', text: 'text-indigo-600' },
+              { bg: 'bg-pink-100', text: 'text-pink-600' },
+            ];
+            const color = colors[index % colors.length];
+            
+            return (
+              <div key={equipe.id} className="card flex items-center p-4">
+                <div className={`flex-shrink-0 ${color.bg} rounded-md p-3`}>
+                  <HardHat className={`h-6 w-6 ${color.text}`} />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">{equipe.nome}</p>
+                  <p className="text-xl font-semibold text-gray-900">{equipe.total}</p>
+                </div>
+              </div>
+            );
+          })}
 
-          <div className="card flex items-center p-4">
-            <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
-              <HardHat className="h-6 w-6 text-red-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Equipe B</p>
-              <p className="text-xl font-semibold text-gray-900">{equipeB}</p>
-            </div>
-          </div>
-
-          <div className="card flex items-center p-4">
-            <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-              <Briefcase className="h-6 w-6 text-purple-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Equipe Administrativa</p>
-              <p className="text-xl font-semibold text-gray-900">{equipeAdministrativa}</p>
-            </div>
-          </div>
-
+          {/* Card Registrados */}
           <div className="card flex items-center p-4">
             <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
               <UserCheck className="h-6 w-6 text-green-600" />
@@ -493,15 +499,6 @@ const ColaboradoresList: React.FC = () => {
         </div>
       </div>
 
-      {/* Form Modal */}
-      {showForm && (
-        <ColaboradorForm
-          colaborador={selectedColaborador}
-          onClose={handleFormClose}
-          onSuccess={handleFormSuccess}
-          companyId={companyId}
-        />
-      )}
     </Layout>
   );
 };

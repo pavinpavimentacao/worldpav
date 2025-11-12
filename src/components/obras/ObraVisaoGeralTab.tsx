@@ -7,7 +7,7 @@ import {
   FileText
 } from 'lucide-react'
 import { Obra } from '../../lib/obrasApi'
-import { getServicosObra } from '../../lib/obrasServicosApi'
+import { getServicosObra, calcularValorExecutadoPorMetragem } from '../../lib/obrasServicosApi'
 
 interface ObraVisaoGeralTabProps {
   obraId: string
@@ -33,17 +33,15 @@ export function ObraVisaoGeralTab({ obraId, obra }: ObraVisaoGeralTabProps) {
         setFaturamentoPrevisto(previstoCalculado)
         console.log('📋 Faturamento Previsto:', { volumePlanejamento, precoTotalServicos, total: previstoCalculado })
         
-        // Valor Executado = Soma dos serviços (metragem_executada × preço_unitário)
+        // Valor Executado = Metragem executada real das ruas × Preço por m²
         if (obra.status === 'concluida' && obra.executed_value) {
           setValorExecutado(obra.executed_value)
           console.log('🏁 Obra concluída - Valor congelado:', obra.executed_value)
         } else {
-          // Somar valor_total de todos os serviços (já calculados com ruas finalizadas)
-          const valorExecutadoReal = servicos.reduce((total, servico) => 
-            total + (servico.valor_total || 0), 0
-          )
+          // Calcular valor executado baseado na metragem REAL executada das ruas
+          const valorExecutadoReal = await calcularValorExecutadoPorMetragem(obraId)
           setValorExecutado(valorExecutadoReal)
-          console.log('🔄 Valor Executado (soma dos serviços):', valorExecutadoReal)
+          console.log('🔄 Valor Executado (metragem real executada):', valorExecutadoReal)
         }
       } catch (error) {
         console.error('Erro ao carregar dados financeiros:', error)

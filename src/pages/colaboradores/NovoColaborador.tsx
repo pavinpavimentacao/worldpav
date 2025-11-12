@@ -26,20 +26,65 @@ import { getOrCreateDefaultCompany, WORLDPAV_COMPANY_ID, PAVIN_COMPANY_ID } from
 import { TIPO_EQUIPE_OPTIONS, TIPO_CONTRATO_OPTIONS, getFuncoesOptions, TipoEquipe } from '../../types/colaboradores'
 import { getEquipes } from '../../lib/equipesApi'
 
-// Schema de validação
+// Schema de validação com validações robustas
 const schema = z.object({
-  nome: z.string().min(1, 'O nome é obrigatório'),
+  nome: z.string()
+    .min(3, 'O nome deve ter no mínimo 3 caracteres')
+    .max(100, 'O nome deve ter no máximo 100 caracteres')
+    .regex(/^[a-zA-ZÀ-ÿ\s]+$/, 'O nome deve conter apenas letras')
+    .refine(val => val.trim().split(' ').length >= 2, 'Digite o nome completo'),
+  
+  cpf: z.string()
+    .min(1, 'O CPF é obrigatório')
+    .refine(val => {
+      const cleanCPF = unformatCPF(val);
+      return cleanCPF.length === 11;
+    }, 'CPF deve ter 11 dígitos')
+    .refine(val => isValidCPF(val), 'CPF inválido'),
+  
+  rg: z.string()
+    .min(1, 'O RG é obrigatório')
+    .refine(val => {
+      const cleanRG = unformatRG(val);
+      return cleanRG.length >= 7 && cleanRG.length <= 9;
+    }, 'RG deve ter entre 7 e 9 dígitos'),
+  
+  telefone: z.string()
+    .min(1, 'O telefone é obrigatório')
+    .refine(val => isValidPhone(val), 'Telefone inválido. Use o formato (11) 99999-9999'),
+  
+  email: z.string()
+    .min(1, 'O email é obrigatório')
+    .email('Email inválido')
+    .refine(val => isValidEmail(val), 'Formato de email inválido')
+    .transform(val => val.toLowerCase().trim()),
+  
+  dataAdmissao: z.string()
+    .min(1, 'A data de admissão é obrigatória')
+    .refine(val => {
+      const dataAdmissao = new Date(val);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      return dataAdmissao <= hoje;
+    }, 'A data de admissão não pode ser futura'),
+  
   funcao: z.string().min(1, 'A função é obrigatória'),
-  tipoEquipe: z.string().min(1, 'O tipo de equipe é obrigatório'),
-  tipoContrato: z.string().min(1, 'O tipo de contrato é obrigatório'),
-  telefone: z.string().min(1, 'O telefone é obrigatório'),
-  email: z.string().email('Email inválido'),
-  dataAdmissao: z.string().min(1, 'A data de admissão é obrigatória'),
-  salario: z.number().min(0, 'O salário deve ser maior que 0'),
-  status: z.enum(['ativo', 'inativo'], { required_error: 'Selecione o status' }),
-  empresa: z.string().min(1, 'A empresa é obrigatória'),
-  cpf: z.string().min(1, 'O CPF é obrigatório'),
-  rg: z.string().min(1, 'O RG é obrigatório')
+  
+  tipoEquipe: z.string().min(1, 'Selecione uma equipe'),
+  
+  tipoContrato: z.string().min(1, 'Selecione o tipo de contrato'),
+  
+  salario: z.number()
+    .positive('O salário deve ser maior que zero')
+    .min(100, 'O salário deve ser no mínimo R$ 100,00')
+    .max(1000000, 'O salário parece incorreto'),
+  
+  status: z.enum(['ativo', 'inativo'], { 
+    required_error: 'Selecione o status',
+    invalid_type_error: 'Status inválido'
+  }),
+  
+  empresa: z.string().min(1, 'Selecione uma empresa')
 })
 
 type FormValues = z.infer<typeof schema>
@@ -108,9 +153,60 @@ const NovoColaborador: React.FC = () => {
     email?: string;
   }>({})
 
+  // Estado para verificar duplicidade
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false)
+
   // Observar mudanças no tipo de equipe para atualizar funções
   const tipoEquipeSelecionado = watch('tipoEquipe') as TipoEquipe
   const funcoesOptions = getFuncoesOptions(tipoEquipeSelecionado)
+
+  // Função para verificar se CPF já existe
+  const verificarCPFExistente = async (cpf: string): Promise<boolean> => {
+    const cleanCPF = unformatCPF(cpf);
+    if (cleanCPF.length !== 11) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('colaboradores')
+        .select('id, nome')
+        .eq('cpf', cleanCPF)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erro ao verificar CPF:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Erro ao verificar CPF:', error);
+      return false;
+    }
+  }
+
+  // Função para verificar se Email já existe
+  const verificarEmailExistente = async (email: string): Promise<boolean> => {
+    const cleanEmail = email.toLowerCase().trim();
+    if (!isValidEmail(cleanEmail)) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('colaboradores')
+        .select('id, nome')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Erro ao verificar email:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Erro ao verificar email:', error);
+      return false;
+    }
+  }
 
   // Função para formatar e validar campos
   const handleFieldChange = (field: string, value: string) => {
@@ -125,8 +221,9 @@ const NovoColaborador: React.FC = () => {
       }
     } else if (field === 'rg') {
       formattedValue = formatRG(value);
-      if (value && value.length > 0 && value.length < 9) {
-        validationError = 'RG deve ter 9 dígitos';
+      const cleanRG = unformatRG(value);
+      if (value && cleanRG.length > 0 && cleanRG.length < 7) {
+        validationError = 'RG deve ter no mínimo 7 dígitos';
       }
     } else if (field === 'telefone') {
       formattedValue = formatPhone(value);
@@ -150,9 +247,68 @@ const NovoColaborador: React.FC = () => {
     }));
   }
 
+  // Função para verificar duplicidade ao sair do campo (onBlur)
+  const handleFieldBlur = async (field: string, value: string) => {
+    if (field === 'cpf' && value) {
+      const cleanCPF = unformatCPF(value);
+      if (cleanCPF.length === 11 && isValidCPF(value)) {
+        setCheckingDuplicate(true);
+        const existe = await verificarCPFExistente(value);
+        setCheckingDuplicate(false);
+        
+        if (existe) {
+          setValidationErrors((prev) => ({
+            ...prev,
+            cpf: 'Este CPF já está cadastrado no sistema',
+          }));
+        }
+      }
+    } else if (field === 'email' && value) {
+      if (isValidEmail(value)) {
+        setCheckingDuplicate(true);
+        const existe = await verificarEmailExistente(value);
+        setCheckingDuplicate(false);
+        
+        if (existe) {
+          setValidationErrors((prev) => ({
+            ...prev,
+            email: 'Este email já está cadastrado no sistema',
+          }));
+        }
+      }
+    }
+  }
+
   const onSubmit = async (data: FormValues) => {
     try {
       setIsSubmitting(true)
+
+      // Verificar se há erros de validação customizados
+      if (Object.keys(validationErrors).some(key => validationErrors[key as keyof typeof validationErrors])) {
+        toast.error('Corrija os erros de validação antes de continuar');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Verificar duplicidade de CPF
+      console.log('🔍 Verificando duplicidade de CPF...');
+      const cpfExiste = await verificarCPFExistente(data.cpf);
+      if (cpfExiste) {
+        toast.error('Este CPF já está cadastrado no sistema');
+        setValidationErrors(prev => ({ ...prev, cpf: 'Este CPF já está cadastrado' }));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Verificar duplicidade de Email
+      console.log('🔍 Verificando duplicidade de Email...');
+      const emailExiste = await verificarEmailExistente(data.email);
+      if (emailExiste) {
+        toast.error('Este email já está cadastrado no sistema');
+        setValidationErrors(prev => ({ ...prev, email: 'Este email já está cadastrado' }));
+        setIsSubmitting(false);
+        return;
+      }
       
       // Obter ou criar empresas se necessário
       console.log('🏢 Verificando empresas...');
@@ -311,15 +467,27 @@ const NovoColaborador: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                   CPF *
                     </label>
+                <div className="relative">
                 <Input
                   {...register('cpf')}
                   onChange={(e) => handleFieldChange('cpf', e.target.value)}
+                      onBlur={(e) => handleFieldBlur('cpf', e.target.value)}
                   placeholder="000.000.000-00"
-                  className={errors.cpf || validationErrors.cpf ? 'border-red-500' : ''}
+                      className={errors.cpf || validationErrors.cpf ? 'border-red-500' : ''}
+                      maxLength={14}
                 />
+                  {checkingDuplicate && watch('cpf') && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  )}
+                </div>
                 {(errors.cpf || validationErrors.cpf) && (
                   <p className="text-red-500 text-sm mt-1">{errors.cpf?.message || validationErrors.cpf}</p>
                 )}
+                  {!errors.cpf && !validationErrors.cpf && watch('cpf') && isValidCPF(watch('cpf')) && (
+                    <p className="text-green-600 text-sm mt-1">✓ CPF válido</p>
+                  )}
               </div>
 
                   <div>
@@ -330,11 +498,15 @@ const NovoColaborador: React.FC = () => {
                   {...register('rg')}
                   onChange={(e) => handleFieldChange('rg', e.target.value)}
                   placeholder="00.000.000-0"
-                  className={errors.rg || validationErrors.rg ? 'border-red-500' : ''}
+                      className={errors.rg || validationErrors.rg ? 'border-red-500' : ''}
+                      maxLength={12}
                 />
                 {(errors.rg || validationErrors.rg) && (
                   <p className="text-red-500 text-sm mt-1">{errors.rg?.message || validationErrors.rg}</p>
                 )}
+                  {!errors.rg && !validationErrors.rg && watch('rg') && unformatRG(watch('rg')).length >= 7 && (
+                    <p className="text-green-600 text-sm mt-1">✓ RG válido</p>
+                  )}
               </div>
 
                   <div>
@@ -520,27 +692,42 @@ const NovoColaborador: React.FC = () => {
                   {...register('telefone')}
                   onChange={(e) => handleFieldChange('telefone', e.target.value)}
                   placeholder="(11) 99999-9999"
-                  className={errors.telefone || validationErrors.telefone ? 'border-red-500' : ''}
+                      className={errors.telefone || validationErrors.telefone ? 'border-red-500' : ''}
+                      maxLength={15}
                     />
                     {(errors.telefone || validationErrors.telefone) && (
                   <p className="text-red-500 text-sm mt-1">{errors.telefone?.message || validationErrors.telefone}</p>
                 )}
+                    {!errors.telefone && !validationErrors.telefone && watch('telefone') && isValidPhone(watch('telefone')) && (
+                      <p className="text-green-600 text-sm mt-1">✓ Telefone válido</p>
+                    )}
               </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email *
                     </label>
+                <div className="relative">
                 <Input
                   {...register('email')}
                   onChange={(e) => handleFieldChange('email', e.target.value)}
+                        onBlur={(e) => handleFieldBlur('email', e.target.value)}
                       type="email"
                   placeholder="email@exemplo.com"
                   className={errors.email || validationErrors.email ? 'border-red-500' : ''}
                     />
+                      {checkingDuplicate && watch('email') && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                        </div>
+                      )}
+                </div>
                     {(errors.email || validationErrors.email) && (
                   <p className="text-red-500 text-sm mt-1">{errors.email?.message || validationErrors.email}</p>
                 )}
+                    {!errors.email && !validationErrors.email && watch('email') && isValidEmail(watch('email')) && (
+                      <p className="text-green-600 text-sm mt-1">✓ Email válido</p>
+                    )}
           </div>
 
             </div>

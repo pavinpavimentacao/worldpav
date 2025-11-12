@@ -496,6 +496,7 @@ export async function criarDiaria(input: {
       .from('obras_ruas')
       .select('name')
       .eq('id', input.rua_id)
+      .is('deleted_at', null)
       .single();
     ruaNome = rua?.name;
   }
@@ -573,6 +574,7 @@ export async function atualizarDiaria(
       .from('obras_ruas')
       .select('name')
       .eq('id', input.rua_id)
+      .is('deleted_at', null)
       .single();
     updateData.rua_nome = rua?.name;
   }

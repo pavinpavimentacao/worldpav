@@ -8,7 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { formatDateBR } from '../../utils/date-format';
 import type { ProgramacaoPavimentacao } from '../../types/programacao-pavimentacao';
 import { ConfirmarObraModal, DadosConfirmacaoObra } from '../../components/programacao/ConfirmarObraModal';
-import { createRelatorioDiario, finalizarRua, criarFaturamentoRua } from '../../lib/relatoriosDiariosApi';
+import { createRelatorioDiario, finalizarRua } from '../../lib/relatoriosDiariosApi';
+import { calcularPrecoPorM2 } from '../../lib/obrasServicosApi';
 import { getEquipeByPrefixo } from '../../lib/equipesApi';
 import { toast } from '../../lib/toast-hooks';
 import { ProgramacaoPavimentacaoAPI } from '../../lib/programacao-pavimentacao-api';
@@ -203,17 +204,34 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
 
       console.log('✅ Relatório criado:', relatorio.id);
 
-      // 2. FINALIZAR RUA E CRIAR FATURAMENTO
-      await finalizarRua(programacaoSelecionada.rua_id, relatorio.id, dados.data_fim, dados.metragem_feita, dados.toneladas_aplicadas);
-      await criarFaturamentoRua(programacaoSelecionada.obra_id, programacaoSelecionada.rua_id, dados.metragem_feita, 25);
+      // 2. BUSCAR PREÇO POR M² DA OBRA (dos serviços cadastrados)
+      const precoPorM2Obra = await calcularPrecoPorM2(programacaoSelecionada.obra_id);
+      console.log('💰 Preço por m² da obra (serviços):', precoPorM2Obra);
+
+      // 3. FINALIZAR RUA COM O PREÇO CORRETO (sem fallback)
+      if (!precoPorM2Obra || precoPorM2Obra === 0) {
+        throw new Error('Obra não possui serviços cadastrados. Adicione os serviços na aba "Serviços" antes de confirmar.');
+      }
       
-      // 3. ATUALIZAR STATUS DA PROGRAMAÇÃO NO BANCO
+      await finalizarRua(
+        programacaoSelecionada.rua_id, 
+        relatorio.id, 
+        dados.data_fim, 
+        dados.metragem_feita, 
+        dados.toneladas_aplicadas,
+        precoPorM2Obra // Apenas valor real, sem fallback
+      );
+      
+      // NÃO criar faturamento duplicado - a aba Financeiro busca diretamente das ruas
+      console.log('✅ Rua finalizada. Os dados aparecerão automaticamente na aba Financeiro.');
+      
+      // 4. ATUALIZAR STATUS DA PROGRAMAÇÃO NO BANCO
       const programacaoAtualizada = await ProgramacaoPavimentacaoAPI.confirmar(
         programacaoSelecionada.id, 
         relatorio.id
       );
-
-      // 4. ATUALIZAR ESTADO LOCAL
+      
+      // 5. ATUALIZAR ESTADO LOCAL
       setProgramacoes(programacoes.map(p => 
         p.id === programacaoSelecionada.id 
           ? programacaoAtualizada
@@ -222,7 +240,7 @@ const ProgramacaoPavimentacaoList: React.FC = () => {
       
       toast.success(`Rua finalizada! Relatório ${relatorio.id} criado e salvo com sucesso.`);
       
-      // 5. NAVEGAR PARA O RELATÓRIO
+      // 6. NAVEGAR PARA O RELATÓRIO
       setTimeout(() => {
         navigate(`/relatorios-diarios/${relatorio.id}`);
       }, 2000);

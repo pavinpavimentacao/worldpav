@@ -207,19 +207,31 @@ export async function calcularValorExecutadoPorMetragem(obraId: string): Promise
       return 0
     }
 
+    // Se não encontrou ruas com preço, usar preço dos serviços da obra
+    let precoMedio = 0
+    
     if (!ruas || ruas.length === 0) {
-      console.log('⚠️ Nenhuma rua encontrada com preço por m²')
-      return 0
+      console.log('⚠️ Nenhuma rua com preço por m². Buscando preço dos serviços...')
+      
+      // Buscar preço por m² dos serviços da obra
+      precoMedio = await calcularPrecoPorM2(obraId)
+      console.log('💰 Preço por m² dos serviços:', precoMedio)
+    } else {
+      // Calcular preço médio por m² das ruas
+      const precos = ruas
+        .map(rua => parseFloat(rua.preco_por_m2) || 0)
+        .filter(preco => preco > 0)
+      
+      precoMedio = precos.length > 0 
+        ? precos.reduce((total, preco) => total + preco, 0) / precos.length 
+        : 0
     }
 
-    // Calcular preço médio por m²
-    const precos = ruas
-      .map(rua => parseFloat(rua.preco_por_m2) || 0)
-      .filter(preco => preco > 0)
-    
-    const precoMedio = precos.length > 0 
-      ? precos.reduce((total, preco) => total + preco, 0) / precos.length 
-      : 0
+    // Se ainda não tiver preço, retornar 0
+    if (precoMedio === 0) {
+      console.log('⚠️ Nenhum preço disponível (ruas ou serviços)')
+      return 0
+    }
 
     // Calcular valor executado = metragem total × preço médio por m²
     const valorExecutado = metragemTotalExecutada * precoMedio

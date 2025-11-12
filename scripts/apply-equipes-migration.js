@@ -135,3 +135,7 @@ CREATE TRIGGER equipes_updated_at_trigger
 applyMigration();
 
 
+
+
+
+

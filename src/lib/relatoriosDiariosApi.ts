@@ -220,6 +220,7 @@ export async function getRelatoriosDiarios(filtros?: {
             .from('obras_ruas')
             .select('name')
             .eq('id', item.rua_id)
+            .is('deleted_at', null)
             .single()
           if (ruaError) {
             console.error(`❌ [RelatoriosDiariosApi] Erro ao buscar rua:`, ruaError)
@@ -462,6 +463,7 @@ export async function getRelatorioDiarioById(id: string): Promise<RelatorioDiari
         .from('obras_ruas')
         .select('name')
         .eq('id', relatorio.rua_id)
+        .is('deleted_at', null)
         .single()
       if (rua) ruaNome = rua.name
     }
@@ -813,6 +815,7 @@ export async function createRelatorioDiario(data: CreateRelatorioDiarioData): Pr
         .from('obras_ruas')
         .select('name')
         .eq('id', novoRelatorio.rua_id)
+        .is('deleted_at', null)
         .single()
       if (rua) ruaNome = rua.name
     }
@@ -963,7 +966,8 @@ export async function finalizarRua(
   relatorio_id: string,
   data_finalizacao: string,
   metragem_executada: number,
-  toneladas_executadas: number
+  toneladas_executadas: number,
+  preco_por_m2: number
 ): Promise<void> {
   try {
     console.log('🔍 [RelatoriosDiariosApi] Finalizando rua:', {
@@ -971,7 +975,30 @@ export async function finalizarRua(
       relatorio_id,
       data_finalizacao,
       metragem_executada,
-      toneladas_executadas
+      toneladas_executadas,
+      preco_por_m2
+    })
+
+    // Validar que o preço foi fornecido (sem fallback)
+    if (!preco_por_m2 || preco_por_m2 === 0) {
+      throw new Error('Preço por m² não fornecido. Adicione serviços à obra antes de finalizar.')
+    }
+
+    const precoPorM2Final = preco_por_m2
+
+    // Calcular espessura: (toneladas / metragem / densidade) * 100
+    // Densidade do asfalto = 2.4 ton/m³
+    const espessura_calculada = metragem_executada > 0 
+      ? (toneladas_executadas / metragem_executada / 2.4) * 100 
+      : 0
+
+    // Calcular valor total
+    const valor_total = metragem_executada * precoPorM2Final
+
+    console.log('💰 Valores calculados:', {
+      espessura_calculada: espessura_calculada.toFixed(2) + ' cm',
+      preco_por_m2: precoPorM2Final,
+      valor_total: valor_total
     })
 
     // Atualizar rua
@@ -982,7 +1009,11 @@ export async function finalizarRua(
         relatorio_diario_id: relatorio_id,
         data_finalizacao: data_finalizacao,
         metragem_executada: metragem_executada,
-        toneladas_executadas: toneladas_executadas
+        toneladas_utilizadas: toneladas_executadas,
+        toneladas_executadas: toneladas_executadas,
+        preco_por_m2: precoPorM2Final,
+        valor_total: valor_total,
+        espessura_calculada: espessura_calculada
       })
       .eq('id', rua_id)
 

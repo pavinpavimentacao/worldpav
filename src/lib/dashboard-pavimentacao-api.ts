@@ -444,6 +444,7 @@ export class DashboardPavimentacaoApi {
               .from('obras_ruas')
               .select('name')
               .eq('id', prog.rua_id)
+              .is('deleted_at', null)
               .single()
             
             if (rua) rua_nome = rua.name
@@ -587,6 +588,7 @@ export class DashboardPavimentacaoApi {
           .from('obras_ruas')
           .select('name')
           .eq('id', proximaProg.rua_id)
+          .is('deleted_at', null)
           .single()
         
         if (rua) rua_nome = rua.name
@@ -621,6 +623,7 @@ export class DashboardPavimentacaoApi {
         .from('obras_ruas')
         .select('valor_total, created_at')
         .eq('status', 'concluida')
+        .is('deleted_at', null)
         .gte('created_at', mesInicio)
         .lte('created_at', mesFim)
 
@@ -665,6 +668,7 @@ export class DashboardPavimentacaoApi {
         .from('obras_ruas')
         .select('metragem_executada, created_at')
         .eq('status', 'concluida')
+        .is('deleted_at', null)
         .gte('created_at', mesInicio)
         .lte('created_at', mesFim)
 
@@ -688,6 +692,7 @@ export class DashboardPavimentacaoApi {
         .from('obras_ruas')
         .select('toneladas_utilizadas, created_at')
         .eq('status', 'concluida')
+        .is('deleted_at', null)
         .gte('created_at', mesInicio)
         .lte('created_at', mesFim)
 
@@ -785,6 +790,7 @@ export class DashboardPavimentacaoApi {
           obra:obras(name, client:clients(name))
         `)
         .eq('status', 'concluida')
+        .is('deleted_at', null)
         .gte('data_finalizacao', mesInicio)
         .lte('data_finalizacao', mesFim)
         .order('valor_total', { ascending: false })

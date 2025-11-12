@@ -1,0 +1,212 @@
+{
+  "data": "2025-11-02T21:49:04.529Z",
+  "bucketsExistentes": [],
+  "problemasBuckets": [
+    {
+      "tipo": "FALTANDO",
+      "bucket": "colaboradores-documents",
+      "config": {
+        "public": false,
+        "tipos": [
+          "application/pdf",
+          "image/*",
+          "application/zip"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "colaboradores-photos",
+      "config": {
+        "public": false,
+        "tipos": [
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "maquinarios-photos",
+      "config": {
+        "public": false,
+        "tipos": [
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "maquinarios-documents",
+      "config": {
+        "public": false,
+        "tipos": [
+          "application/pdf",
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "obras-photos",
+      "config": {
+        "public": false,
+        "tipos": [
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "notas-fiscais",
+      "config": {
+        "public": false,
+        "tipos": [
+          "application/pdf"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "relatorios-photos",
+      "config": {
+        "public": false,
+        "tipos": [
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "contas-pagar-documents",
+      "config": {
+        "public": false,
+        "tipos": [
+          "application/pdf",
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "general-uploads",
+      "config": {
+        "public": false,
+        "tipos": [
+          "*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "documents",
+      "config": {
+        "public": false,
+        "tipos": [
+          "application/pdf",
+          "application/msword",
+          "text/plain",
+          "image/*"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "obras-notas-fiscais",
+      "config": {
+        "public": true,
+        "tipos": [
+          "application/pdf"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "obras-medicoes",
+      "config": {
+        "public": true,
+        "tipos": [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "obras-comprovantes",
+      "config": {
+        "public": true,
+        "tipos": [
+          "application/pdf",
+          "image/jpeg",
+          "image/png",
+          "image/jpg"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "contratos-documentacao",
+      "config": {
+        "public": true,
+        "tipos": [
+          "application/pdf",
+          "image/jpeg",
+          "image/png",
+          "image/jpg"
+        ]
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "attachments",
+      "config": {
+        "public": false,
+        "tipos": [
+          "application/pdf",
+          "application/xml",
+          "text/xml"
+        ],
+        "nota": "⚠️ USADO MAS NÃO CONFIGURADO!"
+      }
+    },
+    {
+      "tipo": "FALTANDO",
+      "bucket": "obras-pagamentos-diretos",
+      "config": {
+        "public": true,
+        "tipos": [
+          "application/pdf"
+        ],
+        "nota": "⚠️ USADO MAS NÃO CONFIGURADO!"
+      }
+    }
+  ],
+  "problemasUpload": [],
+  "problemascodigo": [
+    {
+      "arquivo": "NotaFiscalForm.tsx",
+      "bucket": "attachments",
+      "linha": 91,
+      "deveria": "obras-notas-fiscais"
+    },
+    {
+      "arquivo": "NotaFiscalFormSimple.tsx",
+      "bucket": "attachments",
+      "linha": 116,
+      "deveria": "obras-notas-fiscais"
+    },
+    {
+      "arquivo": "ContaPagarForm.tsx",
+      "bucket": "attachments",
+      "linha": 266,
+      "deveria": "obras-comprovantes ou contas-pagar-documents"
+    },
+    {
+      "arquivo": "AdicionarPagamentoDiretoModal.tsx",
+      "bucket": "obras-pagamentos-diretos",
+      "linha": 86,
+      "erro": "Falta 3º parâmetro (path)"
+    }
+  ]
+}

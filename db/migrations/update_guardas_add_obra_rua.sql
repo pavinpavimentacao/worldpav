@@ -36,3 +36,5 @@ COMMENT ON COLUMN diarias_guarda_seguranca.obra_id IS 'Obra onde a diária ocorr
 COMMENT ON COLUMN diarias_guarda_seguranca.rua_id IS 'Rua da obra onde a diária ocorreu (opcional)';
 COMMENT ON COLUMN diarias_guarda_seguranca.rua_nome IS 'Nome da rua (preenchido automaticamente se rua_id estiver definido)';
 
+
+

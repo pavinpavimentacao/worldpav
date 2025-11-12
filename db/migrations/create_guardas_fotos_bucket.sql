@@ -111,3 +111,5 @@ guardas-fotos/
 3. Confirmar visualização da foto no modal de detalhes
 */
 
+
+

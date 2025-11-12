@@ -27,24 +27,9 @@ import { calcularFaturamentoPrevisto } from '../utils/notas-fiscais-utils'
 export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamento[]> {
   console.log('🔍 [getObraFaturamentos] Buscando faturamentos da obra:', obraId)
   
-  // Primeiro, tentar buscar faturamentos existentes na tabela
-  const { data: faturamentosExistentes, error } = await supabase
-    .from('obras_financeiro_faturamentos')
-    .select(`
-      *,
-      rua:obras_ruas(*)
-    `)
-    .eq('obra_id', obraId)
-    .is('deleted_at', null) // ✅ Filtrar faturamentos excluídos
-    .order('created_at', { ascending: false })
-
-  if (faturamentosExistentes && faturamentosExistentes.length > 0) {
-    console.log('✅ Faturamentos encontrados na tabela:', faturamentosExistentes.length)
-    return faturamentosExistentes
-  }
-
-  // Se não existem faturamentos, buscar diretamente das ruas finalizadas da obra
-  console.log('⚠️ Nenhum faturamento na tabela. Buscando diretamente das ruas...')
+  // SEMPRE buscar diretamente das ruas finalizadas (fonte única da verdade)
+  // Não usar tabela obras_financeiro_faturamentos para evitar dados duplicados/incorretos
+  console.log('📊 Buscando faturamentos diretamente das ruas finalizadas...')
   
   const { data: ruas, error: ruasError } = await supabase
     .from('obras_ruas')
@@ -52,7 +37,9 @@ export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamen
     .eq('obra_id', obraId)
     .eq('status', 'concluida')
     .not('metragem_executada', 'is', null)
+    .gt('metragem_executada', 0)
     .not('preco_por_m2', 'is', null)
+    .gt('preco_por_m2', 0) // Apenas ruas com preço real (sem fallback de 0)
     .is('deleted_at', null)
     .order('data_finalizacao', { ascending: false })
 
@@ -62,7 +49,7 @@ export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamen
   }
 
   if (!ruas || ruas.length === 0) {
-    console.log('⚠️ Nenhuma rua finalizada encontrada')
+    console.log('⚠️ Nenhuma rua finalizada com dados completos (metragem e preço)')
     return []
   }
 
@@ -71,20 +58,22 @@ export async function getObraFaturamentos(obraId: string): Promise<ObraFaturamen
   // Converter ruas em faturamentos
   const faturamentos: ObraFaturamento[] = ruas.map(rua => {
     const metragem = parseFloat(rua.metragem_executada || '0')
-    const toneladas = parseFloat(rua.toneladas_executadas || '0')
+    const toneladas = parseFloat(rua.toneladas_utilizadas || rua.toneladas_executadas || '0')
     const precoPorM2 = parseFloat(rua.preco_por_m2 || '0')
-    const valorTotal = metragem * precoPorM2
-    const espessura = parseFloat(rua.espessura_calculada || '0') || (toneladas / metragem / 2.4) * 100
+    const valorTotal = parseFloat(rua.valor_total || '0') || (metragem * precoPorM2)
+    const espessura = parseFloat(rua.espessura_calculada || '0') || (metragem > 0 ? (toneladas / metragem / 2.4) * 100 : 0)
+
+    console.log(`📋 Rua: ${rua.name} - Metragem: ${metragem} m² × Preço: R$ ${precoPorM2}/m² = R$ ${valorTotal}`)
 
     return {
-      id: rua.id, // Usar ID da rua temporariamente
+      id: rua.id, // Usar ID da rua
       obra_id: obraId,
       rua_id: rua.id,
       rua: {
         id: rua.id,
         obra_id: obraId,
         nome: rua.name,
-        metragem_planejada: parseFloat(rua.volume_planejamento || '0'),
+        metragem_planejada: parseFloat(rua.metragem_planejada || '0'),
         status: rua.status,
         ordem: rua.ordem || 0,
         created_at: rua.created_at,
@@ -467,6 +456,7 @@ export async function getFaturamentoPrevisto(obraId: string, precoPorM2: number)
     .from('obras_ruas')
     .select('metragem_planejada')
     .eq('obra_id', obraId)
+    .is('deleted_at', null)
   
   if (error) {
     console.error('Erro ao buscar ruas para calcular faturamento previsto:', error)

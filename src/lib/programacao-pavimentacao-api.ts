@@ -160,6 +160,7 @@ export class ProgramacaoPavimentacaoAPI {
               .from('obras_ruas')
               .select('name')
               .eq('id', prog.rua_id)
+              .is('deleted_at', null)
               .single()
             
             if (rua) {
@@ -326,6 +327,7 @@ export class ProgramacaoPavimentacaoAPI {
           .from('obras_ruas')
           .select('name')
           .eq('id', programacao.rua_id)
+          .is('deleted_at', null)
           .single()
         
         if (rua) {

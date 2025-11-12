@@ -93,3 +93,5 @@ export function MaiorRuaDiaCard({ data, loading }: MaiorRuaDiaCardProps) {
   )
 }
 
+
+

@@ -149,6 +149,7 @@ export function SelecionarClienteObraRua({
         .from('obras_ruas')
         .select('id, name, obra_id, status')
         .eq('obra_id', obraId)
+        .is('deleted_at', null)
         .in('status', ['planejada', 'em_execucao'])
         .order('name')
       

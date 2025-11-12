@@ -9,7 +9,7 @@ import { NotasMedicoesTab } from '../../components/obras/NotasMedicoesTab'
 import { ObraVisaoGeralTab } from '../../components/obras/ObraVisaoGeralTab'
 import { ObraServicosTab } from '../../components/obras/ObraServicosTab'
 import { getObraById, Obra } from '../../lib/obrasApi'
-import { calcularPrecoPorM2, getServicosObra } from '../../lib/obrasServicosApi'
+import { calcularPrecoPorM2, getServicosObra, calcularValorExecutadoPorMetragem } from '../../lib/obrasServicosApi'
 import { useToast } from '../../lib/toast-hooks'
 
 type TabType = 'visao-geral' | 'ruas' | 'financeiro' | 'notas-medicoes' | 'servicos'
@@ -57,12 +57,11 @@ const ObraDetails = () => {
       const precoPorM2 = await calcularPrecoPorM2(id)
       setPrecoPorM2Calculado(precoPorM2)
       
-      // Valor Executado = Soma dos serviços (metragem_executada × preço_unitário)
-      const valorExecutadoCalculado = servicos.reduce((total, servico) => 
-        total + (servico.valor_total || 0), 0
-      )
+      // Valor Executado = Metragem executada real das ruas × Preço por m²
+      // Usar a função que calcula baseado na metragem REAL executada
+      const valorExecutadoCalculado = await calcularValorExecutadoPorMetragem(id)
       setValorExecutado(valorExecutadoCalculado)
-      console.log('💰 Valor Executado (soma serviços):', valorExecutadoCalculado)
+      console.log('💰 Valor Executado (metragem real executada):', valorExecutadoCalculado)
     } catch (error) {
       console.error('Erro ao carregar obra:', error)
       addToast({ message: 'Erro ao carregar obra', type: 'error' })
