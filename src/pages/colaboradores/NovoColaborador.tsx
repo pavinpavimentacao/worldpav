@@ -104,22 +104,42 @@ const NovoColaborador: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [equipes, setEquipes] = useState<Array<{ id: string; name: string }>>([])
   const [loadingEquipes, setLoadingEquipes] = useState(true)
+  const [funcoes, setFuncoes] = useState<Array<{ id: string; nome: string; tipo_equipe: string | null }>>([])
+  const [loadingFuncoes, setLoadingFuncoes] = useState(true)
   
-  // Carregar equipes ao montar o componente
+  // Carregar equipes e funções ao montar o componente
   React.useEffect(() => {
-    const loadEquipes = async () => {
+    const loadData = async () => {
       try {
         const companyId = await getOrCreateDefaultCompany()
+        
+        // Carregar equipes
         const equipesData = await getEquipes(companyId)
         setEquipes(equipesData)
+        
+        // Carregar funções do banco de dados
+        const { data: funcoesData, error: funcoesError } = await supabase
+          .from('funcoes')
+          .select('id, nome, tipo_equipe')
+          .eq('company_id', companyId)
+          .eq('ativo', true)
+          .is('deleted_at', null)
+          .order('nome', { ascending: true })
+        
+        if (funcoesError) {
+          console.error('Erro ao carregar funções:', funcoesError)
+        } else {
+          setFuncoes(funcoesData || [])
+        }
       } catch (error) {
-        console.error('Erro ao carregar equipes:', error)
+        console.error('Erro ao carregar dados:', error)
       } finally {
         setLoadingEquipes(false)
+        setLoadingFuncoes(false)
       }
     }
     
-    loadEquipes()
+    loadData()
   }, [])
   
   const {
@@ -165,7 +185,20 @@ const NovoColaborador: React.FC = () => {
 
   // Observar mudanças no tipo de equipe para atualizar funções
   const tipoEquipeSelecionado = watch('tipoEquipe') as TipoEquipe
-  const funcoesOptions = getFuncoesOptions(tipoEquipeSelecionado)
+  
+  // Usar funções do banco de dados, com fallback para funções hardcoded
+  const funcoesOptions = React.useMemo(() => {
+    if (funcoes.length > 0) {
+      // Filtrar funções baseado no tipo de equipe selecionado (se houver)
+      // Por enquanto, mostrar todas as funções ativas
+      return funcoes.map(f => ({
+        value: f.nome,
+        label: f.nome
+      }))
+    }
+    // Fallback para funções hardcoded se não houver funções no banco
+    return getFuncoesOptions(tipoEquipeSelecionado)
+  }, [funcoes, tipoEquipeSelecionado])
 
   // Função para verificar se CPF já existe
   const verificarCPFExistente = async (cpf: string): Promise<boolean> => {
@@ -285,6 +318,20 @@ const NovoColaborador: React.FC = () => {
       setValue('funcao', novaFuncaoNome.trim());
       setNovaFuncaoNome('');
       setShowFuncaoModal(false);
+      
+      // Recarregar funções do banco
+      const companyId = await getOrCreateDefaultCompany();
+      const { data: funcoesData, error: funcoesError } = await supabase
+        .from('funcoes')
+        .select('id, nome, tipo_equipe')
+        .eq('company_id', companyId)
+        .eq('ativo', true)
+        .is('deleted_at', null)
+        .order('nome', { ascending: true });
+      
+      if (!funcoesError && funcoesData) {
+        setFuncoes(funcoesData);
+      }
     } catch (error: any) {
       console.error('Erro ao criar função:', error);
       toast.error(error.message || 'Erro ao criar função');
