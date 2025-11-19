@@ -5,6 +5,20 @@
 -- enquanto o problema de RLS não é resolvido
 -- =====================================================
 
+-- Garantir que a empresa Worldpav existe
+INSERT INTO public.companies (
+  id,
+  name,
+  created_at,
+  updated_at
+) VALUES (
+  '39cf8b61-6737-4aa5-af3f-51fba9f12345'::UUID,
+  'Worldpav',
+  NOW(),
+  NOW()
+)
+ON CONFLICT (id) DO NOTHING;
+
 -- Inserir função "Motorista de Van" para a empresa Worldpav
 -- Usando o ID da empresa: 39cf8b61-6737-4aa5-af3f-51fba9f12345
 INSERT INTO public.funcoes (
