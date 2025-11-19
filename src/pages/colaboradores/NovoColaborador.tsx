@@ -16,7 +16,9 @@ import {
   Calendar,
   DollarSign,
   Building,
-  FileText
+  FileText,
+  Briefcase,
+  X
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatCPF, formatRG, formatPhone, formatEmail, unformatCPF, unformatRG, unformatPhone, isValidCPF, isValidEmail, isValidPhone } from '../../utils/formatters'
@@ -155,6 +157,11 @@ const NovoColaborador: React.FC = () => {
 
   // Estado para verificar duplicidade
   const [checkingDuplicate, setCheckingDuplicate] = useState(false)
+  
+  // Estado para modal de criar função
+  const [showFuncaoModal, setShowFuncaoModal] = useState(false)
+  const [novaFuncaoNome, setNovaFuncaoNome] = useState('')
+  const [criandoFuncao, setCriandoFuncao] = useState(false)
 
   // Observar mudanças no tipo de equipe para atualizar funções
   const tipoEquipeSelecionado = watch('tipoEquipe') as TipoEquipe
@@ -246,6 +253,45 @@ const NovoColaborador: React.FC = () => {
       [field]: validationError || undefined,
     }));
   }
+
+  // Função para criar nova função
+  const handleCriarFuncao = async () => {
+    if (!novaFuncaoNome.trim()) {
+      toast.error('Digite o nome da função');
+      return;
+    }
+
+    try {
+      setCriandoFuncao(true);
+      const companyId = await getOrCreateDefaultCompany();
+      
+      const { data, error } = await supabase
+        .from('funcoes')
+        .insert({
+          company_id: companyId,
+          nome: novaFuncaoNome.trim(),
+          descricao: null,
+          ativo: true,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao criar função:', error);
+        throw error;
+      }
+
+      toast.success('Função criada com sucesso!');
+      setValue('funcao', novaFuncaoNome.trim());
+      setNovaFuncaoNome('');
+      setShowFuncaoModal(false);
+    } catch (error: any) {
+      console.error('Erro ao criar função:', error);
+      toast.error(error.message || 'Erro ao criar função');
+    } finally {
+      setCriandoFuncao(false);
+    }
+  };
 
   // Função para verificar duplicidade ao sair do campo (onBlur)
   const handleFieldBlur = async (field: string, value: string) => {
@@ -565,9 +611,19 @@ const NovoColaborador: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Função *
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Função *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowFuncaoModal(true)}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Criar Nova Função
+                  </button>
+                </div>
                 <Controller
                   name="funcao"
                   control={control}
@@ -739,7 +795,7 @@ const NovoColaborador: React.FC = () => {
           <div className="flex justify-end space-x-4">
             <Link to="/colaboradores">
               <Button type="button" variant="outline">
-              Cancelar
+                Cancelar
             </Button>
             </Link>
             <Button type="submit" disabled={isSubmitting}>
@@ -749,6 +805,79 @@ const NovoColaborador: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* Modal para Criar Nova Função */}
+      {showFuncaoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 rounded-lg p-2">
+                  <Briefcase className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Criar Nova Função
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Adicione uma nova função para os colaboradores
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowFuncaoModal(false);
+                  setNovaFuncaoNome('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nome da Função <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="text"
+                  value={novaFuncaoNome}
+                  onChange={(e) => setNovaFuncaoNome(e.target.value)}
+                  placeholder="Ex: Operador de Rolo"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCriarFuncao();
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  onClick={handleCriarFuncao}
+                  disabled={criandoFuncao || !novaFuncaoNome.trim()}
+                  className="flex-1"
+                >
+                  {criandoFuncao ? 'Criando...' : 'Criar Função'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowFuncaoModal(false);
+                    setNovaFuncaoNome('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

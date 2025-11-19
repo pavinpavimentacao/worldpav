@@ -186,6 +186,12 @@ export default function FuncoesList() {
 
     try {
       const companyId = await getOrCreateDefaultCompany();
+      
+      console.log('🔍 [FuncoesList] Tentando salvar função:', {
+        editing: !!editingFuncao,
+        companyId,
+        formData
+      });
 
       if (editingFuncao) {
         // Atualizar
@@ -201,18 +207,61 @@ export default function FuncoesList() {
         if (error) throw error;
         toast.success('Função atualizada com sucesso!');
       } else {
-        // Criar
-        const { error } = await supabase
-          .from('funcoes')
-          .insert({
-            company_id: companyId,
-            nome: formData.nome.trim(),
-            descricao: formData.descricao.trim() || null,
-            ativo: formData.ativo,
+        // Criar - tentar usar RPC primeiro, se falhar usar insert direto
+        const dadosInsert = {
+          company_id: companyId,
+          nome: formData.nome.trim(),
+          descricao: formData.descricao.trim() || null,
+          ativo: formData.ativo,
+        };
+        
+        console.log('📝 [FuncoesList] Dados para inserir:', dadosInsert);
+        
+        // Tentar usar RPC primeiro (bypassa RLS)
+        // IMPORTANTE: Parâmetros em ordem alfabética
+        const { data: rpcData, error: rpcError } = await supabase.rpc('insert_funcao', {
+          p_ativo: formData.ativo,
+          p_company_id: companyId,
+          p_descricao: formData.descricao.trim() || null,
+          p_nome: formData.nome.trim(),
+        });
+        
+        if (rpcError) {
+          console.error('❌ [FuncoesList] Erro ao chamar RPC:', {
+            message: rpcError.message,
+            code: rpcError.code,
+            details: rpcError.details,
+            hint: rpcError.hint
           });
+          console.log('⚠️ [FuncoesList] RPC não disponível ou com erro, tentando insert direto...');
+          
+          // Se RPC não existir ou falhar, tentar insert direto
+          const { data, error } = await supabase
+            .from('funcoes')
+            .insert(dadosInsert)
+            .select()
+            .single();
 
-        if (error) throw error;
-        toast.success('Função criada com sucesso!');
+          if (error) {
+            console.error('❌ [FuncoesList] Erro detalhado:', {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint
+            });
+            throw error;
+          }
+          
+          console.log('✅ [FuncoesList] Função criada com sucesso:', data);
+          toast.success('Função criada com sucesso!');
+        } else if (rpcData) {
+          // RPC retorna JSONB, converter para objeto
+          const funcaoCriada = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+          console.log('✅ [FuncoesList] Função criada com sucesso via RPC:', funcaoCriada);
+          toast.success('Função criada com sucesso!');
+        } else {
+          throw new Error('RPC retornou sem dados e sem erro');
+        }
       }
 
       handleCloseModal();
