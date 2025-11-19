@@ -67,3 +67,5 @@ Todas com: qual = (auth.role() = 'authenticated'::text)
 
 
 
+
+

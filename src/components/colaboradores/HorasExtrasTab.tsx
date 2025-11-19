@@ -15,7 +15,7 @@ interface HoraExtra {
   data: string;
   horas: number;
   valor_calculado: number;
-  tipo_dia: 'normal' | 'sabado' | 'domingo' | 'feriado';
+  tipo_dia: 'diurno' | 'noturno' | 'normal' | 'sabado' | 'domingo' | 'feriado';
   created_at: string;
 }
 
@@ -26,6 +26,8 @@ interface HorasExtrasTabProps {
 }
 
 const TIPOS_DIA_LABELS: Record<string, string> = {
+  'diurno': 'Diurno',
+  'noturno': 'Noturno',
   'normal': 'Dia Normal',
   'sabado': 'Sábado',
   'domingo': 'Domingo',
@@ -33,6 +35,8 @@ const TIPOS_DIA_LABELS: Record<string, string> = {
 };
 
 const TIPOS_DIA_CORES: Record<string, string> = {
+  'diurno': 'bg-blue-100 text-blue-800 border-blue-200',
+  'noturno': 'bg-indigo-100 text-indigo-800 border-indigo-200',
   'normal': 'bg-blue-100 text-blue-800 border-blue-200',
   'sabado': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   'domingo': 'bg-red-100 text-red-800 border-red-200',
@@ -318,6 +322,7 @@ export function HorasExtrasTab({ colaboradorId, colaboradorNome, salarioFixo }: 
     </div>
   );
 }
+
 
 
 

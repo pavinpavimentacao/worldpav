@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, DollarSign, Calendar, User, Edit2, Trash2, Check, X, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, DollarSign, Calendar, User, Edit2, Trash2, Check, X, TrendingUp, AlertCircle, Loader2, Filter, Search, FileSpreadsheet, FileText } from 'lucide-react';
 import { Button } from "../shared/Button";
 import { Input } from '../ui/input';
 import { CurrencyInput } from '../ui/currency-input';
@@ -19,13 +19,22 @@ import { RegistroDiaria, formatarValor, calcularValorTotalDiaria } from '../../t
 import { formatDateBR } from '../../utils/date-format';
 import { supabase } from '../../lib/supabase';
 import { getCurrentCompanyId } from '../../lib/utils';
-import { WORLDPAV_COMPANY_ID } from '../../lib/company-utils';
+import { WORLDPAV_COMPANY_ID, getOrCreateDefaultCompany } from '../../lib/company-utils';
+import { DatePicker } from '../ui/date-picker';
+import { getPeriodoAtualDiarias } from '../../utils/periodo-calculo';
+import { getEquipes } from '../../lib/equipesApi';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { DiariasExporter, DiariaExportData } from '../../utils/diarias-exporter';
 
 interface ColaboradorOption {
   id: string;
   nome: string;
   funcao: string;
+  equipe_id?: string | null;
 }
+
+type FiltroDataDiarias = 'hoje' | 'ontem' | 'ultimos30' | 'periodo' | 'personalizado' | 'todos';
 
 export const DiariasTab: React.FC = () => {
   const [diarias, setDiarias] = useState<RegistroDiaria[]>([]);
@@ -35,17 +44,35 @@ export const DiariasTab: React.FC = () => {
   const [diariaSelecionada, setDiariaSelecionada] = useState<RegistroDiaria | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [colaboradores, setColaboradores] = useState<ColaboradorOption[]>([]);
+  const [colaboradoresMap, setColaboradoresMap] = useState<Map<string, ColaboradorOption>>(new Map());
   const [companyId, setCompanyId] = useState<string>('');
   const [loadingColaboradores, setLoadingColaboradores] = useState(true);
+  const [equipes, setEquipes] = useState<Array<{ id: string; name: string }>>([]);
+  
+  // Filtros
+  const [filtroData, setFiltroData] = useState<FiltroDataDiarias>('periodo');
+  const [filtroEquipe, setFiltroEquipe] = useState<string>('');
+  const [dataInicioPersonalizada, setDataInicioPersonalizada] = useState<string>('');
+  const [dataFimPersonalizada, setDataFimPersonalizada] = useState<string>('');
 
-  // Carregar companyId do usuário
+  // Carregar companyId do usuário e equipes
   useEffect(() => {
     async function loadUserCompany() {
       try {
         // Usar diretamente o Company ID do WorldPav como padrão
         // Se necessário, pode fazer fallback para getCurrentCompanyId() no futuro
-        setCompanyId(WORLDPAV_COMPANY_ID);
-        console.log('✅ Company ID carregado (WorldPav):', WORLDPAV_COMPANY_ID);
+        const companyIdValue = await getOrCreateDefaultCompany();
+        setCompanyId(companyIdValue);
+        console.log('✅ Company ID carregado:', companyIdValue);
+        
+        // Carregar equipes
+        const equipesData = await getEquipes(companyIdValue);
+        setEquipes(equipesData.map(eq => ({ id: eq.id, name: eq.name })));
+        
+        // Inicializar período atual
+        const periodo = getPeriodoAtualDiarias();
+        setDataInicioPersonalizada(periodo.dataInicio);
+        setDataFimPersonalizada(periodo.dataFim);
       } catch (error) {
         console.error('Erro ao carregar empresa do usuário:', error);
         // Em caso de erro, usar WorldPav como padrão
@@ -66,7 +93,7 @@ export const DiariasTab: React.FC = () => {
         setLoadingColaboradores(true);
         const { data, error } = await supabase
           .from('colaboradores')
-          .select('id, name, position, tipo_equipe, status')
+          .select('id, name, position, tipo_equipe, equipe_id, status')
           .eq('company_id', companyId)
           .eq('status', 'ativo')
           .is('deleted_at', null)
@@ -82,9 +109,14 @@ export const DiariasTab: React.FC = () => {
             id: c.id,
             nome: c.name || 'Nome não informado',
             funcao: c.position || 'Função não informada',
+            equipe_id: c.equipe_id || null,
           }));
 
         setColaboradores(colaboradoresAdaptados);
+        // Criar mapa para busca rápida
+        const mapa = new Map<string, ColaboradorOption>();
+        colaboradoresAdaptados.forEach(c => mapa.set(c.id, c));
+        setColaboradoresMap(mapa);
         console.log(`✅ ${colaboradoresAdaptados.length} colaboradores de equipe de massa (pavimentação + máquinas) carregados`);
       } catch (error) {
         console.error('Erro ao carregar colaboradores:', error);
@@ -134,19 +166,82 @@ export const DiariasTab: React.FC = () => {
   const [filtroColaborador, setFiltroColaborador] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pendente' | 'pago'>('todos');
 
+  // Calcular período atual de diárias
+  const periodoAtualDiarias = getPeriodoAtualDiarias();
+
   // Filtrar diárias
   const diariasFiltradas = useMemo(() => {
-    return diarias.filter((diaria) => {
-      const matchColaborador =
-        filtroColaborador === '' ||
-        diaria.colaborador_nome?.toLowerCase().includes(filtroColaborador.toLowerCase()) ||
-        diaria.colaborador_funcao?.toLowerCase().includes(filtroColaborador.toLowerCase());
+    let filtradas = [...diarias];
 
-      const matchStatus = filtroStatus === 'todos' || diaria.status_pagamento === filtroStatus;
+    // Filtro por colaborador (nome)
+    if (filtroColaborador.trim()) {
+      const nomeLower = filtroColaborador.toLowerCase();
+      filtradas = filtradas.filter(diaria =>
+        diaria.colaborador_nome?.toLowerCase().includes(nomeLower) ||
+        diaria.colaborador_funcao?.toLowerCase().includes(nomeLower)
+      );
+    }
 
-      return matchColaborador && matchStatus;
-    });
-  }, [diarias, filtroColaborador, filtroStatus]);
+    // Filtro por status
+    if (filtroStatus !== 'todos') {
+      filtradas = filtradas.filter(diaria => diaria.status_pagamento === filtroStatus);
+    }
+
+    // Filtro por data
+    if (filtroData !== 'todos') {
+      const hoje = new Date();
+      const ontem = new Date(hoje);
+      ontem.setDate(ontem.getDate() - 1);
+      const ultimos30 = new Date(hoje);
+      ultimos30.setDate(ultimos30.getDate() - 30);
+
+      let dataInicio: string | null = null;
+      let dataFim: string | null = null;
+
+      switch (filtroData) {
+        case 'hoje':
+          dataInicio = hoje.toISOString().split('T')[0];
+          dataFim = hoje.toISOString().split('T')[0];
+          break;
+        case 'ontem':
+          dataInicio = ontem.toISOString().split('T')[0];
+          dataFim = ontem.toISOString().split('T')[0];
+          break;
+        case 'ultimos30':
+          dataInicio = ultimos30.toISOString().split('T')[0];
+          dataFim = hoje.toISOString().split('T')[0];
+          break;
+        case 'periodo':
+          // Usar período atual de diárias (21 a 20)
+          dataInicio = periodoAtualDiarias.dataInicio;
+          dataFim = periodoAtualDiarias.dataFim;
+          break;
+        case 'personalizado':
+          if (dataInicioPersonalizada && dataFimPersonalizada) {
+            dataInicio = dataInicioPersonalizada;
+            dataFim = dataFimPersonalizada;
+          }
+          break;
+      }
+
+      if (dataInicio && dataFim) {
+        filtradas = filtradas.filter(diaria => {
+          const dataDiaria = diaria.data_diaria;
+          return dataDiaria >= dataInicio! && dataDiaria <= dataFim!;
+        });
+      }
+    }
+
+    // Filtro por equipe
+    if (filtroEquipe) {
+      filtradas = filtradas.filter(diaria => {
+        const colaborador = colaboradoresMap.get(diaria.colaborador_id);
+        return colaborador?.equipe_id === filtroEquipe;
+      });
+    }
+
+    return filtradas;
+  }, [diarias, filtroColaborador, filtroStatus, filtroData, filtroEquipe, dataInicioPersonalizada, dataFimPersonalizada, periodoAtualDiarias, colaboradoresMap]);
 
   // Estatísticas
   const estatisticas = useMemo(() => {
@@ -268,6 +363,96 @@ export const DiariasTab: React.FC = () => {
     return calcularValorTotalDiaria(qtd, valorUnit, adic, desc);
   }, [quantidade, valorUnitario, adicional, desconto]);
 
+  const handleExportExcel = () => {
+    try {
+      if (diariasFiltradas.length === 0) {
+        toast.error('Nenhuma diária para exportar');
+        return;
+      }
+
+      const dadosExport: DiariaExportData[] = diariasFiltradas.map((diaria) => ({
+        id: diaria.id,
+        colaborador_nome: diaria.colaborador_nome || 'Nome não informado',
+        colaborador_funcao: diaria.colaborador_funcao,
+        quantidade: diaria.quantidade,
+        valor_unitario: diaria.valor_unitario,
+        adicional: diaria.adicional,
+        desconto: diaria.desconto,
+        valor_total: diaria.valor_total,
+        data_diaria: diaria.data_diaria,
+        data_pagamento: diaria.data_pagamento,
+        status_pagamento: diaria.status_pagamento,
+        observacoes: diaria.observacoes,
+        created_at: diaria.created_at,
+      }));
+
+      const periodo = filtroData === 'periodo' 
+        ? periodoAtualDiarias 
+        : filtroData === 'personalizado' && dataInicioPersonalizada && dataFimPersonalizada
+        ? { dataInicio: dataInicioPersonalizada, dataFim: dataFimPersonalizada }
+        : undefined;
+
+      DiariasExporter.exportToExcel(dadosExport, {
+        periodo,
+        filtros: {
+          nome: filtroColaborador || undefined,
+          equipe: filtroEquipe || undefined,
+          status: filtroStatus !== 'todos' ? filtroStatus : undefined,
+        },
+      });
+
+      toast.success('Excel exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      toast.error('Erro ao exportar Excel. Tente novamente.');
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      if (diariasFiltradas.length === 0) {
+        toast.error('Nenhuma diária para exportar');
+        return;
+      }
+
+      const dadosExport: DiariaExportData[] = diariasFiltradas.map((diaria) => ({
+        id: diaria.id,
+        colaborador_nome: diaria.colaborador_nome || 'Nome não informado',
+        colaborador_funcao: diaria.colaborador_funcao,
+        quantidade: diaria.quantidade,
+        valor_unitario: diaria.valor_unitario,
+        adicional: diaria.adicional,
+        desconto: diaria.desconto,
+        valor_total: diaria.valor_total,
+        data_diaria: diaria.data_diaria,
+        data_pagamento: diaria.data_pagamento,
+        status_pagamento: diaria.status_pagamento,
+        observacoes: diaria.observacoes,
+        created_at: diaria.created_at,
+      }));
+
+      const periodo = filtroData === 'periodo' 
+        ? periodoAtualDiarias 
+        : filtroData === 'personalizado' && dataInicioPersonalizada && dataFimPersonalizada
+        ? { dataInicio: dataInicioPersonalizada, dataFim: dataFimPersonalizada }
+        : undefined;
+
+      DiariasExporter.exportToPDF(dadosExport, {
+        periodo,
+        filtros: {
+          nome: filtroColaborador || undefined,
+          equipe: filtroEquipe || undefined,
+          status: filtroStatus !== 'todos' ? filtroStatus : undefined,
+        },
+      });
+
+      toast.success('PDF exportado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast.error('Erro ao exportar PDF. Tente novamente.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -287,10 +472,32 @@ export const DiariasTab: React.FC = () => {
           <h2 className="text-2xl font-semibold text-gray-900">Pagamento de Diárias</h2>
           <p className="text-gray-600 mt-1">Gestão financeira de diárias por colaborador</p>
         </div>
-        <Button onClick={handleOpenModal} className="flex items-center space-x-2">
-          <Plus className="w-5 h-5" />
-          <span>Adicionar Diária</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {diariasFiltradas.length > 0 && (
+            <>
+              <Button 
+                onClick={handleExportExcel}
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Exportar Excel</span>
+              </Button>
+              <Button 
+                onClick={handleExportPDF}
+                variant="outline"
+                className="flex items-center space-x-2"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Exportar PDF</span>
+              </Button>
+            </>
+          )}
+          <Button onClick={handleOpenModal} className="flex items-center space-x-2">
+            <Plus className="w-5 h-5" />
+            <span>Adicionar Diária</span>
+          </Button>
+        </div>
       </div>
 
       {/* Estatísticas */}
@@ -345,42 +552,144 @@ export const DiariasTab: React.FC = () => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar Colaborador</label>
-            <Input
-              type="text"
-              value={filtroColaborador}
-              onChange={(e) => setFiltroColaborador(e.target.value)}
-              placeholder="Nome ou função..."
-            />
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-5 w-5 text-gray-500" />
+            <h3 className="text-lg font-semibold text-gray-900">Filtros</h3>
           </div>
+          <button
+            onClick={() => {
+              setFiltroColaborador('');
+              setFiltroStatus('todos');
+              setFiltroData('periodo');
+              setFiltroEquipe('');
+              const periodo = getPeriodoAtualDiarias();
+              setDataInicioPersonalizada(periodo.dataInicio);
+              setDataFimPersonalizada(periodo.dataFim);
+            }}
+            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+          >
+            <X className="h-4 w-4" />
+            Limpar
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Filtro de Data */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Período
+            </label>
+            <select
+              value={filtroData}
+              onChange={(e) => {
+                const tipo = e.target.value as FiltroDataDiarias;
+                setFiltroData(tipo);
+                if (tipo === 'periodo') {
+                  const periodo = getPeriodoAtualDiarias();
+                  setDataInicioPersonalizada(periodo.dataInicio);
+                  setDataFimPersonalizada(periodo.dataFim);
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            >
+              <option value="periodo">Período Atual (21 a 20)</option>
+              <option value="hoje">Hoje</option>
+              <option value="ontem">Ontem</option>
+              <option value="ultimos30">Últimos 30 dias</option>
+              <option value="personalizado">Personalizado</option>
+              <option value="todos">Todos</option>
+            </select>
+          </div>
+
+          {/* Data Personalizada - Início */}
+          {filtroData === 'personalizado' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Início
+              </label>
+              <DatePicker
+                value={dataInicioPersonalizada}
+                onChange={setDataInicioPersonalizada}
+                label=""
+                className="text-sm"
+              />
+            </div>
+          )}
+
+          {/* Data Personalizada - Fim */}
+          {filtroData === 'personalizado' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Fim
+              </label>
+              <DatePicker
+                value={dataFimPersonalizada}
+                onChange={setDataFimPersonalizada}
+                label=""
+                className="text-sm"
+              />
+            </div>
+          )}
+
+          {/* Filtro por Nome */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nome do Colaborador
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={filtroColaborador}
+                onChange={(e) => setFiltroColaborador(e.target.value)}
+                placeholder="Buscar por nome..."
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Filtro por Equipe */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Equipe
+            </label>
+            <select
+              value={filtroEquipe}
+              onChange={(e) => setFiltroEquipe(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            >
+              <option value="">Todas as equipes</option>
+              {equipes.map(equipe => (
+                <option key={equipe.id} value={equipe.id}>
+                  {equipe.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             >
               <option value="todos">Todos</option>
               <option value="pendente">Pendentes</option>
               <option value="pago">Pagos</option>
             </select>
           </div>
-          <div className="flex items-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setFiltroColaborador('');
-                setFiltroStatus('todos');
-              }}
-              className="w-full"
-            >
-              Limpar Filtros
-            </Button>
-          </div>
         </div>
+
+        {/* Mostrar período atual quando filtro for "periodo" */}
+        {filtroData === 'periodo' && (
+          <div className="mt-3 text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
+            <span className="font-medium">Período atual:</span> {format(new Date(periodoAtualDiarias.dataInicio + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })} até {format(new Date(periodoAtualDiarias.dataFim + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+          </div>
+        )}
       </div>
 
       {/* Lista de Diárias */}

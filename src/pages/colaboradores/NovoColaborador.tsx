@@ -50,14 +50,14 @@ const schema = z.object({
     }, 'RG deve ter entre 7 e 9 dígitos'),
   
   telefone: z.string()
-    .min(1, 'O telefone é obrigatório')
-    .refine(val => isValidPhone(val), 'Telefone inválido. Use o formato (11) 99999-9999'),
+    .optional()
+    .refine(val => !val || isValidPhone(val), 'Telefone inválido. Use o formato (11) 99999-9999')
+    .transform(val => val || ''),
   
   email: z.string()
-    .min(1, 'O email é obrigatório')
-    .email('Email inválido')
-    .refine(val => isValidEmail(val), 'Formato de email inválido')
-    .transform(val => val.toLowerCase().trim()),
+    .optional()
+    .refine(val => !val || isValidEmail(val), 'Formato de email inválido')
+    .transform(val => val ? val.toLowerCase().trim() : ''),
   
   dataAdmissao: z.string()
     .min(1, 'A data de admissão é obrigatória')
@@ -300,14 +300,16 @@ const NovoColaborador: React.FC = () => {
         return;
       }
 
-      // Verificar duplicidade de Email
-      console.log('🔍 Verificando duplicidade de Email...');
-      const emailExiste = await verificarEmailExistente(data.email);
-      if (emailExiste) {
-        toast.error('Este email já está cadastrado no sistema');
-        setValidationErrors(prev => ({ ...prev, email: 'Este email já está cadastrado' }));
-        setIsSubmitting(false);
-        return;
+      // Verificar duplicidade de Email (apenas se fornecido)
+      if (data.email && data.email.trim()) {
+        console.log('🔍 Verificando duplicidade de Email...');
+        const emailExiste = await verificarEmailExistente(data.email);
+        if (emailExiste) {
+          toast.error('Este email já está cadastrado no sistema');
+          setValidationErrors(prev => ({ ...prev, email: 'Este email já está cadastrado' }));
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       // Obter ou criar empresas se necessário
@@ -319,8 +321,8 @@ const NovoColaborador: React.FC = () => {
         name: data.nome,
         cpf: unformatCPF(data.cpf),
         rg: unformatRG(data.rg),
-        phone: unformatPhone(data.telefone),
-        email: data.email.toLowerCase().trim(),
+        phone: data.telefone ? unformatPhone(data.telefone) : null,
+        email: data.email && data.email.trim() ? data.email.toLowerCase().trim() : null,
         position: data.funcao, // Usar função selecionada
         equipe_id: data.tipoEquipe, // ✅ Agora é o ID da equipe
         tipo_equipe: 'pavimentacao', // Mantém para compatibilidade (pode ser qualquer valor válido)
@@ -686,7 +688,7 @@ const NovoColaborador: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Telefone *
+                      Telefone
                     </label>
                 <Input
                   {...register('telefone')}
@@ -705,7 +707,7 @@ const NovoColaborador: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email *
+                      Email
                     </label>
                 <div className="relative">
                 <Input

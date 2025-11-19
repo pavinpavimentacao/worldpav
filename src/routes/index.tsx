@@ -34,6 +34,9 @@ import NovaEquipe from '../pages/equipes/NovaEquipe'
 import EquipeDetalhes from '../pages/equipes/EquipeDetalhes'
 import EditarEquipe from '../pages/equipes/EditarEquipe'
 
+// Funções
+import FuncoesList from '../pages/funcoes/FuncoesList'
+
 // Reports
 import ReportsList from '../pages/reports/ReportsList'
 import NewReportImproved from '../pages/reports/NewReportImproved'
@@ -287,6 +290,17 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth>
         <EditarEquipe />
+      </RequireAuth>
+    ),
+    errorElement: <GenericError />
+  },
+
+  // ==================== FUNÇÕES ====================
+  {
+    path: '/funcoes',
+    element: (
+      <RequireAuth>
+        <FuncoesList />
       </RequireAuth>
     ),
     errorElement: <GenericError />

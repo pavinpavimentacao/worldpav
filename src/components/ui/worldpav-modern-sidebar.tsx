@@ -18,7 +18,8 @@ import {
   Shield,
   ClipboardCheck,
   CreditCard,
-  FileText
+  FileText,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '../../lib/auth-hooks';
 
@@ -43,6 +44,7 @@ const navigationItems: NavigationItem[] = [
   { id: "programacao", name: "Programação", icon: Calendar, href: "/programacao-pavimentacao" },
   { id: "colaboradores", name: "Colaboradores", icon: UserCheck, href: "/colaboradores" },
   { id: "equipes", name: "Equipes", icon: Users, href: "/equipes" },
+  { id: "funcoes", name: "Funções", icon: Briefcase, href: "/funcoes" },
   { id: "controle-diario", name: "Controle Diário", icon: ClipboardCheck, href: "/controle-diario" },
   { id: "relatorios-diarios", name: "Relatórios Diários", icon: ClipboardList, href: "/relatorios-diarios" },
   { id: "recebimentos", name: "Recebimentos", icon: CreditCard, href: "/recebimentos" },
@@ -64,9 +66,10 @@ export function WorldPavModernSidebar({ className = "", onNavigate }: WorldPavMo
     if (path.startsWith('/clients')) return 'clientes';
     if (path.startsWith('/obras')) return 'obras';
     if (path.startsWith('/programacao-pavimentacao')) return 'programacao';
-    if (path.startsWith('/colaboradores')) return 'colaboradores';
-    if (path.startsWith('/equipes')) return 'equipes';
-    if (path.startsWith('/controle-diario')) return 'controle-diario';
+  if (path.startsWith('/colaboradores')) return 'colaboradores';
+  if (path.startsWith('/equipes')) return 'equipes';
+  if (path.startsWith('/funcoes')) return 'funcoes';
+  if (path.startsWith('/controle-diario')) return 'controle-diario';
     if (path.startsWith('/relatorios-diarios')) return 'relatorios-diarios';
     if (path.startsWith('/recebimentos')) return 'recebimentos';
     if (path.startsWith('/contas-pagar')) return 'contas-pagar';

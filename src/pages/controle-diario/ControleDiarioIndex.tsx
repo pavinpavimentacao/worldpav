@@ -4,15 +4,16 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ClipboardList, DollarSign, History, Users, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
+import { ClipboardList, DollarSign, History, Clock, Users, Calendar, TrendingUp, AlertCircle } from 'lucide-react';
 import { Layout } from "../../components/layout/Layout";
 import { RelacaoDiariaTab } from '../../components/controle-diario/RelacaoDiariaTab';
 import { DiariasTab } from '../../components/controle-diario/DiariasTab';
 import { HistoricoTab } from '../../components/controle-diario/HistoricoTab';
+import { HorasExtrasTab } from '../../components/controle-diario/HorasExtrasTab';
 import { getEstatisticasControleDiario } from '../../mocks/controle-diario-mock';
 import { formatarValor, EstatisticasControleDiario } from '../../types/controle-diario';
 
-type TabType = 'relacao' | 'diarias' | 'historico';
+type TabType = 'relacao' | 'diarias' | 'historico' | 'horas-extras';
 
 interface Tab {
   id: TabType;
@@ -56,6 +57,12 @@ const ControleDiarioIndex: React.FC = () => {
       label: 'Diárias',
       icon: DollarSign,
       description: 'Pagamentos e gestão financeira',
+    },
+    {
+      id: 'horas-extras',
+      label: 'Horas Extras',
+      icon: Clock,
+      description: 'Gerenciamento de horas extras',
     },
     {
       id: 'historico',
@@ -177,6 +184,7 @@ const ControleDiarioIndex: React.FC = () => {
           <div className="p-6">
             {activeTab === 'relacao' && <RelacaoDiariaTab />}
             {activeTab === 'diarias' && <DiariasTab />}
+            {activeTab === 'horas-extras' && <HorasExtrasTab />}
             {activeTab === 'historico' && <HistoricoTab />}
           </div>
         </div>

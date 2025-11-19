@@ -445,7 +445,7 @@ export type Database = {
           data: string
           horas: number
           valor_calculado: number
-          tipo_dia: 'normal' | 'sabado' | 'domingo' | 'feriado'
+          tipo_dia: 'diurno' | 'noturno' | 'normal' | 'sabado' | 'domingo' | 'feriado'
           created_at: string
         }
         Insert: {
@@ -454,7 +454,7 @@ export type Database = {
           data: string
           horas: number
           valor_calculado: number
-          tipo_dia: 'normal' | 'sabado' | 'domingo' | 'feriado'
+          tipo_dia: 'diurno' | 'noturno' | 'normal' | 'sabado' | 'domingo' | 'feriado'
           created_at?: string
         }
         Update: {
@@ -463,7 +463,7 @@ export type Database = {
           data?: string
           horas?: number
           valor_calculado?: number
-          tipo_dia?: 'normal' | 'sabado' | 'domingo' | 'feriado'
+          tipo_dia?: 'diurno' | 'noturno' | 'normal' | 'sabado' | 'domingo' | 'feriado'
           created_at?: string
         }
       }

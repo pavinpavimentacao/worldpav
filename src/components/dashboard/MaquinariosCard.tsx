@@ -94,3 +94,5 @@ export function MaquinariosCard({ maquinarios, loading }: MaquinariosCardProps) 
 
 
 
+
+

@@ -38,3 +38,5 @@ COMMENT ON COLUMN diarias_guarda_seguranca.rua_nome IS 'Nome da rua (preenchido 
 
 
 
+
+

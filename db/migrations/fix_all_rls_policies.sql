@@ -220,3 +220,5 @@ SELECT '✅ Todas as políticas RLS foram atualizadas com sucesso!' AS status;
 
 
 
+
+
