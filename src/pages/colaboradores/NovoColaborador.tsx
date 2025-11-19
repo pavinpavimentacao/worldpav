@@ -127,8 +127,9 @@ const NovoColaborador: React.FC = () => {
           .order('nome', { ascending: true })
         
         if (funcoesError) {
-          console.error('Erro ao carregar funções:', funcoesError)
+          console.error('❌ [NovoColaborador] Erro ao carregar funções:', funcoesError)
         } else {
+          console.log('✅ [NovoColaborador] Funções carregadas do banco:', funcoesData)
           setFuncoes(funcoesData || [])
         }
       } catch (error) {
@@ -188,17 +189,39 @@ const NovoColaborador: React.FC = () => {
   
   // Usar funções do banco de dados, com fallback para funções hardcoded
   const funcoesOptions = React.useMemo(() => {
-    if (funcoes.length > 0) {
-      // Filtrar funções baseado no tipo de equipe selecionado (se houver)
-      // Por enquanto, mostrar todas as funções ativas
-      return funcoes.map(f => ({
-        value: f.nome,
-        label: f.nome
-      }))
-    }
-    // Fallback para funções hardcoded se não houver funções no banco
-    return getFuncoesOptions(tipoEquipeSelecionado)
-  }, [funcoes, tipoEquipeSelecionado])
+    console.log('🔍 [NovoColaborador] Funções carregadas do banco:', funcoes);
+    console.log('🔍 [NovoColaborador] Total de funções:', funcoes.length);
+    console.log('🔍 [NovoColaborador] Loading funções:', loadingFuncoes);
+    
+    // Combinar funções do banco com funções hardcoded (evitar duplicatas)
+    const funcoesHardcoded = getFuncoesOptions(tipoEquipeSelecionado);
+    const funcoesBanco = funcoes.map(f => ({
+      value: f.nome,
+      label: f.nome
+    }));
+    
+    // Criar um Set para evitar duplicatas
+    const funcoesUnicas = new Map<string, { value: string; label: string }>();
+    
+    // Adicionar funções do banco primeiro (prioridade)
+    funcoesBanco.forEach(f => {
+      funcoesUnicas.set(f.value, f);
+    });
+    
+    // Adicionar funções hardcoded que não estão no banco
+    funcoesHardcoded.forEach(f => {
+      if (!funcoesUnicas.has(f.value)) {
+        funcoesUnicas.set(f.value, f);
+      }
+    });
+    
+    const options = Array.from(funcoesUnicas.values()).sort((a, b) => 
+      a.label.localeCompare(b.label)
+    );
+    
+    console.log('✅ [NovoColaborador] Opções de funções finais:', options);
+    return options;
+  }, [funcoes, tipoEquipeSelecionado, loadingFuncoes])
 
   // Função para verificar se CPF já existe
   const verificarCPFExistente = async (cpf: string): Promise<boolean> => {
@@ -319,8 +342,7 @@ const NovoColaborador: React.FC = () => {
       setNovaFuncaoNome('');
       setShowFuncaoModal(false);
       
-      // Recarregar funções do banco
-      const companyId = await getOrCreateDefaultCompany();
+      // Recarregar funções do banco (companyId já foi declarado acima)
       const { data: funcoesData, error: funcoesError } = await supabase
         .from('funcoes')
         .select('id, nome, tipo_equipe')

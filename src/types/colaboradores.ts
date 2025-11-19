@@ -23,6 +23,7 @@ export type FuncaoEquipeMassa =
   | 'Operador de VibroAcabadora'
   | 'Mesista'
   | 'Motorista de Caminhão Espargidor'
+  | 'Motorista de Van'
   | 'Mangueirista'
   | 'Encarregado'
   // Funções antigas mantidas para compatibilidade
@@ -305,6 +306,7 @@ export const FUNCOES_EQUIPE_MASSA: SelectOption[] = [
   { value: 'Operador de VibroAcabadora', label: 'Operador de VibroAcabadora' },
   { value: 'Mesista', label: 'Mesista' },
   { value: 'Motorista de Caminhão Espargidor', label: 'Motorista de Caminhão Espargidor' },
+  { value: 'Motorista de Van', label: 'Motorista de Van' },
   { value: 'Mangueirista', label: 'Mangueirista' },
   { value: 'Encarregado', label: 'Encarregado' },
 ];
@@ -418,6 +420,7 @@ export function getFuncaoColor(funcao: FuncaoColaborador): { bg: string; text: s
     'Operador de VibroAcabadora': { bg: 'bg-red-100', text: 'text-red-800' },
     'Mesista': { bg: 'bg-pink-100', text: 'text-pink-800' },
     'Motorista de Caminhão Espargidor': { bg: 'bg-blue-100', text: 'text-blue-800' },
+    'Motorista de Van': { bg: 'bg-indigo-100', text: 'text-indigo-800' },
     'Mangueirista': { bg: 'bg-cyan-100', text: 'text-cyan-800' },
     'Encarregado': { bg: 'bg-emerald-100', text: 'text-emerald-800' },
     
